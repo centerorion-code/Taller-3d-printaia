@@ -16,7 +16,7 @@ Usar una lista de tareas si la pieza lleva modelado. Mantener informado con fras
 1. `get_device_info`: verificar que `orca-mcp` esté `announced` y que estén conectadas la carpeta de trabajo y las de perfiles de Orca (`process` y `filament`). Si faltan, pedir acceso **una sola vez** con `device_request_folder_access` listando solo esas carpetas. Si el permiso se rechaza, pedir que conecte esas carpetas desde la app de Claude (menú + → Agregar carpeta). Si `orca-mcp` no está, derivar a `/instalar`.
 2. Traer `taller-3d/config.json` de la carpeta de trabajo (y `taller-3d/novedades-orca.json` si existe). Si no hay configuración, derivar a `/instalar`.
 3. Si `config.json` no tiene `aceptacion`, mostrar el resumen del aviso de uso y pedir ACEPTO (skill `impresion-3d`, regla 8).
-4. Elegir la impresora: la que diga el usuario o `impresora_por_defecto`. Cargar sus datos (`datos/impresoras/<datos>.json` o el JSON propio).
+4. Elegir la impresora (`references/impresoras.md`, sección 1): la que diga el usuario; si no dice y en Orca hay varias, preguntar en cuál quiere trabajar (primero la última usada). Si esa impresora todavía no está preparada en el taller, prepararla con `/impresoras` (se investiga en internet y se configura óptima) antes de seguir. Traer su JSON (`datos`, en `taller-3d/impresoras/`) con `device_stage_files`: es el `--impresora` de los scripts.
 5. Preparar Python: `pip install --break-system-packages -q manifold3d numpy matplotlib`.
 
 ## 1. Entender la pieza (cuestionario corto)
@@ -32,7 +32,7 @@ Si el pedido no lo dice, preguntar con AskUserQuestion (hasta 4 preguntas juntas
 
 Además, en texto: medidas críticas (con calibre si es un encastre), cantidad, color y fecha si la hay. **No inventar medidas:** si falta una que importa, preguntarla. Si manda una foto, usarla para la forma y pedir las medidas que la foto no da.
 
-Con las respuestas, decidir y anotar: material (si va al sol o al calor, nunca PLA), receta (`references/recetas.md`), orientación y si es un uso crítico (regla 9).
+Con las respuestas, decidir y anotar: material (si va al sol o al calor, nunca PLA), receta (`references/recetas.md`), orientación y si es un uso crítico (regla 9). Si las medidas ya muestran que no entra en la impresora elegida, avisarlo antes de modelar y sugerir otra suya donde entre (Revisar, paso 1).
 
 ## 2. Modelo
 
@@ -41,10 +41,11 @@ Crear la carpeta de la pieza en el contenedor: `/mnt/user-data/outputs/taller-3d
 - **Pieza funcional o geométrica:** escribir `pieza.py` con `cad.py` según la plantilla de `references/cad.md` (parámetros arriba, medidas del usuario, holguras de `holgura()` o de `aprendizajes.md` si hay calibración propia). Correrlo para generar `pieza.stl`.
 - **Forma orgánica, decorativa o con texto:** Blender (MCP) o un modelo que traiga el usuario. Si trae un STL, traerlo con `device_stage_files`.
 - **Objeto que resuelve un plugin de Orca** (llavero, cartel o placa con nombre, florero, caja Gridfinity, litofanía, texturas): antes de modelar, buscar en el Plugin Hub (`references/plugins-orca.md`) y, si hay uno que sirva, ofrecerlo junto con la opción de hacerlo acá. Si lo usa, el STL que genere sigue desde la revisión de abajo.
-- **Pieza muy grande:** partirla con encastres o tornillos.
+- **Pieza muy grande para la impresora elegida:** primero ver si entra en otra de sus impresoras (Revisar, paso 1); si no, partirla con encastres o tornillos.
 
 Revisar:
-1. `revisar_stl.py pieza.stl --material <m> --esperado <AxBxC>` (y `--rotar/--apoyar/--centrar --salida` si hay que orientarla). RECHAZADO → corregir el modelo.
+1. `revisar_stl.py pieza.stl --impresora <json> --otras <carpeta taller-3d/impresoras traída> --material <m> --esperado <AxBxC>` (y `--rotar/--apoyar/--centrar --salida` si hay que orientarla). RECHAZADO → corregir el modelo.
+   - **No entra en la impresora elegida:** el informe dice en cuál de sus otras impresoras preparadas entra (`entra_en_otras`). Si tiene otras en Orca sin preparar, buscar su volumen de impresión oficial en internet. Si alguna entra, sugerírsela ("No entra en la X, pero sí en tu Y. ¿La hacemos ahí?"); si la elige, prepararla con `/impresoras` si hace falta y seguir con esa. Si ninguna entra, ofrecer partirla con encastres o escalarla.
 2. `vista_previa.py pieza.stl vista.png --titulo "<nombre>"` y **mostrar la vista** al usuario (SendUserFile). Si es un diseño nuevo, esperar su OK antes de seguir; si es un STL que trajo, seguir.
 
 ## 3. Configuración
@@ -61,7 +62,7 @@ Revisar:
    ```bash
    python3 -I perfil_orca.py crear --tipo filamento --nombre "<filamento_auto>" --hereda "<inherits del filamento>" \
      --base "<filamento del usuario traído>" --cama "<cama>" [--set clave=valor ...] \
-     --anterior "<AUTO filamento actual traído>" --config <config.json> --material <m> \
+     --anterior "<AUTO filamento actual traído>" --config <config.json> --impresora <datos> --material <m> \
      --salida /mnt/user-data/outputs/taller-3d/perfiles
    ```
    Anotar la temperatura de cama de la primera capa que informa el script. Nunca modificar el perfil del filamento del usuario desde `/pieza`.

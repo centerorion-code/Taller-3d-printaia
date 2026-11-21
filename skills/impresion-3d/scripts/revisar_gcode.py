@@ -12,7 +12,7 @@ Revisa:
   - tiempo, filamento y costo estimados.
 
 Uso:
-  python3 revisar_gcode.py ARCHIVO.gcode [--impresora ender-3-v3-plus | ruta.json]
+  python3 revisar_gcode.py ARCHIVO.gcode [--impresora taller-3d/impresoras/<id>.json | --buscar <carpeta>]
          [--material PETG] [--json informe.json]
          [--precio-kg 25000] [--precio-kwh 150] [--watts 180] [--moneda ARS]
 
@@ -111,12 +111,24 @@ IMPRESORA_GENERICA = {
 }
 
 
-def detectar_impresora(ruta: Path | None, texto: str | None = None) -> dict:
-    """Elige los datos de impresora según printer_model / printer_settings_id del G-code.
+def elegir_impresora(modelo: str, perfil: str, candidatas) -> dict | None:
+    """Entre los datos de impresora del usuario, la que corresponde a ese printer_model y ese nombre de
+    perfil. Primero coincidencias exactas (perfil de máquina o modelo); después el patrón más largo."""
+    candidatas = [c for c in candidatas or [] if isinstance(c, dict)]
+    for datos in candidatas:
+        if perfil and perfil in (datos.get("perfiles_maquina") or []):
+            return datos
+    for datos in candidatas:
+        if modelo and modelo == datos.get("nombre"):
+            return datos
+    con_patron = [d for d in candidatas if d.get("patron_perfiles") and d["patron_perfiles"] in perfil]
+    return max(con_patron, key=lambda d: len(d["patron_perfiles"])) if con_patron else None
 
-    Si no coincide con ninguna impresora conocida, devuelve una genérica que solo controla
-    temperaturas absolutas, comandos peligrosos y variables (no el área).
-    """
+
+def detectar_impresora(ruta: Path | None, texto: str | None = None, candidatas=None) -> dict:
+    """Elige, entre los datos de impresora del usuario (candidatas), la del G-code según su printer_model y
+    printer_settings_id. El plugin no trae impresoras: si no se pasan datos o ninguno coincide, devuelve una
+    genérica que solo controla temperaturas absolutas, comandos peligrosos y variables (no el área)."""
     modelo = perfil = ""
     fuente = io.StringIO(texto) if texto is not None else open(ruta, encoding="utf-8", errors="replace")
     with fuente as f:
@@ -125,12 +137,7 @@ def detectar_impresora(ruta: Path | None, texto: str | None = None) -> dict:
                 modelo = linea.split("=", 1)[1].strip().strip('"')
             elif linea.startswith("; printer_settings_id ="):
                 perfil = linea.split("=", 1)[1].strip().strip('"')
-    for id_imp in comun.impresoras_disponibles():
-        datos = comun.cargar_impresora(id_imp)
-        patron = datos.get("patron_perfiles")
-        if (modelo and modelo == datos.get("nombre")) or (patron and patron in perfil):
-            return datos
-    return IMPRESORA_GENERICA
+    return elegir_impresora(modelo, perfil, candidatas) or IMPRESORA_GENERICA
 
 
 class Revision:
@@ -557,7 +564,10 @@ def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description="Revisión de seguridad de un G-code.")
     ap.add_argument("gcode", type=Path)
     ap.add_argument("--impresora", default="auto",
-                    help="id o ruta a un JSON de impresora; 'auto' la deduce del G-code")
+                    help="JSON con los datos de la impresora (taller-3d/impresoras/<id>.json); 'auto' la busca "
+                         "en --buscar según el G-code o usa límites genéricos")
+    ap.add_argument("--buscar", type=Path, action="append", default=[],
+                    help="carpeta con datos de impresoras del usuario, para --impresora auto")
     ap.add_argument("--material", help="PLA, PETG, TPU, ABS, ASA... (si no, lo toma del G-code)")
     ap.add_argument("--json", type=Path, help="guardar el informe en JSON")
     ap.add_argument("--precio-kg", type=float)
@@ -571,7 +581,10 @@ def main(argv=None) -> None:
     costos = None
     if a.precio_kg or a.precio_kwh:
         costos = {"precio_kg": a.precio_kg, "precio_kwh": a.precio_kwh, "watts": a.watts, "moneda": a.moneda}
-    impresora = detectar_impresora(a.gcode) if a.impresora == "auto" else comun.cargar_impresora(a.impresora)
+    if a.impresora == "auto":
+        impresora = detectar_impresora(a.gcode, candidatas=comun.impresoras_en(a.buscar))
+    else:
+        impresora = comun.cargar_impresora(a.impresora)
     r = revisar(a.gcode, impresora, a.material, costos, a.cama_primera_capa)
     print(informe_texto(r))
     if a.json:

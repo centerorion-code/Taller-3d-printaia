@@ -8,10 +8,13 @@ estima la superficie de apoyo, marca voladizos que pueden necesitar soporte y co
 con las medidas esperadas. Opcionalmente rota, apoya y centra la pieza y la guarda.
 
 Uso:
-  python3 revisar_stl.py pieza.stl [--impresora ender-3-v3-plus] [--material PETG]
+  python3 revisar_stl.py pieza.stl [--impresora taller-3d/impresoras/<id>.json] [--material PETG]
          [--esperado 40x20x10] [--tolerancia 0.2] [--umbral-voladizo 45]
          [--rotar 90,0,0] [--apoyar] [--centrar] [--salida pieza_orientada.stl]
-         [--json informe.json]
+         [--otras <carpeta con los datos de las otras impresoras>] [--json informe.json]
+
+Si la pieza no entra en la impresora elegida y se pasa --otras, dice en cuáles de las otras
+impresoras del usuario entra (tal cual o girándola).
 
 Código de salida: 0 aprobado, 1 con advertencias, 2 rechazado.
 """
@@ -138,7 +141,7 @@ def analizar(tri: np.ndarray, impresora: dict, material: str | None, esperado=No
             agregar(RECHAZO, "No entra en la cama así orientada, pero entra girándola 90° (usar --rotar).")
         else:
             agregar(RECHAZO, f"No entra en la impresora ({disponible[0]:g}×{disponible[1]:g}×{disponible[2]:g} mm): "
-                    "hay que partirla o escalarla.")
+                    "usar otra impresora más grande, partirla o escalarla.")
 
     # Apoyo en la cama
     z_min = minimo[2]
@@ -198,6 +201,33 @@ def analizar(tri: np.ndarray, impresora: dict, material: str | None, esperado=No
     }
 
 
+def entra_en(medidas, impresora: dict) -> str | None:
+    """'tal cual', 'girándola' o None si la pieza no entra en esa impresora."""
+    a = impresora["area"]
+    disponible = np.array([a["x_max"] - a["x_min"], a["y_max"] - a["y_min"], a["z_max"]], dtype=float)
+    medidas = np.asarray(medidas, dtype=float)
+    if np.all(medidas <= disponible + 1e-6):
+        return "tal cual"
+    for perm in itertools.permutations(range(3)):
+        if np.all(medidas[list(perm)] <= disponible + 1e-6):
+            return "girándola"
+    return None
+
+
+def otras_donde_entra(medidas, impresoras, actual: dict | None = None) -> list[dict]:
+    """De las otras impresoras del usuario, en cuáles entra la pieza."""
+    salida = []
+    for imp in impresoras:
+        if actual is not None and imp.get("id") == actual.get("id"):
+            continue
+        como = entra_en(medidas, imp)
+        if como:
+            a = imp["area"]
+            salida.append({"id": imp.get("id"), "nombre": imp.get("nombre"), "como": como,
+                           "area_mm": [a["x_max"] - a["x_min"], a["y_max"] - a["y_min"], a["z_max"]]})
+    return salida
+
+
 def informe_texto(r: dict, nombre: str) -> str:
     m = r.get("medidas_mm", [0, 0, 0])
     lineas = [
@@ -213,6 +243,12 @@ def informe_texto(r: dict, nombre: str) -> str:
             f" | Apoyo: {r['apoyo_cm2']} cm² | "
             f"Voladizos críticos: {r['voladizo_cm2']} cm²",
         ]
+    if r.get("entra_en_otras") is not None:
+        if r["entra_en_otras"]:
+            lineas.append("Entra en otra impresora tuya: " + ", ".join(
+                f"{o['nombre']} ({o['como']})" for o in r["entra_en_otras"]))
+        else:
+            lineas.append("No entra en ninguna de tus otras impresoras preparadas.")
     if r["hallazgos"]:
         lineas.append("Hallazgos:")
         etiqueta = {RECHAZO: "[RECHAZO]", ADVERTENCIA: "[ADVERTENCIA]"}
@@ -224,8 +260,9 @@ def informe_texto(r: dict, nombre: str) -> str:
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description="Revisión de una malla STL.")
     ap.add_argument("stl", type=Path)
-    ap.add_argument("--impresora", default="ender-3-v3-plus",
-                    help="datos de la impresora; 'ninguna' para no revisar la cama (solo diseño)")
+    ap.add_argument("--impresora", default="ninguna",
+                    help="JSON con los datos de la impresora (taller-3d/impresoras/<id>.json) para revisar que "
+                         "entre en la cama; 'ninguna' (por defecto) no lo revisa")
     ap.add_argument("--material")
     ap.add_argument("--esperado", help="medidas esperadas, por ejemplo 40x20x10")
     ap.add_argument("--tolerancia", type=float, default=0.2)
@@ -234,6 +271,9 @@ def main(argv=None) -> None:
     ap.add_argument("--apoyar", action="store_true", help="bajar la pieza hasta Z=0")
     ap.add_argument("--centrar", action="store_true", help="centrar la pieza en la cama")
     ap.add_argument("--salida", type=Path, help="guardar la malla transformada")
+    ap.add_argument("--otras", type=Path, action="append", default=[],
+                    help="carpeta con los datos de las otras impresoras del usuario (taller-3d/impresoras): si no "
+                         "entra en la elegida, dice en cuál entra")
     ap.add_argument("--json", type=Path)
     a = ap.parse_args(argv)
 
@@ -253,6 +293,8 @@ def main(argv=None) -> None:
         tri = tri + np.array([*(centro - actual), 0.0])
     esperado = [float(v) for v in a.esperado.lower().replace("×", "x").split("x")] if a.esperado else None
     r = analizar(tri, impresora, a.material, esperado, a.tolerancia, a.umbral_voladizo)
+    if a.otras and r.get("entra_en_cama") is not True:
+        r["entra_en_otras"] = otras_donde_entra(r["medidas_mm"], comun.impresoras_en(a.otras), impresora)
     if a.salida:
         escribir_stl(a.salida, tri)
         r["salida"] = str(a.salida)

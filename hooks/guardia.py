@@ -125,19 +125,32 @@ def _rechazos(hallazgos: list[dict]) -> list[str]:
     return [h["mensaje"] for h in hallazgos if h["gravedad"] == comun.RECHAZO]
 
 
-def _impresora_para(texto_nombres: str) -> dict:
+# Dónde puede haber datos de impresoras del usuario (taller-3d/impresoras/*.json): las copias traídas de la
+# PC y las salidas en el espacio de Claude. El plugin no trae impresoras; si no hay datos, límites genéricos.
+RAICES_DATOS = [Path("/mnt/user-data/uploads"), Path("/mnt/user-data/outputs")]
+
+
+def _impresoras_del_usuario() -> list[dict]:
     import comun
-    for id_imp in comun.impresoras_disponibles():
-        datos = comun.cargar_impresora(id_imp)
-        patron = datos.get("patron_perfiles")
-        if (patron and patron in texto_nombres) or (datos.get("nombre") and datos["nombre"] in texto_nombres):
-            return datos
-    return {"limites": {"boquilla_max_c": 300, "cama_max_c": 120}}
+    carpetas = []
+    for raiz in RAICES_DATOS:
+        for patron in ("taller-3d/impresoras", "*/taller-3d/impresoras", "*/*/taller-3d/impresoras"):
+            try:
+                carpetas += [c for c in raiz.glob(patron) if c.is_dir()]
+            except OSError:
+                continue
+    return comun.impresoras_en(carpetas)
+
+
+def _impresora_para(modelo: str, perfil: str) -> dict:
+    """Los datos de la impresora del usuario que correspondan; si no hay, límites genéricos."""
+    import revisar_gcode
+    return revisar_gcode.elegir_impresora(modelo, perfil, _impresoras_del_usuario()) or revisar_gcode.IMPRESORA_GENERICA
 
 
 def _revisar_gcode(texto: str) -> list[str]:
     import revisar_gcode
-    impresora = revisar_gcode.detectar_impresora(None, texto=texto)
+    impresora = revisar_gcode.detectar_impresora(None, texto=texto, candidatas=_impresoras_del_usuario())
     return _rechazos(revisar_gcode.revisar(None, impresora, texto=texto)["hallazgos"])
 
 
@@ -146,7 +159,7 @@ def _revisar_ajustes_3mf(ajustes: dict) -> list[str]:
     import perfil_orca
     problemas = []
     catalogo = __import__("comun").cargar_catalogo()
-    impresora = _impresora_para(f"{ajustes.get('printer_model', '')} {ajustes.get('printer_settings_id', '')}")
+    impresora = _impresora_para(str(ajustes.get("printer_model", "")), str(ajustes.get("printer_settings_id", "")))
     for clave, valor in ajustes.items():
         if clave in perfil_orca.CLAVES_QUE_EJECUTAN and perfil_orca._tiene_valor(valor):
             problemas.append(f"'{clave}' {perfil_orca.CLAVES_QUE_EJECUTAN[clave]}")
@@ -184,7 +197,7 @@ def _revisar_perfil(bajo: str, datos: bytes) -> list[str]:
         return [f"no es un perfil válido (JSON roto: {error})"]
     if not isinstance(perfil, dict):
         return ["no es un perfil válido (se esperaba un objeto JSON)"]
-    impresora = _impresora_para(f"{perfil.get('name', '')} {perfil.get('inherits', '')}")
+    impresora = _impresora_para("", f"{perfil.get('name', '')} {perfil.get('inherits', '')}")
     return _rechazos(perfil_orca.validar(perfil, tipo, impresora))
 
 

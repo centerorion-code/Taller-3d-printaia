@@ -1,5 +1,16 @@
 # Cambios
 
+## 0.1.7 (2026-11-21)
+
+- **El plugin ya no trae impresoras cargadas.** Se borraron los datos fijos de la Creality Ender-3 V3 Plus: cada persona tiene las suyas, y no se pueden guardar todas.
+- **Elegir la impresora:** el taller lista las impresoras que tenés en Orca y, si hay varias, te pregunta en cuál querés trabajar (la última usada aparece primera). En `/instalar` se prepara solo la que elegís; las demás, cuando las uses.
+- **Investigar y configurar:** la primera vez que usás una impresora, Claude busca en internet sus datos oficiales (temperaturas máximas, volumen, cerramiento) y sus perfiles de OrcaSlicer, pregunta lo que no encuentre (no inventa límites), arma los perfiles AUTO óptimos y comprueba con un cubo de prueba que los datos coincidan con lo que usa Orca. Quedan en `taller-3d/impresoras/<id>.json` de tu carpeta de trabajo.
+- **Si una pieza no entra** en la impresora elegida, te dice en cuál de tus otras impresoras entra (`revisar_stl.py --otras`).
+- Nuevo `impresora.py` (`validar`, `desde-gcode`, `comparar`) y `references/impresoras.md`.
+- Los scripts ya no suponen ninguna impresora: sin sus datos, las temperaturas se controlan con límites genéricos (300 °C de boquilla, 120 °C de cama) y el área no se revisa. El bloqueo automático usa los datos de la impresora si están en el espacio de Claude.
+- Configuraciones de antes: si `datos` apunta a la Ender-3 V3 Plus del plugin, `/impresoras` la vuelve a preparar.
+- 52 pruebas automáticas, con una impresora inventada.
+
 ## 0.1.6 (2026-11-21)
 
 - El catálogo de parámetros va en partes de menos de 200 KB, con un parámetro por línea.

@@ -1,6 +1,6 @@
 # Fuentes
 
-- Creality Ender-3 V3 Plus (especificaciones): https://www.creality.com/products/creality-ender-3-v3-plus
+- Especificaciones de cada impresora: las investiga `/impresoras` en el sitio del fabricante y quedan en `fuentes` de sus datos (`taller-3d/impresoras/<id>.json`).
 - Wiki de OrcaSlicer, guía de calibración: https://www.orcaslicer.com/wiki/guides/calibration_guide.html
 - Wiki de OrcaSlicer, costuras: https://www.orcaslicer.com/wiki/print_settings/quality/quality_settings_seam
 - Código y perfiles de OrcaSlicer 2.5.1: https://github.com/OrcaSlicer/OrcaSlicer

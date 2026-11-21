@@ -105,11 +105,11 @@ Opciones (en PowerShell): `-Orca "<ruta de orca-slicer.exe>"` (por ejemplo, uno 
 
 ## Después de instalar (todos los sistemas)
 
-1. **Abrí OrcaSlicer una vez** y agregá tu impresora con el asistente. Guardá una copia de usuario del perfil de la impresora, por ejemplo `Mi Ender-3 V3 Plus 0.4 nozzle`, y un perfil propio de proceso y de filamento: así Orca crea las carpetas de perfiles.
+1. **Abrí OrcaSlicer una vez** y agregá tu impresora con el asistente. Guardá una copia de usuario del perfil de cada impresora con la que quieras trabajar, por ejemplo `Mi <modelo> 0.4 nozzle`, y un perfil propio de proceso y de filamento: así Orca crea las carpetas de perfiles.
 2. **Conectá las carpetas** en la app de Claude (menú + → Agregar carpeta), con las rutas que te muestra el instalador al final:
    - la carpeta de trabajo;
    - las carpetas `process` y `filament` de tus perfiles de Orca. Linux: `~/.config/OrcaSlicer/user/default/...` (Flatpak: `~/.var/app/com.orcaslicer.OrcaSlicer/config/OrcaSlicer/user/default/...`). Windows: `C:\Users\<vos>\OrcaSlicer\user\default\...` (**no** por AppData). macOS: `~/Library/Application Support/OrcaSlicer/user/default/...`.
-3. En Claude escribí **`/instalar`**: revisa que todo ande, registra tu impresora, carga tus precios y tu tienda si querés, y hace una pieza de prueba.
+3. En Claude escribí **`/instalar`**: revisa que todo ande, te pregunta en qué impresora de tu Orca querés trabajar y la prepara (investiga sus datos oficiales y arma los perfiles), carga tus precios y tu tienda si querés, y hace una pieza de prueba.
 
 ## Blender (opcional)
 

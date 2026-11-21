@@ -34,7 +34,7 @@
     "densidad": 1.04,
     "notas": [
       "Emite vapores (estireno): solo con buena ventilación.",
-      "Sin cerramiento se agrieta y se despega; la Ender-3 V3 Plus es abierta."
+      "Sin cerramiento se agrieta y se despega: en impresoras abiertas, piezas chicas y con brim."
     ]
   },
   "ASA": {
@@ -51,7 +51,7 @@
     "cama": [100, 110], "cama_tope": 115,
     "densidad": 1.20,
     "notas": [
-      "Necesita cerramiento y cama a más de 100 °C: no recomendado en la Ender-3 V3 Plus."
+      "Necesita cerramiento y cama a más de 100 °C: no recomendado en impresoras abiertas o con cama de 100 °C o menos."
     ]
   },
   "PA": {

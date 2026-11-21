@@ -36,7 +36,7 @@ agujero_inserto("M3", profundidad)          # insertos de latón con calor
 chaflan_inferior(solido, mm=0.4)
 unir(a, b, ...); restar(base, r1, r2, ...); intersectar(a, b)
 mover(s, x, y, z); rotar(s, x, y, z); espejar(s, "x"); escalar(s, f)
-apoyar(s); centrar(s, x=150, y=150); medidas(s)
+apoyar(s); centrar(s, impresora=datos)  # o centrar(s, x, y); medidas(s)
 exportar_stl(s, "pieza.stl")                # valida, limpia y apoya en Z=0
 holgura("presion"|"justo"|"deslizante"|"giratorio", "PETG")
 TORNILLOS["M4"]["pasante"]                  # medidas de tornillos y tuercas

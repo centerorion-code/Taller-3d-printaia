@@ -26,7 +26,7 @@ Crear y modificar siempre con `perfil_orca.py` (valida y escribe el `.info`). Es
 
 ## Laminar con perfiles por nombre (orca-mcp)
 
-`slice_model(model_path, machine_profile, process_profile, filament_profile, output_dir)` con los nombres de usuario (por ejemplo `Mi Ender-3 V3 Plus 0.4 nozzle`, `AUTO proceso @Ender-3 V3 Plus`, el filamento del usuario). `output_dir` dentro de la carpeta de trabajo (ruta absoluta).
+`slice_model(model_path, machine_profile, process_profile, filament_profile, output_dir)` con los nombres de usuario (por ejemplo `Mi <modelo> 0.4 nozzle`, `AUTO proceso @<modelo>`, el filamento del usuario). `output_dir` dentro de la carpeta de trabajo (ruta absoluta).
 
 ## Tipo de cama
 
@@ -34,12 +34,9 @@ En la ventana de Orca, la temperatura de cama sale del tipo de cama elegido (`cu
 
 **Por línea de comandos (orca-mcp) Orca ignora `curr_bed_type` aunque esté en el proceso y usa siempre Cool Plate** (comprobado con Orca 2.5.1: la cabecera dice `curr_bed_type = Cool Plate`). Consecuencia: un PLA genérico puede salir con la cama a 35 °C. Solución del taller: laminar siempre con `AUTO filamento`, creado con `perfil_orca.py crear --tipo filamento --cama "<cama real>"`, que copia las temperaturas de esa cama a `cool_plate_temp` y `cool_plate_temp_initial_layer` (las toma del perfil del usuario o, si no las define, de `cama_sistema` en los datos de la impresora). Verificar con `revisar_gcode.py --cama-primera-capa` (`START_PRINT ... BED_TEMP=`).
 
-## Perfiles de sistema de la Ender-3 V3 Plus (boquilla 0.4)
+## Perfiles de sistema de cada impresora
 
-- Máquina: `Creality Ender-3 V3 Plus 0.4 nozzle` (setting_id `HGz252Lczho2ktAf`).
-- Procesos: `0.12mm Fine`, `0.16mm Optimal`, `0.20mm Standard`, `0.24mm Draft` + ` @Creality Ender-3 V3 Plus` (ids en `datos/impresoras/ender-3-v3-plus.json`).
-- Filamentos: `Generic PLA/PETG/ABS/ASA/TPU/PA/PC/PLA-CF/PETG-CF @Ender-3 V3 Plus-all`, `Hyper PLA/PETG @Ender-3 V3 Plus-all`, `CR-PLA/CR-PETG/... @Ender-3 V3 Plus-all`.
-- Valores de sistema del 0.20 (muy rápidos para calidad): pared externa 200 mm/s a 5000 mm/s², relleno 300, 3 paredes, 3 capas arriba y abajo, 15 % crosshatch.
+Los nombres y `setting_id` de los perfiles de sistema de máquina, procesos y filamentos de cada impresora están en `sistema` de sus datos (`taller-3d/impresoras/<id>.json`), investigados en los perfiles de OrcaSlicer de ese modelo (`references/impresoras.md`). Los procesos de sistema suelen estar pensados para velocidad: para calidad, bajar la pared externa y las aceleraciones según `recetas.md`.
 
 ## Verificar un perfil
 

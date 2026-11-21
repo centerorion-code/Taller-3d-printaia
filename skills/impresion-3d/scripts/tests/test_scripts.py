@@ -22,13 +22,17 @@ import comun  # noqa: E402
 import perfil_orca  # noqa: E402
 import revisar_gcode  # noqa: E402
 
+# Impresora inventada para las pruebas: el plugin no trae impresoras.
+IMPRESORA_PRUEBA = Path(__file__).resolve().parent / "datos" / "impresora-prueba.json"
+IMP = comun.cargar_impresora(IMPRESORA_PRUEBA)
+
 CABECERA = """; HEADER_BLOCK_START
 ; total layer number: 2
 ; HEADER_BLOCK_END
 """
 CONFIG = """; filament_type = {mat}
-; printer_model = Creality Ender-3 V3 Plus
-; printer_settings_id = Mi Ender-3 V3 Plus 0.4 nozzle
+; printer_model = Marca Prueba 300
+; printer_settings_id = Mi Prueba 300 0.4 nozzle
 ; printable_area = 0x0,300x0,300x300,0x300
 ; total filament used [g] = 1.50
 ; estimated printing time (normal mode) = 5m 10s
@@ -47,7 +51,7 @@ BUENO = "G1 Z0.2 F600\nG1 X100 Y100 F6000\nG1 X120 Y100 E1.2\nG1 X120 Y120 E1.2\
 
 class TestGcode(unittest.TestCase):
     def revisar(self, ruta, material=None):
-        return revisar_gcode.revisar(ruta, revisar_gcode.detectar_impresora(ruta), material)
+        return revisar_gcode.revisar(ruta, revisar_gcode.detectar_impresora(ruta, candidatas=[IMP]), material)
 
     def mensajes(self, r):
         return " | ".join(h["mensaje"] for h in r["hallazgos"])
@@ -55,7 +59,7 @@ class TestGcode(unittest.TestCase):
     def test_bueno(self):
         r = self.revisar(gcode(BUENO))
         self.assertEqual(r["estado"], comun.APROBADO, self.mensajes(r))
-        self.assertEqual(r["impresora"], "ender-3-v3-plus")
+        self.assertEqual(r["impresora"], "prueba")
         self.assertEqual(r["estimaciones"]["gramos"], 1.5)
 
     def test_temperatura_excesiva(self):
@@ -97,9 +101,9 @@ class TestGcode(unittest.TestCase):
 
     def test_cama_esperada(self):
         ruta = gcode(BUENO)
-        r = revisar_gcode.revisar(ruta, revisar_gcode.detectar_impresora(ruta), None, None, 80)
+        r = revisar_gcode.revisar(ruta, revisar_gcode.detectar_impresora(ruta, candidatas=[IMP]), None, None, 80)
         self.assertEqual(r["estado"], comun.ADVERTENCIA)
-        r = revisar_gcode.revisar(ruta, revisar_gcode.detectar_impresora(ruta), None, None, 75)
+        r = revisar_gcode.revisar(ruta, revisar_gcode.detectar_impresora(ruta, candidatas=[IMP]), None, None, 75)
         self.assertEqual(r["estado"], comun.APROBADO)
 
     def test_relativo(self):
@@ -137,8 +141,8 @@ class TestGcode(unittest.TestCase):
 
     def test_impresora_desconocida(self):
         ruta = gcode(BUENO.replace("X120", "X400"))
-        ruta.write_text(ruta.read_text().replace("Mi Ender-3 V3 Plus 0.4 nozzle", "Otra impresora")
-                        .replace("Creality Ender-3 V3 Plus", "Otra marca"))
+        ruta.write_text(ruta.read_text().replace("Mi Prueba 300 0.4 nozzle", "Otra impresora")
+                        .replace("Marca Prueba 300", "Otra marca"))
         r = self.revisar(ruta)
         self.assertEqual(r["impresora"], "generica")
         self.assertEqual(r["estado"], comun.APROBADO, self.mensajes(r))
@@ -146,7 +150,7 @@ class TestGcode(unittest.TestCase):
 
 class TestPerfil(unittest.TestCase):
     def setUp(self):
-        self.imp = comun.cargar_impresora()
+        self.imp = comun.cargar_impresora(IMPRESORA_PRUEBA)
         self.cat = comun.cargar_catalogo()
 
     def crear(self, tipo, hereda, cambios):
@@ -154,31 +158,31 @@ class TestPerfil(unittest.TestCase):
 
     def estado(self, perfil, tipo, material=None):
         usuarios = perfil_orca.perfiles_de_usuario({"impresoras": [{"procesos": {
-            "calidad": "PETG Calidad 0.16 @Ender-3 V3 Plus"}}]})
+            "calidad": "PETG Calidad 0.16 @Prueba 300"}}]})
         h = perfil_orca.validar(perfil, tipo, self.imp, material, self.cat, usuarios)
         return comun.peor(*(x["gravedad"] for x in h)) if h else comun.APROBADO, h
 
     def test_proceso_valido(self):
-        p = self.crear("proceso", "0.20mm Standard @Creality Ender-3 V3 Plus",
+        p = self.crear("proceso", "0.20mm Standard @Marca Prueba 300",
                        {"wall_loops": "4", "sparse_infill_density": "30", "curr_bed_type": "Textured PEI Plate"})
         self.assertEqual(p["sparse_infill_density"], "30%")
         self.assertEqual(self.estado(p, "proceso")[0], comun.APROBADO)
 
     def test_clave_inexistente(self):
-        p = self.crear("proceso", "0.20mm Standard @Creality Ender-3 V3 Plus", {"wal_loops": "4"})
+        p = self.crear("proceso", "0.20mm Standard @Marca Prueba 300", {"wal_loops": "4"})
         self.assertEqual(self.estado(p, "proceso")[0], comun.RECHAZO)
 
     def test_hereda_de_usuario(self):
-        p = self.crear("proceso", "PETG Calidad 0.16 @Ender-3 V3 Plus", {})
+        p = self.crear("proceso", "PETG Calidad 0.16 @Prueba 300", {})
         self.assertEqual(self.estado(p, "proceso")[0], comun.RECHAZO)
 
     def test_filamento_lista_y_temperatura(self):
-        p = self.crear("filamento", "Generic PETG @Ender-3 V3 Plus-all", {"nozzle_temperature": "310"})
+        p = self.crear("filamento", "Generic PETG @Prueba 300-all", {"nozzle_temperature": "310"})
         self.assertEqual(p["nozzle_temperature"], ["310"])
         self.assertEqual(self.estado(p, "filamento", "PETG")[0], comun.RECHAZO)
 
     def test_hereda_de_auto(self):
-        p = self.crear("proceso", "AUTO proceso @Ender-3 V3 Plus", {})
+        p = self.crear("proceso", "AUTO proceso @Prueba 300", {})
         self.assertEqual(self.estado(p, "proceso")[0], comun.RECHAZO)
 
     def test_cama_a_cool_plate(self):
@@ -190,20 +194,20 @@ class TestPerfil(unittest.TestCase):
         self.assertEqual((otras, primera), ("65", "65"))
 
     def test_enum_invalido(self):
-        p = self.crear("proceso", "0.20mm Standard @Creality Ender-3 V3 Plus", {"sparse_infill_pattern": "giroide"})
+        p = self.crear("proceso", "0.20mm Standard @Marca Prueba 300", {"sparse_infill_pattern": "giroide"})
         self.assertEqual(self.estado(p, "proceso")[0], comun.RECHAZO)
 
     def test_scripts_y_plugins_rechazados(self):
         for clave, valor in (("post_process", "/tmp/x.sh"), ("slicing_pipeline_plugin", "Support Fins"),
                              ("plugins", "Support Fins;abc;SlicingPipeline")):
-            p = self.crear("proceso", "0.20mm Standard @Creality Ender-3 V3 Plus", {clave: valor})
+            p = self.crear("proceso", "0.20mm Standard @Marca Prueba 300", {clave: valor})
             self.assertEqual(self.estado(p, "proceso")[0], comun.RECHAZO, clave)
-        p = self.crear("proceso", "0.20mm Standard @Creality Ender-3 V3 Plus", {"post_process": ""})
+        p = self.crear("proceso", "0.20mm Standard @Marca Prueba 300", {"post_process": ""})
         self.assertEqual(self.estado(p, "proceso")[0], comun.APROBADO)
 
     def test_temperaturas_con_espacios_y_otras_claves(self):
-        imp = comun.cargar_impresora("ender-3-v3-plus")
-        base = {"name": "AUTO filamento @Ender-3 V3 Plus", "inherits": "Generic PETG @Ender-3 V3 Plus-all",
+        imp = comun.cargar_impresora(IMPRESORA_PRUEBA)
+        base = {"name": "AUTO filamento @Prueba 300", "inherits": "Generic PETG @Prueba 300-all",
                 "from": "User", "filament_type": ["PETG"]}
         def rechazos(**cambios):
             h = perfil_orca.validar({**base, **cambios}, "filamento", imp)
@@ -213,8 +217,8 @@ class TestPerfil(unittest.TestCase):
         self.assertEqual(rechazos(nozzle_temperature=["240 "], filament_retraction_length=["nil"]), [])
 
     def test_gcode_dentro_del_perfil(self):
-        imp = comun.cargar_impresora("ender-3-v3-plus")
-        p = {"name": "AUTO filamento @Ender-3 V3 Plus", "inherits": "Generic PETG @Ender-3 V3 Plus-all",
+        imp = comun.cargar_impresora(IMPRESORA_PRUEBA)
+        p = {"name": "AUTO filamento @Prueba 300", "inherits": "Generic PETG @Prueba 300-all",
              "from": "User", "filament_start_gcode": ["; inicio\nM104 S400\nM500"]}
         mensajes = " | ".join(h["mensaje"] for h in perfil_orca.validar(p, "filamento", imp)
                               if h["gravedad"] == comun.RECHAZO)
@@ -226,16 +230,16 @@ class TestPerfil(unittest.TestCase):
     def test_crear_quita_scripts_de_la_base(self):
         with tempfile.TemporaryDirectory() as d:
             base = Path(d) / "base.json"
-            base.write_text(json.dumps({"name": "Mi proceso", "inherits": "0.20mm Standard @Creality Ender-3 V3 Plus",
+            base.write_text(json.dumps({"name": "Mi proceso", "inherits": "0.20mm Standard @Marca Prueba 300",
                                         "from": "User", "wall_loops": "3", "post_process": "/home/x/thumb.py",
                                         "slicing_pipeline_plugin": "Support Fins"}), encoding="utf-8")
             r = subprocess.run([sys.executable, str(SCRIPTS / "perfil_orca.py"), "crear", "--tipo", "proceso",
-                                "--nombre", "AUTO proceso @Ender-3 V3 Plus",
-                                "--hereda", "0.20mm Standard @Creality Ender-3 V3 Plus", "--base", str(base),
+                                "--nombre", "AUTO proceso @Prueba 300",
+                                "--hereda", "0.20mm Standard @Marca Prueba 300", "--base", str(base),
                                 "--salida", d], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("Quité por seguridad", r.stdout)
-            hecho = json.loads((Path(d) / "AUTO proceso @Ender-3 V3 Plus.json").read_text(encoding="utf-8"))
+            hecho = json.loads((Path(d) / "AUTO proceso @Prueba 300.json").read_text(encoding="utf-8"))
             self.assertNotIn("post_process", hecho)
             self.assertNotIn("slicing_pipeline_plugin", hecho)
             self.assertEqual(hecho["wall_loops"], "3")
@@ -263,9 +267,9 @@ class TestNovedades(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / "a.json").write_text(json.dumps({"name": "Mi PETG", "inherits": "x", "from": "User",
                                                         "clave_vieja": "1", "wall_loops": "3"}), encoding="utf-8")
-            (Path(d) / "b.json").write_text(json.dumps({"name": "AUTO proceso @Ender-3 V3 Plus", "inherits": "x",
+            (Path(d) / "b.json").write_text(json.dumps({"name": "AUTO proceso @Prueba 300", "inherits": "x",
                                                         "from": "User"}), encoding="utf-8")
-            config = {"impresoras": [{"perfil_maquina": "Mi Ender-3 V3 Plus 0.4 nozzle"}]}
+            config = {"impresoras": [{"perfil_maquina": "Mi Prueba 300 0.4 nozzle"}]}
             r = novedades_orca.revisar_perfiles([Path(d)], config)
             self.assertEqual(r["claves_que_orca_no_usa"], {"Mi PETG": ["clave_vieja"]})
             self.assertEqual(r["auto_sin_impresora"], [])
@@ -282,16 +286,40 @@ class TestCadYStl(unittest.TestCase):
         ruta = Path(tempfile.mkdtemp()) / "p.stl"
         info = exportar_stl(pieza, ruta)
         self.assertEqual(info["medidas_mm"], (40.0, 20.0, 5.0))
-        r = revisar_stl.analizar(revisar_stl.leer_stl(ruta), comun.cargar_impresora(), "PETG", [40, 20, 5])
+        r = revisar_stl.analizar(revisar_stl.leer_stl(ruta), comun.cargar_impresora(IMPRESORA_PRUEBA), "PETG", [40, 20, 5])
         self.assertTrue(r["cerrada"])
         self.assertEqual(r["estado"], comun.APROBADO, r["hallazgos"])
+
+    def test_sugiere_otra_impresora(self):
+        import revisar_stl
+        grande = {**IMP, "id": "grande", "nombre": "Marca Grande 400",
+                  "area": {"x_min": 0, "x_max": 400, "y_min": 0, "y_max": 400, "z_max": 400}}
+        chica = {**IMP, "id": "chica", "nombre": "Marca Chica 180",
+                 "area": {"x_min": 0, "x_max": 180, "y_min": 0, "y_max": 180, "z_max": 180}}
+        self.assertEqual(revisar_stl.entra_en([350, 20, 5], IMP), None)
+        self.assertEqual(revisar_stl.entra_en([20, 20, 320], IMP), "tal cual")
+        self.assertEqual(revisar_stl.entra_en([320, 20, 5], IMP), "girándola")
+        otras = revisar_stl.otras_donde_entra([350, 20, 5], [IMP, grande, chica], IMP)
+        self.assertEqual([(o["id"], o["como"]) for o in otras], [("grande", "tal cual")])
+        from cad import caja, exportar_stl
+        with tempfile.TemporaryDirectory() as d:
+            carpeta = Path(d) / "impresoras"
+            carpeta.mkdir()
+            for datos in (IMP, grande, chica):
+                (carpeta / f"{datos['id']}.json").write_text(json.dumps(datos), encoding="utf-8")
+            stl = Path(d) / "larga.stl"
+            exportar_stl(caja(350, 20, 5), stl)
+            r = subprocess.run([sys.executable, str(SCRIPTS / "revisar_stl.py"), str(stl), "--impresora",
+                                str(IMPRESORA_PRUEBA), "--otras", str(carpeta)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+            self.assertIn("Entra en otra impresora tuya: Marca Grande 400 (tal cual)", r.stdout)
 
     def test_malla_abierta_y_grande(self):
         import numpy as np
 
         import revisar_stl
         tri = np.array([[[0, 0, 0], [400, 0, 0], [0, 10, 0]]], dtype=float)
-        r = revisar_stl.analizar(tri, comun.cargar_impresora(), "PLA")
+        r = revisar_stl.analizar(tri, comun.cargar_impresora(IMPRESORA_PRUEBA), "PLA")
         self.assertEqual(r["estado"], comun.RECHAZO)
 
 
@@ -339,6 +367,91 @@ class TestCatalogo(unittest.TestCase):
             cat.agregar(c, "../afuera")
 
 
+class TestImpresora(unittest.TestCase):
+    """El plugin no trae impresoras: los datos se arman para la que elige el usuario."""
+
+    CONFIG_ORCA = ("; printer_model = Marca Prueba 300\n; printer_settings_id = Mi Prueba 300 0.4 nozzle\n"
+                   "; printable_area = 0x0,300x0,300x300,0x300\n; printable_height = 330\n"
+                   "; gcode_flavor = klipper\n; nozzle_diameter = 0.4\n; machine_max_speed_x = 600,200\n"
+                   "; machine_max_acceleration_x = 20000,1000\n; printer_structure = corexy\n")
+
+    def gcode_orca(self, config):
+        ruta = Path(tempfile.mkdtemp()) / "cubo.gcode"
+        ruta.write_text("G1 X10 Y10\n; CONFIG_BLOCK_START\n" + config + "; CONFIG_BLOCK_END\n", encoding="utf-8")
+        return ruta
+
+    def test_sin_impresoras_del_plugin(self):
+        self.assertFalse((SCRIPTS.parent / "datos" / "impresoras").exists())
+        with self.assertRaises(SystemExit) as error:
+            comun.cargar_impresora("ender-3-v3-plus")
+        self.assertIn("no trae impresoras", str(error.exception))
+
+    def test_datos_incompletos_o_raros(self):
+        datos = json.loads(IMPRESORA_PRUEBA.read_text(encoding="utf-8"))
+        self.assertEqual(comun.problemas_impresora(datos), [])
+        sin_cama = {**datos, "limites": {"boquilla_max_c": 300}}
+        self.assertTrue(any("cama_max_c" in p for p in comun.problemas_impresora(sin_cama)))
+        self.assertTrue(comun.problemas_impresora({**datos, "limites": {"boquilla_max_c": 900, "cama_max_c": 100}}))
+        self.assertTrue(comun.problemas_impresora({**datos, "fuentes": []}))
+        self.assertTrue(comun.problemas_impresora({**datos, "area": {"x_min": 0, "x_max": 0, "y_min": 0,
+                                                                    "y_max": 300, "z_max": 330}}))
+        with tempfile.TemporaryDirectory() as d:
+            ruta = Path(d) / "x.json"
+            ruta.write_text(json.dumps(sin_cama), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                comun.cargar_impresora(ruta)
+            self.assertEqual(comun.impresoras_en([d]), [])
+
+    def test_desde_gcode_y_comparar(self):
+        import impresora
+        ruta = self.gcode_orca(self.CONFIG_ORCA)
+        borrador = impresora.desde_gcode(ruta)
+        self.assertEqual(borrador["area"], {"x_min": 0.0, "x_max": 300.0, "y_min": 0.0, "y_max": 300.0, "z_max": 330.0})
+        self.assertEqual((borrador["firmware"], borrador["boquilla_mm"], borrador["patron_perfiles"]),
+                         ("klipper", 0.4, "Prueba 300"))
+        self.assertIsNone(borrador["limites"]["boquilla_max_c"])
+        self.assertTrue(any("boquilla_max_c" in x for x in borrador["pendiente"]))
+        self.assertTrue(comun.problemas_impresora(borrador))  # sin límites del fabricante no sirve
+        self.assertEqual(impresora.comparar(IMP, impresora.leer_configuracion(ruta)), [])
+        otra = self.gcode_orca(self.CONFIG_ORCA.replace("300x300", "350x350").replace("klipper", "marlin2"))
+        difs = impresora.comparar(IMP, impresora.leer_configuracion(otra))
+        self.assertTrue(any("area.x_max" in d for d in difs) and any("firmware" in d for d in difs))
+        r = subprocess.run([sys.executable, str(SCRIPTS / "impresora.py"), "validar", str(IMPRESORA_PRUEBA)],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_elegir_entre_varias(self):
+        plus = {**IMP, "id": "plus", "nombre": "Marca Prueba 300 Plus", "patron_perfiles": "Prueba 300 Plus",
+                "perfiles_maquina": ["Mi Prueba 300 Plus 0.4 nozzle"]}
+        elegir = revisar_gcode.elegir_impresora
+        self.assertEqual(elegir("", "Mi Prueba 300 Plus 0.4 nozzle", [IMP, plus])["id"], "plus")
+        self.assertEqual(elegir("", "AUTO filamento @Prueba 300 Plus", [IMP, plus])["id"], "plus")
+        self.assertEqual(elegir("", "AUTO filamento @Prueba 300", [IMP, plus])["id"], "prueba")
+        self.assertEqual(elegir("Marca Prueba 300", "otro nombre", [plus, IMP])["id"], "prueba")
+        self.assertIsNone(elegir("Otra", "Otra impresora", [IMP, plus]))
+
+    def test_guardia_usa_los_datos_del_usuario(self):
+        sys.path.insert(0, str(RAIZ / "hooks"))
+        import guardia
+        anteriores = guardia.RAICES_DATOS
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                carpeta = Path(d) / "OrcaSlicer Claude" / "taller-3d" / "impresoras"
+                carpeta.mkdir(parents=True)
+                guardia.RAICES_DATOS = [Path(d)]
+                # ABS con la cama a 105 °C: lo acepta el límite genérico (120) pero no esta impresora (100)
+                texto = gcode("M140 S105\n" + BUENO, mat="ABS").read_text()
+                self.assertEqual(guardia._impresora_para("Marca Prueba 300", "Mi Prueba 300 0.4 nozzle")["id"],
+                                 "generica")
+                self.assertEqual(guardia._revisar_gcode(texto), [])
+                (carpeta / "prueba.json").write_text(IMPRESORA_PRUEBA.read_text(encoding="utf-8"), encoding="utf-8")
+                self.assertEqual(guardia._impresora_para("Marca Prueba 300", "Mi Prueba 300 0.4 nozzle")["id"],
+                                 "prueba")
+                self.assertTrue(guardia._revisar_gcode(texto))
+        finally:
+            guardia.RAICES_DATOS = anteriores
+
+
 class TestGuardia(unittest.TestCase):
     def correr(self, modo, datos):
         return subprocess.run([sys.executable, str(RAIZ / "hooks" / "guardia.py"), modo],
@@ -357,9 +470,9 @@ class TestGuardia(unittest.TestCase):
 
     def test_commit_perfil_malo(self):
         tmp = Path(tempfile.mkdtemp()) / "p.json"
-        tmp.write_text(json.dumps({"from": "User", "name": "AUTO filamento @Ender-3 V3 Plus",
-                                   "inherits": "Generic PETG @Ender-3 V3 Plus-all",
-                                   "filament_settings_id": ["AUTO filamento @Ender-3 V3 Plus"],
+        tmp.write_text(json.dumps({"from": "User", "name": "AUTO filamento @Prueba 300",
+                                   "inherits": "Generic PETG @Prueba 300-all",
+                                   "filament_settings_id": ["AUTO filamento @Prueba 300"],
                                    "nozzle_temperature": ["320"]}))
         r = self.correr("pre-commit", {"tool_input": {"files": [
             {"devicePath": "/home/leo/.config/OrcaSlicer/user/default/filament/x.json", "stagedPath": str(tmp)}]}})
@@ -372,9 +485,9 @@ class TestGuardia(unittest.TestCase):
 
     def test_commit_perfil_con_script(self):
         tmp = Path(tempfile.mkdtemp()) / "p.json"
-        tmp.write_text(json.dumps({"from": "User", "name": "AUTO proceso @Ender-3 V3 Plus",
-                                   "inherits": "0.20mm Standard @Creality Ender-3 V3 Plus",
-                                   "print_settings_id": "AUTO proceso @Ender-3 V3 Plus",
+        tmp.write_text(json.dumps({"from": "User", "name": "AUTO proceso @Prueba 300",
+                                   "inherits": "0.20mm Standard @Marca Prueba 300",
+                                   "print_settings_id": "AUTO proceso @Prueba 300",
                                    "post_process": "/home/leo/x.sh"}))
         r = self.correr("pre-commit", {"tool_input": {"files": [
             {"devicePath": "/home/leo/.config/OrcaSlicer/user/default/process/x.json", "stagedPath": str(tmp)}]}})

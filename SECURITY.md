@@ -35,7 +35,7 @@ Con un archivo de impresión 3D falla cerrado: si no lo puede leer o revisar, no
 - Los bloqueos automáticos (hooks) los cargan Cowork y Claude Code; el chat común de claude.ai los ignora (y ahí tampoco hay acceso a la PC). Por eso las reglas de seguridad también están escritas en las skills, y las revisiones (`revisar_gcode.py`, `perfil_orca.py`) se corren siempre de forma explícita antes de entregar o escribir algo.
 - Los bloqueos de la terminal reconocen las formas comunes de subir archivos o tocar la carpeta de Orca, pero un comando rebuscado puede esquivarlos: son una red de seguridad, no la única barrera. Las skills prohíben esas acciones igual.
 - El servidor MCP de Blender ejecuta código sin protecciones propias (lo advierte la propia Blender Foundation): es opcional; activarlo solo cuando se use.
-- Probado en Linux (Ubuntu 24.04) con una Creality Ender-3 V3 Plus. Otras impresoras se agregan con sus límites oficiales (`/impresoras`).
+- Probado en Linux (Ubuntu 24.04) con una Creality Ender-3 V3 Plus. El plugin no trae impresoras: los límites de cada una salen de las fuentes oficiales del fabricante, que Claude investiga cuando elegís trabajar en ella (`/impresoras`). Si falta un dato se pregunta, y sin los límites de temperatura no lamina para esa impresora. Sin los datos de la impresora, el bloqueo automático controla con límites genéricos (300 °C de boquilla, 120 °C de cama) y no revisa el área.
 - El instalador de Windows no se probó todavía en una PC con Windows. En Windows, la app de Claude (MSIX) no puede crear archivos dentro de AppData que otros programas vean: por eso los datos de Orca se mueven fuera de AppData.
 
 ## Componentes de terceros

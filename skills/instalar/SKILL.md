@@ -19,6 +19,7 @@ Con `get_device_info` y las herramientas de Orca, armar una tabla corta de estad
 | Perfiles de Orca | `list_profiles`: hay un perfil de máquina de usuario; anotar la carpeta real de los perfiles |
 | Carpetas conectadas | `connectedFolders` incluye la carpeta de trabajo y `process`/`filament` de Orca |
 | Configuración | existe `<trabajo>/taller-3d/config.json` y tiene `aceptacion` e `impresoras` |
+| Impresoras | `list_profiles` (machine): cuáles hay en Orca; en `config.json`, cuáles están preparadas (su `datos` es un JSON en `taller-3d/impresoras/` que pasa `impresora.py validar`). Si `datos` es un id viejo (`ender-3-v3-plus`), prepararla de nuevo con `/impresoras` |
 | Windows: datos de Orca | si la plataforma es Windows, la carpeta de perfiles conectada **no** tiene que estar bajo `AppData` (ver sección 2) |
 | Blender (opcional) | `localMcpServers` |
 
@@ -49,12 +50,12 @@ La app de Claude de Windows es un paquete MSIX: Windows manda a una carpeta priv
 ## 3. Carpetas
 
 1. Si no hay carpeta de trabajo, **preguntar dónde quiere guardar sus archivos** antes de crear nada: explicar en una línea qué va ahí (diseños, impresiones con sus vistas y G-code, respaldos y configuración) y ofrecer opciones (`AskUserQuestion` si está): `Documentos/Taller 3D` (recomendada), una carpeta que ya use para impresión 3D (si se ve una entre las conectadas) u otra que diga. No usar AppData en Windows ni la carpeta de Orca. Si el instalador ya la creó, usar esa sin volver a preguntar. Pedir acceso a la elegida junto con las carpetas `process` y `filament` de los perfiles de Orca en **un solo pedido**. Rutas: Linux `~/.config/OrcaSlicer/user/default/...` (Flatpak: `~/.var/app/<id>/config/OrcaSlicer/user/default/...`); Windows, la ruta nueva de la sección 2; macOS `~/Library/Application Support/OrcaSlicer/user/default/...`. Confirmar la ruta real con `list_profiles`.
-2. Crear `impresiones/`, `disenos/`, `respaldos/`, `calibraciones/` y `taller-3d/` escribiendo un `LEEME.md` corto en cada una (si no existen).
+2. Crear `impresiones/`, `disenos/`, `respaldos/`, `calibraciones/`, `taller-3d/` y `taller-3d/impresoras/` escribiendo un `LEEME.md` corto en cada una (si no existen).
 
 ## 4. Configuración inicial
 
 1. **Aviso de uso:** si `config.json` no tiene `aceptacion`, mostrar un resumen de `DISCLAIMER.md` (puntos 1-8 en una línea cada uno) y pedir que escriba ACEPTO. Guardar fecha, versión del plugin y texto.
-2. **Impresoras:** seguir `/impresoras` para la primera impresora (perfil de máquina de usuario, datos y límites, tipo de cama, perfiles propios de proceso y filamento que ya tenga, nombres AUTO).
+2. **Impresora:** preguntar en cuál de las impresoras de Orca quiere trabajar y prepararla con `/impresoras`: datos investigados en internet, tipo de cama, perfiles propios que ya tenga y perfiles AUTO óptimos. Las demás se preparan cuando las elija.
 3. **Costos (opcional):** precio del kWh, precio por kg de cada filamento, consumo de la impresora (180 W si no lo sabe; mejor medirlo).
 4. **Tienda (opcional):** plataforma (WooCommerce, Tiendanube, Shopify, Mercado Libre u otra), URL, margen, costo por hora de máquina, embalaje, redondeo y demora. Sin contraseñas.
 5. Escribir `config.json` (formato en `references/configuracion.md` de la skill `impresion-3d`) con el procedimiento de escritura y crear `historial.csv` con encabezado. Si ya existe, completar solo lo que falte.
@@ -62,7 +63,7 @@ La app de Claude de Windows es un paquete MSIX: Windows manda a una carpeta priv
 ## 5. Pieza de prueba
 
 1. Generar con `cad.py` un cubo de calibración de 20 × 20 × 20 mm con chaflán inferior.
-2. Laminar con los perfiles de la impresora predeterminada: `AUTO proceso` y `AUTO filamento` creado con `--cama` de la configuración (como en `/pieza`).
-3. Traer el G-code y correr `revisar_gcode.py --cama-primera-capa <temperatura>`: tiene que salir APROBADO, con las temperaturas y la cama correctas.
+2. Laminar con los perfiles de la impresora elegida: `AUTO proceso` y `AUTO filamento` creado con `--cama` de la configuración (como en `/pieza`).
+3. Traer el G-code y correr `revisar_gcode.py --impresora <json> --cama-primera-capa <temperatura>`: tiene que salir APROBADO, con las temperaturas y la cama correctas.
 4. Mostrar tiempo, gramos y costo (si hay precios) y dejar todo en `impresiones/AAAA-MM-DD_cubo-prueba/`.
 5. Cerrar con: qué quedó listo, qué falta (si algo), los comandos disponibles (`/pieza`, `/diseno`, `/calibrar`, `/impresoras`, `/publicar`, `/catalogo`, `/restaurar`, `/ayuda`) y cómo pedir una pieza con un ejemplo de `MANUAL.md`. Ofrecer dejar el manual en la carpeta de trabajo.

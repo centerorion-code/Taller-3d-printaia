@@ -13,7 +13,7 @@ Las calibraciones se lanzan desde la ventana de Orca (menú **Calibración**), e
 | 5 | Calibración → Retracción | 0 → 2 mm, paso 0,1 | la primera altura sin hilos; longitud = altura(mm) × paso | `filament_retraction_length` |
 | 6 (opcional) | Calibración → Tolerancia | | qué pernos entran y cuáles giran | holguras para `cad.py` y `xy_hole_compensation` |
 
-Si el flujo cambió mucho, repetir el pressure advance. Esquinado (cornering), VFA y PA adaptativo son opcionales y van al final. El input shaping se calibra con la rutina propia de la impresora si la tiene (la Ender-3 V3 Plus tiene sensor y autochequeo).
+Si el flujo cambió mucho, repetir el pressure advance. Esquinado (cornering), VFA y PA adaptativo son opcionales y van al final. El input shaping se calibra con la rutina propia de la impresora si la tiene (muchas impresoras con Klipper traen acelerómetro y autochequeo: ver el manual del fabricante).
 
 ## Leer resultados con fotos
 

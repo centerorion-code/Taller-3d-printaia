@@ -5,7 +5,7 @@ Cómo pedirle una pieza a Claude y qué pasa desde que la pedís hasta que la im
 ## Antes de empezar (una sola vez)
 
 1. Sumá el plugin desde el menú de **Claude Desktop**, la app de escritorio, con la dirección de GitHub `noamix/Taller-3d-printaia` (no se hace desde el chat), e instalá lo necesario en tu PC (ver [INSTALACION.md](INSTALACION.md)).
-2. En Claude escribí `/instalar`: revisa que todo ande, carga tu impresora y hace una pieza de prueba.
+2. En Claude escribí `/instalar`: revisa que todo ande, te pregunta en qué impresora de tu Orca querés trabajar, investiga sus datos oficiales y la configura, y hace una pieza de prueba.
 3. La primera vez te pide que leas el [aviso de uso](DISCLAIMER.md) y escribas ACEPTO.
 
 La PC tiene que estar prendida y con la app de Claude abierta, porque ahí están tu Orca y tus carpetas. Con eso, podés pedir piezas desde la PC o desde el celular.
@@ -133,7 +133,7 @@ Pedilo con tus palabras: "Hacé el soporte del router 1 cm más ancho" o "el agu
 |---|---|
 | Solo el diseño, sin imprimir | `/diseno` o "necesito el STL de…" |
 | Calibrar un rollo nuevo | `/calibrar` o "calibrá el PETG nuevo" |
-| Agregar otra impresora | `/impresoras` |
+| Trabajar con otra impresora | `/impresoras`, o decilo en el pedido ("en la Bambu") |
 | Vender una pieza | `/publicar` |
 | Ver todas tus piezas o buscar una | `/catalogo` |
 | Volver atrás un cambio de perfil | `/restaurar` |

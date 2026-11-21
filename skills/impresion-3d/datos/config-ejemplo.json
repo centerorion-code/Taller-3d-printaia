@@ -5,21 +5,21 @@
     "version": "2.5.1",
     "carpeta_usuario": "~/.config/OrcaSlicer/user/default"
   },
-  "impresora_por_defecto": "mi-impresora",
+  "impresora_por_defecto": "marca-modelo",
   "impresoras": [
     {
-      "id": "mi-impresora",
-      "nombre": "Mi Ender-3 V3 Plus",
-      "datos": "ender-3-v3-plus",
-      "perfil_maquina": "Mi Ender-3 V3 Plus 0.4 nozzle",
+      "id": "marca-modelo",
+      "nombre": "Mi Marca Modelo",
+      "datos": "taller-3d/impresoras/marca-modelo.json",
+      "perfil_maquina": "Mi Modelo 0.4 nozzle",
       "cama": "Textured PEI Plate",
-      "proceso_auto": "AUTO proceso @Ender-3 V3 Plus",
-      "filamento_auto": "AUTO filamento @Ender-3 V3 Plus",
+      "proceso_auto": "AUTO proceso @Modelo",
+      "filamento_auto": "AUTO filamento @Modelo",
       "procesos": {
-        "estandar": "Mi 0.20mm Standard @Ender-3 V3 Plus"
+        "estandar": "Mi 0.20mm Standard @Modelo"
       },
       "filamentos": {
-        "PLA": "Mi Generic PLA @Ender-3 V3 Plus"
+        "PLA": "Mi Generic PLA @Modelo"
       }
     }
   ],
@@ -28,7 +28,9 @@
     "precio_kwh": null,
     "consumo_w": 180,
     "filamentos": {
-      "PLA": {"precio_kg": null}
+      "PLA": {
+        "precio_kg": null
+      }
     }
   },
   "tienda": {

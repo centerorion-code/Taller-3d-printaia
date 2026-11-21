@@ -1,0 +1,20 @@
+{
+  "_nota": "Impresora inventada solo para las pruebas automáticas. No es una impresora real ni se usa fuera de las pruebas.",
+  "id": "prueba",
+  "nombre": "Marca Prueba 300",
+  "perfiles_maquina": ["Mi Prueba 300 0.4 nozzle"],
+  "patron_perfiles": "Prueba 300",
+  "boquilla_mm": 0.4,
+  "firmware": "klipper",
+  "area": {"x_min": 0, "x_max": 300, "y_min": 0, "y_max": 300, "z_max": 330},
+  "margen_mm": 5,
+  "limites": {"boquilla_max_c": 300, "cama_max_c": 100, "velocidad_max_mm_s": 600, "aceleracion_max_mm_s2": 20000},
+  "cerramiento": false,
+  "sistema": {
+    "maquina": {"nombre": "Marca Prueba 300 0.4 nozzle", "setting_id": "prueba-maquina"},
+    "procesos": {"0.20": {"nombre": "0.20mm Standard @Marca Prueba 300", "setting_id": "prueba-0.20"}},
+    "filamentos": {"PETG": {"nombre": "Generic PETG @Prueba 300-all", "setting_id": "prueba-petg"}}
+  },
+  "cama_sistema": {"PLA": [65, 65], "PETG": [70, 70]},
+  "fuentes": ["https://example.com/ficha-de-la-impresora-de-prueba"]
+}

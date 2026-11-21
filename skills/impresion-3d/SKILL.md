@@ -18,16 +18,17 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
 7. **Nada a internet:** no subir modelos, G-code ni perfiles. La única excepción es publicar un producto en la tienda del propio usuario, a su pedido, con `/publicar`.
 8. **Aviso de uso aceptado.** Antes de la primera acción en la PC, verificar que exista la aceptación en la configuración (sección 3). Si no está, mostrar el resumen de `DISCLAIMER.md` (raíz del plugin) y pedir que escriba ACEPTO.
 9. **Usos críticos:** para piezas médicas, de seguridad, estructurales críticas o en contacto con alimentos, avisar que requieren validación profesional y no afirmar que son aptas. No decir nunca que una pieza impresa es apta para alimentos.
-10. **Materiales con vapores** (ABS, ASA, PC, nylon): avisar que requieren buena ventilación; la Ender-3 V3 Plus es abierta. En cada entrega, recordar no dejar la impresora sin supervisión.
+10. **Materiales con vapores** (ABS, ASA, PC, nylon): avisar que requieren buena ventilación y, si la impresora no tiene cerramiento (`cerramiento: false` en sus datos), que se complican. En cada entrega, recordar no dejar la impresora sin supervisión.
 
 ## 2. Herramientas y rutas
 
 - **Scripts** (Python, en `scripts/` de esta skill; correr con `python3 -I`):
   - `cad.py`: CAD por código (manifold3d). Ver `references/cad.md`.
-  - `revisar_stl.py`: malla cerrada, medidas, entra en la cama, apoyo, voladizos; también rota, apoya y centra.
+  - `revisar_stl.py`: malla cerrada, medidas, entra en la cama (y, con `--otras`, en cuál de las otras impresoras del usuario entra si no), apoyo, voladizos; también rota, apoya y centra.
   - `vista_previa.py`: PNG con 4 vistas y medidas.
   - `perfil_orca.py`: `crear`, `validar` y `diff` de perfiles de usuario.
   - `revisar_gcode.py`: revisión de seguridad del G-code; con `--json` y precios, también calcula el costo.
+  - `impresora.py`: datos de cada impresora (`validar`, `desde-gcode` para leer lo que usa Orca y `comparar`). Ver `references/impresoras.md`.
   - `producto_tienda.py`: ficha de producto y precio (lo usa `/publicar`).
   - `catalogo.py`: índice de las piezas (`taller-3d/catalogo.json`) y página `catalogo.html` con vistas, datos y archivos (skill `catalogo`).
   - `novedades_orca.py`: compara el Orca del usuario con lo que conoce el taller (parámetros nuevos o que ya no están, claves viejas en perfiles, perfiles TEST o AUTO que sobran) y dice cuándo toca revisar en la web (sección 7).
@@ -37,7 +38,8 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
   - `orca-mcp`: `list_profiles`, `get_profile`, `get_model_info`, `slice_model`, `get_slice_estimates`, `analyze_gcode_layers`, `check_installation`.
   - Blender (MCP, opcional): para formas orgánicas o decorativas.
   - Archivos: `get_device_info` (carpetas conectadas y estado de los MCP), `device_list_dir`, `device_stage_files` (copia de la PC a `/mnt/user-data/uploads/<carpeta>/...`), `device_commit_files` (escribe en la PC desde `/mnt/user-data/outputs/...`; para archivos existentes pasar `expectedMtimeMs`), `device_request_folder_access`.
-- **Datos del plugin:** `datos/impresoras/<id>.json` (límites, área, perfiles de sistema), `datos/materiales.json` (rangos de temperatura), `datos/claves-gcode-2.5.1.json` (las 750 claves que Orca 2.5.1 escribe en el G-code), `references/catalogo-orca-2.5.1/parametros-*.json` (1015 parámetros con nombre, explicación en español, tipo, rango y valores posibles; en partes, un parámetro por línea).
+- **Impresoras:** el plugin no trae ninguna. Los datos de cada una (límites, área, perfiles de sistema) los arma `/impresoras` cuando el usuario elige trabajar en ella, investigando en internet, y quedan en `taller-3d/impresoras/<id>.json` de su carpeta de trabajo (`references/impresoras.md`).
+- **Datos del plugin:** `datos/materiales.json` (rangos de temperatura), `datos/claves-gcode-2.5.1.json` (las 750 claves que Orca 2.5.1 escribe en el G-code), `references/catalogo-orca-2.5.1/parametros-*.json` (1015 parámetros con nombre, explicación en español, tipo, rango y valores posibles; en partes, un parámetro por línea).
 
 ## 3. Configuración del usuario y carpeta de trabajo
 
@@ -48,7 +50,7 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
   - `disenos/AAAA-MM-DD_nombre/`: pedidos de solo diseño (`/diseno`): `pieza.py`, STL, vista y `parametros.md`.
   - `respaldos/AAAA-MM-DD_HHMMSS/`: copias previas de lo que se cambió.
   - `calibraciones/<filamento>.md`: resultados de calibración.
-  - `taller-3d/`: `config.json`, `historial.csv`, `aprendizajes.md`, `novedades-orca.json` (lo que se aprendió del Orca del usuario; sección 7), `catalogo.json` (índice de piezas).
+  - `taller-3d/`: `config.json`, `impresoras/<id>.json` (datos de cada impresora preparada), `historial.csv`, `aprendizajes.md`, `novedades-orca.json` (lo que se aprendió del Orca del usuario; sección 7), `catalogo.json` (índice de piezas).
   - `catalogo.html`: la página con todas las piezas. **Cada vez que se guarda, lamina, imprime o publica una pieza, actualizar el catálogo** (`catalogo.py agregar` y `html`, y escribir los dos archivos; skill `catalogo`).
 - Perfiles de usuario de Orca: `~/.config/OrcaSlicer/user/default/{machine,process,filament}/` en Linux (Flatpak: `~/.var/app/<id>/config/OrcaSlicer/user/default/...`; portable: la carpeta de datos que diga `config.json` en `orca.carpeta_usuario`). Si el usuario inició sesión en Orca, `default` es su número de usuario: confirmar con las rutas que devuelve `list_profiles`. macOS: `~/Library/Application Support/OrcaSlicer/user/...`.
 - **Windows:** la app de Claude (MSIX) no puede crear archivos dentro de `AppData` que Orca vea. El instalador deja los datos de Orca en `C:\Users\<usuario>\OrcaSlicer` (con una unión en `%APPDATA%\OrcaSlicer`). Escribir perfiles solo por esa ruta; si los perfiles están bajo `AppData` sin la unión, no escribir y derivar a `/instalar` (sección 2).
@@ -103,7 +105,7 @@ Los archivos del plugin no cambian solos. Lo que se aprende del Orca del usuario
 - `references/diagnostico.md`: problemas frecuentes y qué tocar primero.
 - `references/materiales.md`: comportamiento de cada material (PETG con fundamento académico).
 - `references/cad.md`: reglas de diseño para imprimir y uso de `cad.py`.
-- `references/impresora-ender-3-v3-plus.md`: capacidades y límites.
+- `references/impresoras.md`: elegir la impresora, investigarla y configurarla; formato de sus datos.
 - `references/plugins-orca.md`: plugins de Orca 2.5 (qué son, riesgos, cómo buscarlos y los que sirven).
 - `references/configuracion.md`: formato de `config.json`.
 - `references/fuentes.md`: fuentes.

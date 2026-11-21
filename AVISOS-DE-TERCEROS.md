@@ -12,7 +12,6 @@ Estos archivos de taller-3d contienen material de OrcaSlicer 2.5.1, modificado p
 |---|---|---|
 | `skills/impresion-3d/references/catalogo-orca-2.5.1/parametros-*.json` | Nombres, explicaciones, tipos, rangos, valores posibles y organización en páginas y grupos de los 1015 parámetros, tomados del código fuente | Pasado a JSON, en partes; agregados categoría y modo en español. Las explicaciones en español salen de la traducción de OrcaSlicer o se tradujeron del inglés para taller-3d. |
 | `skills/impresion-3d/datos/claves-gcode-2.5.1.json` | Nombres de las 750 claves que OrcaSlicer 2.5.1 escribe en el G-code | Solo la lista de nombres |
-| `skills/impresion-3d/datos/impresoras/ender-3-v3-plus.json` | Nombres e identificadores de los perfiles de sistema de OrcaSlicer para la Creality Ender-3 V3 Plus | Combinados con datos del fabricante y límites propios |
 
 ## Programas que el taller usa o instala
 

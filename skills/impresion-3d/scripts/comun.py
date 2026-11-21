@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import sys
 from pathlib import Path
 
-VERSION_PLUGIN = "0.1.6"
+VERSION_PLUGIN = "0.1.7"
 VERSION_ORCA = "2.5.1"
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -32,22 +33,93 @@ def cargar_json(ruta: Path | str):
         return json.load(f)
 
 
-def impresoras_disponibles() -> list[str]:
-    return sorted(p.stem for p in (DATOS / "impresoras").glob("*.json"))
+def _numero(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
 
 
-def cargar_impresora(id_o_ruta: str = "ender-3-v3-plus") -> dict:
-    """Carga los datos de una impresora por id (datos/impresoras/<id>.json) o por ruta."""
-    ruta = Path(id_o_ruta).expanduser()
-    if ruta.suffix == ".json" and ruta.exists():
-        return cargar_json(ruta)
-    ruta = DATOS / "impresoras" / f"{id_o_ruta}.json"
-    if not ruta.exists():
+# Rangos razonables de los límites de una impresora: fuera de esto, la fuente seguramente está mal leída.
+LIMITES_RAZONABLES = {"boquilla_max_c": (150, 500), "cama_max_c": (40, 150)}
+
+
+def problemas_impresora(datos) -> list[str]:
+    """Qué falta o está mal en los datos de una impresora. Lista vacía: están completos.
+
+    El plugin no trae impresoras: /impresoras arma estos datos para la impresora que elige el usuario,
+    leyendo su perfil de Orca e investigando las fuentes oficiales. Sin estos campos la revisión de
+    seguridad no puede controlar la impresora, así que no se aceptan datos incompletos ni inventados.
+    """
+    if not isinstance(datos, dict):
+        return ["no es un objeto JSON"]
+    problemas = []
+    if not str(datos.get("id") or "").strip():
+        problemas.append("falta 'id'")
+    if not str(datos.get("nombre") or "").strip():
+        problemas.append("falta 'nombre' (marca y modelo, como el printer_model de Orca)")
+    area = datos.get("area")
+    claves = ("x_min", "x_max", "y_min", "y_max", "z_max")
+    if not isinstance(area, dict):
+        problemas.append("falta 'area' (x_min, x_max, y_min, y_max y z_max, en mm)")
+    elif not all(_numero(area.get(k)) for k in claves):
+        problemas.append("'area' tiene que tener x_min, x_max, y_min, y_max y z_max con números")
+    elif (area["x_max"] <= area["x_min"] or area["y_max"] <= area["y_min"] or not 0 < area["z_max"] <= 3000
+          or area["x_max"] - area["x_min"] > 3000 or area["y_max"] - area["y_min"] > 3000):
+        problemas.append("el área no tiene sentido: revisá las medidas")
+    limites = datos.get("limites")
+    if not isinstance(limites, dict):
+        problemas.append("falta 'limites' (boquilla_max_c y cama_max_c, del fabricante)")
+    else:
+        for clave, (minimo, maximo) in LIMITES_RAZONABLES.items():
+            valor = limites.get(clave)
+            if not _numero(valor):
+                problemas.append(f"falta limites.{clave} (dato oficial del fabricante, en °C)")
+            elif not minimo <= valor <= maximo:
+                problemas.append(f"limites.{clave}={valor} está fuera de lo razonable ({minimo}-{maximo} °C): "
+                                 "revisá la fuente")
+    fuentes = datos.get("fuentes")
+    if not isinstance(fuentes, list) or not any(isinstance(f, str) and f.startswith(("https://", "http://"))
+                                                for f in fuentes):
+        problemas.append("falta 'fuentes' con al menos un enlace oficial (de dónde salen los límites)")
+    margen = datos.get("margen_mm", 5)
+    if not _numero(margen) or not 0 <= margen <= 50:
+        problemas.append("'margen_mm' tiene que ser un número entre 0 y 50")
+    return problemas
+
+
+def cargar_impresora(ruta: Path | str) -> dict:
+    """Carga los datos de una impresora desde su JSON (taller-3d/impresoras/<id>.json de la carpeta de
+    trabajo, traído al espacio de Claude). Rechaza datos incompletos."""
+    archivo = Path(str(ruta)).expanduser()
+    if archivo.suffix.lower() != ".json" or not archivo.is_file():
         raise SystemExit(
-            f"No conozco la impresora '{id_o_ruta}'. Disponibles: {', '.join(impresoras_disponibles())}. "
-            "También se puede pasar la ruta a un JSON con el mismo formato."
-        )
-    return cargar_json(ruta)
+            f"No encuentro los datos de la impresora '{ruta}'. El plugin no trae impresoras cargadas: "
+            "se arman con /impresoras para la impresora que elijas (se toma de Orca y se investiga en internet) "
+            "y quedan en taller-3d/impresoras/ de la carpeta de trabajo. Pasá la ruta a ese JSON.")
+    try:
+        datos = cargar_json(archivo)
+    except ValueError as error:
+        raise SystemExit(f"Los datos de la impresora ({archivo.name}) no son un JSON válido: {error}")
+    faltan = problemas_impresora(datos)
+    if faltan:
+        raise SystemExit(f"Los datos de la impresora ({archivo.name}) están incompletos: {'; '.join(faltan)}. "
+                         "Completalos con /impresoras (fuentes oficiales o preguntando): no se inventan límites.")
+    return datos
+
+
+def impresoras_en(carpetas) -> list[dict]:
+    """Datos de impresora completos que haya en esas carpetas (los incompletos se ignoran)."""
+    encontradas = []
+    for carpeta in carpetas:
+        carpeta = Path(carpeta)
+        if not carpeta.is_dir():
+            continue
+        for archivo in sorted(carpeta.glob("*.json")):
+            try:
+                datos = cargar_json(archivo)
+            except (OSError, ValueError):
+                continue
+            if not problemas_impresora(datos):
+                encontradas.append(datos)
+    return encontradas
 
 
 def cargar_materiales() -> dict:

@@ -9,19 +9,18 @@ Si hay un rechazo, no se escribe nada.
 
 Uso:
   # Crear (o rehacer) un perfil de proceso a partir de uno de usuario + cambios
-  python3 perfil_orca.py crear --tipo proceso --nombre "AUTO proceso @Ender-3 V3 Plus" \\
-      --hereda "0.20mm Standard @Creality Ender-3 V3 Plus" \\
-      --base "PETG Eficiente 0.20 @Ender-3 V3 Plus.json" \\
-      --set wall_loops=5 --set sparse_infill_density=40% \\
-      --anterior "AUTO proceso @Ender-3 V3 Plus.json" --salida /mnt/user-data/outputs/taller-3d/perfiles
+  python3 perfil_orca.py crear --tipo proceso --nombre "AUTO proceso @<modelo>" \\
+      --hereda "<proceso de sistema de la impresora>" --base "<proceso del usuario>.json" \\
+      --set wall_loops=5 --set sparse_infill_density=40% --impresora <datos de la impresora>.json \\
+      --anterior "AUTO proceso @<modelo>.json" --salida /mnt/user-data/outputs/taller-3d/perfiles
 
   # Filamento de trabajo con las temperaturas de la cama real (Orca por línea de comandos usa Cool Plate)
-  python3 perfil_orca.py crear --tipo filamento --nombre "AUTO filamento @Ender-3 V3 Plus" \\
-      --hereda "Generic PETG @Ender-3 V3 Plus-all" --base "GST3D PETG @Ender-3 V3 Plus.json" \\
+  python3 perfil_orca.py crear --tipo filamento --nombre "AUTO filamento @<modelo>" \\
+      --hereda "<filamento de sistema>" --base "<filamento del usuario>.json" --impresora <datos>.json \\
       --cama "Textured PEI Plate" --salida /mnt/user-data/outputs/taller-3d/perfiles
 
   # Validar un perfil existente
-  python3 perfil_orca.py validar archivo.json [--tipo filamento] [--material PETG]
+  python3 perfil_orca.py validar archivo.json [--tipo filamento] [--material PETG] [--impresora <datos>.json]
 
   # Ver diferencias entre dos perfiles
   python3 perfil_orca.py diff viejo.json nuevo.json
@@ -160,11 +159,12 @@ def _seguridad(clave: str, valor: str, impresora: dict | None, material: str | N
     if numero <= 0:
         return problemas
     tipo = "boquilla" if es_boquilla else "cama"
-    if impresora:
-        maximo = impresora["limites"]["boquilla_max_c" if es_boquilla else "cama_max_c"]
-        if numero > maximo:
-            problemas.append((RECHAZO, f"{clave}={valor} °C supera el máximo de la impresora ({maximo} °C)."))
-            return problemas
+    limites = (impresora or revisar_gcode.IMPRESORA_GENERICA)["limites"]
+    maximo = limites["boquilla_max_c" if es_boquilla else "cama_max_c"]
+    if numero > maximo:
+        cual = "de la impresora" if impresora else "que se acepta sin los datos de la impresora"
+        problemas.append((RECHAZO, f"{clave}={valor} °C supera el máximo {cual} ({maximo} °C)."))
+        return problemas
     if datos:
         if numero > datos[f"{tipo}_tope"]:
             problemas.append((RECHAZO, f"{clave}={valor} °C supera el tope para {material} ({datos[f'{tipo}_tope']} °C)."))
@@ -377,7 +377,8 @@ def main(argv=None) -> None:
     c.add_argument("--set-json", type=Path, help="JSON con clave: valor")
     c.add_argument("--quitar", action="append", default=[])
     c.add_argument("--anterior", type=Path, help="versión actual del perfil, para mostrar los cambios")
-    c.add_argument("--impresora", default="ender-3-v3-plus")
+    c.add_argument("--impresora", help="JSON con los datos de la impresora (taller-3d/impresoras/<id>.json); "
+                                       "sin él, las temperaturas se controlan con límites genéricos")
     c.add_argument("--material")
     c.add_argument("--config", type=Path, help="config.json del usuario (para conocer sus perfiles)")
     c.add_argument("--cama", help="tipo de cama del usuario (filamentos): copia sus temperaturas a cool_plate_temp*, "
@@ -387,7 +388,7 @@ def main(argv=None) -> None:
     v = sub.add_parser("validar")
     v.add_argument("archivo", type=Path)
     v.add_argument("--tipo", choices=list(TIPOS))
-    v.add_argument("--impresora", default="ender-3-v3-plus")
+    v.add_argument("--impresora", help="JSON con los datos de la impresora (taller-3d/impresoras/<id>.json)")
     v.add_argument("--material")
     v.add_argument("--config", type=Path)
 
@@ -404,6 +405,10 @@ def main(argv=None) -> None:
         return
 
     impresora = comun.cargar_impresora(a.impresora) if a.impresora else None
+    if impresora is None:
+        print("Sin datos de la impresora: las temperaturas se controlan con límites genéricos "
+              f"({revisar_gcode.IMPRESORA_GENERICA['limites']['boquilla_max_c']} °C de boquilla, "
+              f"{revisar_gcode.IMPRESORA_GENERICA['limites']['cama_max_c']} °C de cama).")
     material = comun.normalizar_material(a.material) if a.material else None
     config = comun.cargar_json(a.config) if getattr(a, "config", None) and a.config.exists() else None
     usuarios = perfiles_de_usuario(config)

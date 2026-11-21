@@ -247,8 +247,15 @@ def apoyar(solido: Manifold) -> Manifold:
     return mover(solido, z=-solido.bounding_box()[2])
 
 
-def centrar(solido: Manifold, x: float = 150.0, y: float = 150.0) -> Manifold:
-    """Centra la pieza en (x, y); por defecto, el centro de la cama de la Ender-3 V3 Plus."""
+def centrar(solido: Manifold, x: float | None = None, y: float | None = None,
+            impresora: dict | None = None) -> Manifold:
+    """Centra la pieza en (x, y) o, con los datos de la impresora, en el centro de su cama."""
+    if impresora is not None:
+        area = impresora["area"]
+        x = (area["x_min"] + area["x_max"]) / 2 if x is None else x
+        y = (area["y_min"] + area["y_max"]) / 2 if y is None else y
+    if x is None or y is None:
+        raise ValueError("centrar necesita x e y, o los datos de la impresora (impresora=...).")
     x0, y0, _, x1, y1, _ = solido.bounding_box()
     return mover(solido, x=x - (x0 + x1) / 2, y=y - (y0 + y1) / 2)
 

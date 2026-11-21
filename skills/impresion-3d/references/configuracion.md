@@ -6,19 +6,19 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
 {
   "version": 1,
   "carpeta_trabajo": "/home/usuario/Documentos/Taller 3D",
-  "aceptacion": {"fecha": "2026-11-21T10:00:00-03:00", "version_plugin": "0.1.6", "texto": "ACEPTO", "medio": "instalar.sh"},
+  "aceptacion": {"fecha": "2026-11-21T10:00:00-03:00", "version_plugin": "0.1.7", "texto": "ACEPTO", "medio": "instalar.sh"},
   "orca": {"version": "2.5.1", "ejecutable": "/home/usuario/Aplicaciones/OrcaSlicer_Linux_AppImage_Ubuntu2404_V2.5.1.AppImage",
            "origen": "oficial", "carpeta_usuario": "/home/usuario/.config/OrcaSlicer/user/default"},
-  "impresora_por_defecto": "ender",
+  "impresora_por_defecto": "marca-modelo",
   "impresoras": [
     {
-      "id": "ender",
-      "nombre": "Mi Ender-3 V3 Plus",
-      "datos": "ender-3-v3-plus",
-      "perfil_maquina": "Mi Ender-3 V3 Plus 0.4 nozzle",
+      "id": "marca-modelo",
+      "nombre": "Mi Marca Modelo",
+      "datos": "taller-3d/impresoras/marca-modelo.json",
+      "perfil_maquina": "Mi Modelo 0.4 nozzle",
       "cama": "Textured PEI Plate",
-      "proceso_auto": "AUTO proceso @Ender-3 V3 Plus",
-      "filamento_auto": "AUTO filamento @Ender-3 V3 Plus",
+      "proceso_auto": "AUTO proceso @Modelo",
+      "filamento_auto": "AUTO filamento @Modelo",
       "procesos": {"calidad": "…", "eficiente": "…", "estandar": "…"},
       "filamentos": {"PETG": "…", "PLA": "…"}
     }
@@ -34,7 +34,8 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
 ## Campos
 
 - `orca`: qué Orca usa el taller. `origen`: `oficial` (lo instaló el instalador), `appimage`, `flatpak`, `sistema`, `instalado` (Windows), `portable` o `indicado` (lo pasó el usuario con `--orca`/`-Orca`). `carpeta_usuario`: carpeta de sus perfiles; en Windows queda fuera de AppData (`C:\Users\<usuario>\OrcaSlicer\user\default`).
-- `datos`: id de `datos/impresoras/<id>.json` del plugin, o ruta a un JSON propio en `taller-3d/impresoras/` (mismo formato) para impresoras que el plugin no trae.
+- `impresoras`: solo las que el usuario eligió para trabajar (no todas las de Orca). `impresora_por_defecto`: la última usada; se ofrece primera cuando hay varias.
+- `datos`: ruta, relativa a la carpeta de trabajo, al JSON con los datos de la impresora en `taller-3d/impresoras/`. Lo arma `/impresoras` investigando en internet (formato en `references/impresoras.md`); el plugin no trae impresoras.
 - `cama`: tipo de cama que usa, con el nombre de Orca ("Textured PEI Plate", "High Temp Plate", "Cool Plate"…). El taller copia sus temperaturas al `AUTO filamento` (ver perfiles-orca.md, tipo de cama).
 - `procesos` y `filamentos`: nombres de los perfiles de usuario de Orca (las claves son libres; las de `filamentos` conviene que sean el material).
 - `costos.filamentos`: precio por kg por material (PETG) o por nombre de perfil de filamento.

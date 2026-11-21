@@ -29,7 +29,7 @@ Si a mitad de `/diseno` pide imprimirla, seguir con `/pieza` desde la configurac
 1. Carpeta: `/mnt/user-data/outputs/taller-3d/disenos/AAAA-MM-DD_nombre/`.
 2. `pieza.py` con `cad.py` según `references/cad.md`: **todos los parámetros arriba**, con nombre claro y un comentario con unidad y rango razonable; el modelo se calcula a partir de ellos, sin números sueltos en el cuerpo. Holguras con `holgura()` o de `aprendizajes.md`.
 3. Correrlo para generar `pieza.stl`.
-4. Revisar: `revisar_stl.py pieza.stl --impresora ninguna --esperado <AxBxC> [--material <m>] --json informe_stl.json` (malla cerrada, medidas, apoyo y voladizos). Si el usuario dijo en qué impresora la va a imprimir y está en la configuración, usar esa impresora para revisar también que entre en la cama. RECHAZADO → corregir.
+4. Revisar: `revisar_stl.py pieza.stl --impresora ninguna --esperado <AxBxC> [--material <m>] --json informe_stl.json` (malla cerrada, medidas, apoyo y voladizos). Si el usuario dijo en qué impresora la va a imprimir y está preparada en el taller, usar sus datos (`--impresora <json>`) para revisar también que entre en la cama, y con `--otras <carpeta taller-3d/impresoras>` el informe dice en cuál de sus otras impresoras entra si en esa no. RECHAZADO → corregir.
 5. `vista_previa.py pieza.stl vista.png --titulo "<nombre>"` y mostrarla. Esperar su OK si es un diseño nuevo.
 6. Variantes (por ejemplo, tres tamaños): un STL por variante cambiando solo los parámetros.
 
