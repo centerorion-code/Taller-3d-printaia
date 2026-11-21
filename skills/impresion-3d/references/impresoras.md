@@ -4,10 +4,28 @@ El plugin no trae impresoras cargadas: hay demasiados modelos y cada persona tie
 
 ## 1. En qué impresora trabajar
 
-1. `list_profiles` de orca-mcp con `machine`: los perfiles de máquina de usuario de Orca, cada uno con su `inherits` (el perfil de sistema: marca, modelo y boquilla).
-2. Si el usuario ya dijo en cuál, usar esa. Si hay una sola, usarla y decirlo. Si hay varias, **preguntar en cuál quiere trabajar** (`AskUserQuestion` con los nombres de Orca; primero la última usada, `impresora_por_defecto` en `config.json`).
-3. Si la que quiere no aparece, puede estar en Orca solo como impresora del sistema, sin copia de usuario, y orca-mcp lamina con perfiles de usuario. Darle los pasos: en Orca, elegir esa impresora y en su configuración guardar una copia (ícono de guardar) como `Mi <modelo> <boquilla> nozzle`. Si no está en Orca, agregarla con el asistente de impresoras (marca y modelo). Verificar con `list_profiles`.
-4. Si esa impresora ya está preparada en el taller (en `config.json`, con `datos` apuntando a un JSON que pasa `impresora.py validar`), usar esos datos. Si no, seguir con la sección 2.
+orca-mcp solo ve las impresoras que tienen **copia de usuario** (un perfil de máquina guardado en `user/<id>/machine/`) y no sabe cuál está elegida en la ventana de Orca. Muchas personas tienen varias impresoras en Orca y solo una con copia, así que no alcanza con `list_profiles`.
+
+1. **Juntar las impresoras** con `python3 -I impresora.py detectar`:
+   - `--maquinas <carpeta machine traída>`: las copias de usuario (las mismas que muestra `list_profiles` con `machine`).
+   - `--perfiles <process> <filament>` (carpetas traídas): las impresoras que nombran los perfiles del usuario en `compatible_printers`. Para saber el modelo usar `compatible_printers`, no `inherits`: `inherits` puede traer nombres viejos que Orca resuelve con `renamed_from`.
+   - `--orca <json>`, solo si hay terminal en la PC (`device_bash`): las impresoras instaladas en Orca y la elegida, sacadas de `OrcaSlicer.conf` **en la PC** con el comando de abajo. Ese archivo guarda la IP y el código de acceso de las impresoras en red: nunca traerlo con `device_stage_files` ni leerlo entero (el bloqueo automático lo impide). Sin terminal, no tocarlo y preguntarle al usuario qué impresoras tiene.
+2. Si el usuario ya dijo en cuál, usar esa. Si hay una sola, usarla y decirlo. Si hay varias, **preguntar en cuál quiere trabajar** (`AskUserQuestion`): primero la elegida en Orca o la última usada (`impresora_por_defecto`), y marcar cuáles ya tienen copia de usuario.
+3. Avisar en una línea: elegir una impresora en la ventana de Orca no le llega a Claude; Claude trabaja con las copias de usuario guardadas.
+4. **Si la elegida no tiene copia de usuario, ofrecer crearla:**
+   1. Investigar su perfil de sistema de máquina en la versión de Orca del usuario (`sistema.maquina`, con nombre y `setting_id`; sección 2). Usar el nombre de esa versión, no uno viejo.
+   2. `perfil_orca.py crear --tipo maquina --nombre "Mi <modelo> <boquilla> nozzle" --hereda "<perfil de sistema de máquina>" --impresora <datos>.json --salida <carpeta>`: arma el mismo JSON mínimo que guarda Orca y el `.info` con el `base_id`.
+   3. Escribirlo con `device_commit_files` en la carpeta `machine` de los perfiles de usuario (`user/<id>/machine/`, con la misma `<id>` que `process` y `filament`).
+   4. Pedirle que cierre y abra Orca, y verificar con `list_profiles` (`machine`).
+   La alternativa es que la guarde el usuario en Orca: elegir la impresora y, en su configuración, guardar una copia con el ícono de guardar. Si la impresora no está ni en Orca, agregarla con el asistente de impresoras de Orca (marca y modelo).
+5. Si esa impresora ya está preparada en el taller (en `config.json`, con `datos` apuntando a un JSON que pasa `impresora.py validar`), usar esos datos. Si no, seguir con la sección 2.
+
+**Leer la lista de Orca en la PC** (solo con `device_bash`): estos comandos no copian el archivo y sacan solo `models` y `presets.machine`. Guardar la salida como `orca.json` en el espacio de Claude y pasarla con `--orca`.
+
+- Linux o macOS: `python3 -c 'import json,sys; c=json.load(open(sys.argv[1], encoding="utf-8")); print(json.dumps({"models": c.get("models", []), "machine": (c.get("presets") or {}).get("machine")}, ensure_ascii=False))' "<carpeta de datos de Orca>/OrcaSlicer.conf"`
+- Windows (PowerShell): `$c = Get-Content -Raw -Encoding UTF8 "<carpeta de datos de Orca>\OrcaSlicer.conf" | ConvertFrom-Json; @{models = $c.models; machine = $c.presets.machine} | ConvertTo-Json -Depth 5 -Compress`
+
+La carpeta de datos de Orca es la que contiene `user/`: Linux `~/.config/OrcaSlicer` (Flatpak: `~/.var/app/com.orcaslicer.OrcaSlicer/config/OrcaSlicer`), Windows `C:\Users\<usuario>\OrcaSlicer` después del instalador (antes, `%APPDATA%\OrcaSlicer`), macOS `~/Library/Application Support/OrcaSlicer`.
 
 ## 2. Investigar la impresora
 
@@ -68,7 +86,7 @@ Los números del ejemplo son de muestra: cada valor sale de la impresora real.
 | Campo | De dónde sale |
 |---|---|
 | `nombre` (el `printer_model` de Orca), `perfiles_maquina`, `area`, `firmware`, `boquilla_mm` | Orca: el perfil de máquina del usuario (`impresora.py desde-gcode`) |
-| `patron_perfiles` | El modelo como aparece en los nombres de los perfiles (`... @Modelo`); lo usa la revisión automática para reconocer la impresora |
+| `patron_perfiles` | El modelo como aparece en los nombres de los perfiles de sistema (`... @Modelo`); lo usa la revisión automática para reconocer la impresora, como palabra entera. Si el nombre corto es ambiguo, el modelo completo (`Creality Hi`, no `Hi`). Los perfiles AUTO se llaman `AUTO proceso @<patron_perfiles>` |
 | `limites.boquilla_max_c`, `limites.cama_max_c` | Fabricante. Obligatorios |
 | `cerramiento`, `cinematica`, `boquilla_tipo`, `limites.velocidad_max_mm_s`, `limites.aceleracion_max_mm_s2` | Fabricante (o el perfil de Orca para las velocidades) |
 | `sistema`, `cama_sistema` | Perfiles de OrcaSlicer de ese modelo. `cama_sistema`: [otras capas, primera capa] para la cama por defecto |

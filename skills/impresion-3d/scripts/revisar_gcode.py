@@ -113,7 +113,8 @@ IMPRESORA_GENERICA = {
 
 def elegir_impresora(modelo: str, perfil: str, candidatas) -> dict | None:
     """Entre los datos de impresora del usuario, la que corresponde a ese printer_model y ese nombre de
-    perfil. Primero coincidencias exactas (perfil de máquina o modelo); después el patrón más largo."""
+    perfil. Primero coincidencias exactas (perfil de máquina o modelo); después el patrón más largo,
+    como palabra entera."""
     candidatas = [c for c in candidatas or [] if isinstance(c, dict)]
     for datos in candidatas:
         if perfil and perfil in (datos.get("perfiles_maquina") or []):
@@ -121,8 +122,13 @@ def elegir_impresora(modelo: str, perfil: str, candidatas) -> dict | None:
     for datos in candidatas:
         if modelo and modelo == datos.get("nombre"):
             return datos
-    con_patron = [d for d in candidatas if d.get("patron_perfiles") and d["patron_perfiles"] in perfil]
+    con_patron = [d for d in candidatas if d.get("patron_perfiles") and contiene_palabra(perfil, d["patron_perfiles"])]
     return max(con_patron, key=lambda d: len(d["patron_perfiles"])) if con_patron else None
+
+
+def contiene_palabra(texto: str, patron: str) -> bool:
+    """El patrón aparece entero, no pegado a otras letras ("Hi" está en "@Creality Hi-all", no en "High Flow")."""
+    return bool(re.search(r"(?<!\w)" + re.escape(str(patron)) + r"(?!\w)", str(texto)))
 
 
 def detectar_impresora(ruta: Path | None, texto: str | None = None, candidatas=None) -> dict:

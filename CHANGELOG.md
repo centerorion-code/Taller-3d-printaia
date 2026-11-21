@@ -1,5 +1,19 @@
 # Cambios
 
+## 0.1.8 (2026-11-21)
+
+Correcciones de una prueba real con varias impresoras en Orca.
+
+- **Ve todas las impresoras de Orca, no solo las que tienen copia de usuario.** `impresora.py detectar` junta las copias de usuario (carpeta `machine`), las impresoras que nombran tus perfiles en `compatible_printers` y, si Claude tiene terminal en tu PC, la lista de Orca y la impresora elegida, leídas ahí mismo de `OrcaSlicer.conf`. Para saber el modelo usa `compatible_printers`, no `inherits`, que puede traer nombres viejos.
+- **Pregunta en cuál trabajar** poniendo primero la elegida en Orca o la última usada, marca cuáles tienen copia y avisa que elegir una impresora en la ventana de Orca no le llega a Claude.
+- **Crea la copia de usuario** de la impresora si no la tiene (`perfil_orca.py crear --tipo maquina`), en la carpeta `machine`; después hay que reiniciar Orca. También la podés guardar vos en Orca.
+- La carpeta `machine` de los perfiles de Orca se pide junto con `process` y `filament`, en un solo pedido. Los instaladores la muestran al final.
+- **`OrcaSlicer.conf` no se trae ni se lee entero:** guarda la IP y el código de acceso de las impresoras en red. Un bloqueo nuevo impide traerlo con `device_stage_files` o leerlo entero por terminal; solo se aceptan los comandos que sacan `models` y `presets.machine`.
+- `/taller-3d:instalar` comprueba que la carpeta de trabajo exista antes de pedir el permiso (la app solo conecta carpetas que existen) y, si no existe, te pide que la crees.
+- Los perfiles `AUTO` de una impresora con copia de usuario ya no salen como "sin impresora" aunque esa impresora no esté preparada en el taller (`novedades_orca.py perfiles --maquinas`).
+- El nombre corto de una impresora para reconocer sus perfiles ya no puede ser algo como "Hi" (de "Creality Hi"), que coincidía con "High Flow": queda el modelo completo y se compara como palabra entera.
+- **Comandos con prefijo:** en la app se escriben `/taller-3d:instalar`, `/taller-3d:pieza`, etc. Se corrigieron README, INSTALACION, el manual, la ayuda, el cierre de `/taller-3d:instalar`, los instaladores y el flyer.
+
 ## 0.1.7 (2026-11-21)
 
 - **El plugin ya no trae impresoras cargadas.** Se borraron los datos fijos de la Creality Ender-3 V3 Plus: cada persona tiene las suyas, y no se pueden guardar todas.

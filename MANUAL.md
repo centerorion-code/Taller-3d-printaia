@@ -5,7 +5,7 @@ Cómo pedirle una pieza a Claude y qué pasa desde que la pedís hasta que la im
 ## Antes de empezar (una sola vez)
 
 1. Sumá el plugin desde el menú de **Claude Desktop**, la app de escritorio, con la dirección de GitHub `noamix/Taller-3d-printaia` (no se hace desde el chat), e instalá lo necesario en tu PC (ver [INSTALACION.md](INSTALACION.md)).
-2. En Claude escribí `/instalar`: revisa que todo ande, te pregunta en qué impresora de tu Orca querés trabajar, investiga sus datos oficiales y la configura, y hace una pieza de prueba.
+2. En Claude escribí `/taller-3d:instalar`: revisa que todo ande, te pregunta en qué impresora de tu Orca querés trabajar, investiga sus datos oficiales y la configura, y hace una pieza de prueba.
 3. La primera vez te pide que leas el [aviso de uso](DISCLAIMER.md) y escribas ACEPTO.
 
 La PC tiene que estar prendida y con la app de Claude abierta, porque ahí están tu Orca y tus carpetas. Con eso, podés pedir piezas desde la PC o desde el celular.
@@ -14,8 +14,8 @@ La PC tiene que estar prendida y con la app de Claude abierta, porque ahí está
 
 | Querés… | Pedilo así | Qué recibís |
 |---|---|---|
-| **Solo el diseño** (lo imprimís en otro lado, lo mandás a un servicio o querés el archivo) | "Diseñame…", "necesito el STL de…", `/diseno` | Modelo paramétrico: STL, archivo editable con las medidas arriba y una vista. No hace falta la PC. |
-| **La pieza lista para imprimir** en tu impresora | "Haceme…", "imprimime…", `/pieza` | Todo lo anterior más la configuración, el G-code revisado y el costo. |
+| **Solo el diseño** (lo imprimís en otro lado, lo mandás a un servicio o querés el archivo) | "Diseñame…", "necesito el STL de…", `/taller-3d:diseno` | Modelo paramétrico: STL, archivo editable con las medidas arriba y una vista. No hace falta la PC. |
+| **La pieza lista para imprimir** en tu impresora | "Haceme…", "imprimime…", `/taller-3d:pieza` | Todo lo anterior más la configuración, el G-code revisado y el costo. |
 | **La pieza y su publicación** en tu tienda | "…y publicala", o decí que sí cuando Claude te lo ofrece | Además, el borrador del producto con precio, imagen y descripción. |
 
 Si no queda claro cuál querés, Claude te lo pregunta una sola vez.
@@ -43,7 +43,7 @@ Un buen pedido dice:
 - "Diseñame un organizador para cajón de 3 divisiones, 300 × 120 × 50 mm. Solo el STL, que lo imprimo en un servicio. Que pueda cambiar la cantidad de divisiones."
 - "Quiero hacer llaveros con nombre para vender." Si hay un plugin de Orca que lo hace, Claude te lo sugiere (y te dice de quién es y qué riesgos tiene); si preferís, lo diseña él.
 
-También podés escribir `/pieza` y Claude te guía.
+También podés escribir `/taller-3d:pieza` y Claude te guía.
 
 ### Si no sabés algo
 
@@ -58,7 +58,7 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
         ↓
  3. Diseño + vista previa ── ¿la aprobás? ── no → cambios y otra vista
         │                      (si hay un plugin de Orca que lo hace, te lo sugiere)
-        ├── ¿solo el diseño? → STL + archivo editable y listo (/diseno)
+        ├── ¿solo el diseño? → STL + archivo editable y listo (/taller-3d:diseno)
         ↓ sí, para imprimir
  4. Configuración según el uso (perfiles de trabajo AUTO)
         ↓
@@ -90,7 +90,7 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
    **En paralelo, la publicación:** si tenés tienda configurada, Claude te ofrece armar el producto en ese momento, con el precio calculado con el tiempo y los gramos reales y una imagen ilustrativa (dice "Imagen ilustrativa"). Lo aprobás vos, también desde la app de Claude en el celular, y queda como borrador.
 8. **Imprimís vos.** Pasás el G-code a la impresora (por USB o con la app de la marca) y la arrancás desde ahí. **Claude nunca arranca una impresión.** Mirá la primera capa completa y no dejes la impresora sola.
 9. **Contale cómo salió.** Mandale una foto, aunque haya salido bien. Si algo falló, lo diagnostica y lo corrige. Lo que funcionó queda anotado y mejora las próximas piezas.
-10. **Vender.** Cuando tengas la pieza impresa, mandale la foto: la suma al producto como imagen principal. El borrador lo publicás vos desde tu tienda. Si no lo armaste antes, `/publicar` lo hace en cualquier momento.
+10. **Vender.** Cuando tengas la pieza impresa, mandale la foto: la suma al producto como imagen principal. El borrador lo publicás vos desde tu tienda. Si no lo armaste antes, `/taller-3d:publicar` lo hace en cualquier momento.
 
 ## Qué decidís vos
 
@@ -129,17 +129,19 @@ Pedilo con tus palabras: "Hacé el soporte del router 1 cm más ancho" o "el agu
 
 ## Otros pedidos
 
+Los comandos llevan el nombre del plugin adelante (`/taller-3d:...`): si escribís `/pieza` a secas, no corre. Con tus palabras también funciona.
+
 | Para… | Decí o usá |
 |---|---|
-| Solo el diseño, sin imprimir | `/diseno` o "necesito el STL de…" |
-| Calibrar un rollo nuevo | `/calibrar` o "calibrá el PETG nuevo" |
-| Trabajar con otra impresora | `/impresoras`, o decilo en el pedido ("en la Bambu") |
-| Vender una pieza | `/publicar` |
-| Ver todas tus piezas o buscar una | `/catalogo` |
-| Volver atrás un cambio de perfil | `/restaurar` |
-| Revisar que todo ande | `/instalar` |
+| Solo el diseño, sin imprimir | `/taller-3d:diseno` o "necesito el STL de…" |
+| Calibrar un rollo nuevo | `/taller-3d:calibrar` o "calibrá el PETG nuevo" |
+| Trabajar con otra impresora | `/taller-3d:impresoras`, o decilo en el pedido ("en la Bambu") |
+| Vender una pieza | `/taller-3d:publicar` |
+| Ver todas tus piezas o buscar una | `/taller-3d:catalogo` |
+| Volver atrás un cambio de perfil | `/taller-3d:restaurar` |
+| Revisar que todo ande | `/taller-3d:instalar` |
 | Una duda de configuración | "¿Qué es la costura en bisel?", "¿por qué salen hilos?" |
-| Volver a ver este manual | `/ayuda` |
+| Volver a ver este manual | `/taller-3d:ayuda` |
 
 ## Lo que el taller no hace (todavía)
 
@@ -147,13 +149,13 @@ Pedilo con tus palabras: "Hacé el soporte del router 1 cm más ancho" o "el agu
 - No garantiza piezas para uso médico, de seguridad o en contacto con alimentos.
 - Para figuras, formas orgánicas o texto en relieve necesita Blender, un plugin de Orca o un modelo existente: el diseño por código es para piezas funcionales.
 - No imprime roscas: usa tornillos pasantes, tuercas o insertos de latón.
-- Un encastre muy justo puede necesitar una prueba. Si calibrás la tolerancia con `/calibrar`, acierta más a la primera.
+- Un encastre muy justo puede necesitar una prueba. Si calibrás la tolerancia con `/taller-3d:calibrar`, acierta más a la primera.
 
 ## Preguntas frecuentes
 
 **¿Puedo pedir desde el celular?** Sí, con la PC prendida y la app de Claude abierta en la PC.
 
-**¿Necesito la PC para un diseño?** No. Con `/diseno` Claude te manda el STL y el archivo editable por el chat. La PC hace falta para laminar y para dejar los archivos en tu carpeta.
+**¿Necesito la PC para un diseño?** No. Con `/taller-3d:diseno` Claude te manda el STL y el archivo editable por el chat. La PC hace falta para laminar y para dejar los archivos en tu carpeta.
 
 **¿Se entera de las novedades de Orca?** Sí. Después de cada laminado compara tu Orca con lo que conoce (parámetros nuevos o que ya no están) y una vez por mes revisa si salió una versión nueva o hay plugins útiles. Te avisa solo lo que te sirve; nunca instala ni actualiza nada solo.
 
@@ -167,4 +169,4 @@ Pedilo con tus palabras: "Hacé el soporte del router 1 cm más ancho" o "el agu
 
 **¿Y si la pieza sale mal?** Mandale una foto y contale qué pasó: lo diagnostica, corrige el perfil o el modelo y lo anota para la próxima.
 
-**¿Qué pasa con mis perfiles de Orca?** Solo se reescriben los "AUTO". Los tuyos se cambian únicamente si lo aprobás, siempre con respaldo, y `/restaurar` los vuelve atrás.
+**¿Qué pasa con mis perfiles de Orca?** Solo se reescriben los "AUTO". Los tuyos se cambian únicamente si lo aprobás, siempre con respaldo, y `/taller-3d:restaurar` los vuelve atrás.

@@ -5,7 +5,7 @@ description: Base de conocimiento y reglas de seguridad del taller 3D (OrcaSlice
 
 # Taller 3D: conocimiento y reglas
 
-Responder en el idioma del usuario (rioplatense si escribe así), directo y accionable. Fundamentar cada ajuste: qué se cambia y por qué.
+Responder en el idioma del usuario (rioplatense si escribe así), directo y accionable. Fundamentar cada ajuste: qué se cambia y por qué. Al nombrarle un comando al usuario, escribirlo como se usa en la app, con el prefijo del plugin (`/taller-3d:pieza`); en estas instrucciones aparecen sin prefijo.
 
 ## 1. Reglas de seguridad (siempre, sin excepción)
 
@@ -28,7 +28,7 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
   - `vista_previa.py`: PNG con 4 vistas y medidas.
   - `perfil_orca.py`: `crear`, `validar` y `diff` de perfiles de usuario.
   - `revisar_gcode.py`: revisión de seguridad del G-code; con `--json` y precios, también calcula el costo.
-  - `impresora.py`: datos de cada impresora (`validar`, `desde-gcode` para leer lo que usa Orca y `comparar`). Ver `references/impresoras.md`.
+  - `impresora.py`: impresoras del usuario y sus datos (`detectar` las que tiene en Orca, `validar`, `desde-gcode` para leer lo que usa Orca y `comparar`). Ver `references/impresoras.md`.
   - `producto_tienda.py`: ficha de producto y precio (lo usa `/publicar`).
   - `catalogo.py`: índice de las piezas (`taller-3d/catalogo.json`) y página `catalogo.html` con vistas, datos y archivos (skill `catalogo`).
   - `novedades_orca.py`: compara el Orca del usuario con lo que conoce el taller (parámetros nuevos o que ya no están, claves viejas en perfiles, perfiles TEST o AUTO que sobran) y dice cuándo toca revisar en la web (sección 7).
@@ -94,7 +94,7 @@ Los archivos del plugin no cambian solos. Lo que se aprende del Orca del usuario
 
 1. **Después de cada laminado** (`/pieza`, `/calibrar`, la prueba de `/instalar`), con el G-code ya traído: `python3 -I novedades_orca.py gcode <gcode> --estado <novedades-orca.json traído>`. Si dice que es otra versión de Orca o hay parámetros nuevos o que ya no están, contarlo en una línea. Antes de explicar o recomendar un parámetro nuevo, buscarlo en la wiki de Orca (orcaslicer.com/wiki) o en sus notas de versión. `perfil_orca.py` no acepta claves que no estén en el catálogo de la 2.5.1: si una nueva hace falta, el usuario la cambia en Orca y conviene actualizar el plugin.
 2. **Una vez por mes:** `novedades_orca.py web --estado ...` dice si toca. Si toca, buscar si salió una versión nueva de OrcaSlicer (orcaslicer.com/download) y si hay plugins nuevos que sirvan en el Plugin Hub (`references/plugins-orca.md`); anotarlo con `--marcar "<resumen>"`. Contarle al usuario solo lo que le sirve. No instalar ni actualizar nada solo.
-3. **Lo que no se usa:** en `/impresoras` y `/restaurar`, traer las carpetas de perfiles y correr `novedades_orca.py perfiles <process> <filament> --config <config.json>`: claves viejas que Orca ya no usa, perfiles `TEST` de más de 30 días y `AUTO` de impresoras que ya no están. Ofrecer ordenarlos; nunca cambiar ni borrar perfiles del usuario sin su OK.
+3. **Lo que no se usa:** en `/impresoras` y `/restaurar`, traer las carpetas de perfiles y correr `novedades_orca.py perfiles <process> <filament> --config <config.json> --maquinas <machine>`: claves viejas que Orca ya no usa, perfiles `TEST` de más de 30 días y `AUTO` de impresoras que ya no están. Ofrecer ordenarlos; nunca cambiar ni borrar perfiles del usuario sin su OK.
 
 ## 8. Referencias
 

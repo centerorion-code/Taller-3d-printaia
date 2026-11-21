@@ -49,7 +49,7 @@ param(
 Set-StrictMode -Version 1.0
 $ErrorActionPreference = 'Stop'
 
-$VersionPlugin = '0.1.7'
+$VersionPlugin = '0.1.8'
 $OrcaVersion = '2.5.1'
 $OrcaBase = "https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v$OrcaVersion"
 $OrcaArchivos = @{
@@ -877,6 +877,7 @@ try {
     if (-not $Prueba) { Info "Registro de la instalación: $Registro" }
     $proceso = Join-Path $DatosOrca 'user\default\process'
     $filamento = Join-Path $DatosOrca 'user\default\filament'
+    $maquina = Join-Path $DatosOrca 'user\default\machine'
     Write-Host ''
     Write-Host 'Próximos pasos:'
     Write-Host '  1. Abrí OrcaSlicer una vez y agregá tu impresora con el asistente. Guardá una copia de usuario del'
@@ -886,11 +887,12 @@ try {
     Write-Host "     - $CarpetaTrabajo"
     Write-Host "     - $proceso"
     Write-Host "     - $filamento"
+    Write-Host "     - $maquina (aparece cuando guardás la copia de la impresora)"
     if ($DatosOrca -ne $datosReales) {
         Write-Host '     No las conectes pasando por AppData: Orca no vería lo que escribe Claude.'
     }
-    Write-Host '  3. Instalá el plugin taller-3d en Claude (si no lo hiciste) y escribí: /instalar'
-    Write-Host '     Claude revisa que todo ande, registra tu impresora y hace una pieza de prueba.'
+    Write-Host '  3. Instalá el plugin taller-3d en Claude (si no lo hiciste) y escribí: /taller-3d:instalar'
+    Write-Host '     Claude revisa que todo ande, te pregunta en qué impresora trabajar y hace una pieza de prueba.'
 } catch {
     Write-Host ''
     Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red

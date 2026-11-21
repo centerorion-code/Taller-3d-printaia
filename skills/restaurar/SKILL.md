@@ -18,7 +18,7 @@ Cargar antes la skill `impresion-3d` y seguir sus reglas. Script: `<raíz del pl
 ## Ordenar perfiles de prueba
 
 La conexión con la PC no puede borrar archivos. Para limpiar:
-1. Listar los perfiles `TEST ...` y, si el usuario quiere, los `AUTO ...` (`list_profiles`). Para saber cuáles sobran, traer las carpetas de perfiles y correr `novedades_orca.py perfiles <process> <filament> --config <config.json>`: marca los `TEST` de más de 30 días, los `AUTO` de impresoras que ya no están y las claves que Orca ya no usa.
+1. Listar los perfiles `TEST ...` y, si el usuario quiere, los `AUTO ...` (`list_profiles`). Para saber cuáles sobran, traer las carpetas de perfiles y correr `novedades_orca.py perfiles <process> <filament> --config <config.json> --maquinas <machine>`: marca los `TEST` de más de 30 días, los `AUTO` de impresoras que ya no están y las claves que Orca ya no usa.
 2. Indicar cómo borrarlos: en Orca, elegir el perfil y usar el ícono de borrar, o desde el explorador de archivos, borrando el `.json` y el `.info` de cada uno en la carpeta de perfiles de usuario.
 3. No borrar nunca perfiles que no sean `TEST` o `AUTO` sin que el usuario lo pida explícitamente.
 

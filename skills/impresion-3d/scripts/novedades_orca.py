@@ -12,7 +12,7 @@ Uso:
   python3 novedades_orca.py gcode plate_1.gcode --estado novedades-orca.json
 
   # Perfiles de usuario: claves que Orca ya no usa, perfiles TEST viejos, AUTO de impresoras que no están
-  python3 novedades_orca.py perfiles <carpeta process> <carpeta filament> [--config config.json]
+  python3 novedades_orca.py perfiles <carpeta process> <carpeta filament> [--config config.json] [--maquinas <carpeta machine>]
 
   # ¿Toca revisar en la web si hay Orca o plugins nuevos? (cada 30 días)
   python3 novedades_orca.py web --estado novedades-orca.json [--marcar "Orca 2.5.1 sigue siendo la última"]
@@ -114,12 +114,20 @@ def _actualizado(archivo: Path, perfil: dict) -> dt.date | None:
         return None
 
 
-def revisar_perfiles(rutas: list[Path], config: dict | None) -> dict:
+def revisar_perfiles(rutas: list[Path], config: dict | None, maquinas: list[Path] | None = None) -> dict:
     catalogo = comun.cargar_catalogo()
     base = set(comun.cargar_json(BASE_GCODE)["claves"])
     conocidas = set(catalogo) | base | META
     impresoras = {str(i.get("perfil_maquina", "")) for i in (config or {}).get("impresoras", [])}
     patrones = {str(i.get("nombre_corto") or i.get("id") or "") for i in (config or {}).get("impresoras", [])}
+    # Las copias de usuario de máquina también son impresoras presentes, aunque no estén preparadas en el taller.
+    for archivo in _perfiles(maquinas or []):
+        try:
+            datos = comun.cargar_json(archivo)
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            continue
+        if isinstance(datos, dict):
+            impresoras.update(str(datos[k]) for k in ("name", "inherits") if datos.get(k))
     en_config = set()
     for imp in (config or {}).get("impresoras", []):
         for valor in imp.values():
@@ -169,6 +177,8 @@ def main(argv=None) -> None:
     p = sub.add_parser("perfiles")
     p.add_argument("rutas", type=Path, nargs="+")
     p.add_argument("--config", type=Path)
+    p.add_argument("--maquinas", type=Path, nargs="*", default=[],
+                   help="carpeta machine traída: sus copias de usuario cuentan como impresoras presentes")
     w = sub.add_parser("web")
     w.add_argument("--marcar", nargs="?", const="", help="anotar que se revisó hoy (con una nota opcional)")
     for s in (g, p, w):
@@ -194,7 +204,7 @@ def main(argv=None) -> None:
             print("  Sin novedades desde la última vez.")
     elif a.accion == "perfiles":
         config = comun.cargar_json(a.config) if a.config and a.config.exists() else None
-        r = revisar_perfiles(a.rutas, config)
+        r = revisar_perfiles(a.rutas, config, a.maquinas)
         for nombre, claves in r["claves_que_orca_no_usa"].items():
             print(f"  {nombre}: claves que Orca {comun.VERSION_ORCA} ya no usa: {', '.join(claves)}")
         for t in r["test_viejos"]:

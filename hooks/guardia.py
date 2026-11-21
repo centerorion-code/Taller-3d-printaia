@@ -326,9 +326,37 @@ def escribe_en_orca(comando: str) -> bool:
     return False
 
 
+AVISO_CONF = ("taller-3d: OrcaSlicer.conf guarda la IP y el código de acceso de las impresoras en red, así que no "
+              "se trae ni se lee entero. Con la terminal de la PC leé solo models y presets.machine con el comando "
+              "de references/impresoras.md (skill impresion-3d); si no hay terminal, preguntale al usuario qué "
+              "impresoras tiene.")
+
+
+def es_conf_de_orca(ruta: str) -> bool:
+    return re.split(r"[\\/]", str(ruta).strip())[-1].lower() == "orcaslicer.conf"
+
+
+def lee_conf_entero(comando: str) -> bool:
+    """¿El comando lee OrcaSlicer.conf sin filtrarlo? Solo se acepta sacar models y presets.machine como JSON."""
+    c = comando.lower()
+    if "orcaslicer.conf" not in c:
+        return False
+    filtrado = "json" in c and "models" in c and "machine" in c
+    return not filtrado or any(x in c for x in ("local_machines", "access_code", "dev_ip", "user_access"))
+
+
+def pre_stage(datos: dict) -> None:
+    entrada = datos.get("tool_input") or {}
+    rutas = entrada.get("paths") if isinstance(entrada.get("paths"), list) else []
+    if any(es_conf_de_orca(r) for r in rutas):
+        bloquear(AVISO_CONF)
+
+
 def pre_bash(datos: dict) -> None:
     comando = _comando(datos.get("tool_input") or {})
     c = comando.lower()
+    if lee_conf_entero(comando):
+        bloquear(AVISO_CONF)
     if re.search(HERRAMIENTAS_RED, c) and any(re.search(p, c) for p in PATRONES_IMPRESION):
         bloquear("taller-3d: el plugin nunca arranca impresiones. Mandá el archivo a la impresora y "
                  "arrancala vos desde la pantalla o la app de la impresora.")
@@ -361,7 +389,8 @@ def main() -> None:
         sys.exit(0)
     if not isinstance(datos, dict):
         sys.exit(0)
-    acciones = {"pre-commit": pre_commit, "pre-write": pre_write, "pre-bash": pre_bash, "post-slice": post_slice}
+    acciones = {"pre-commit": pre_commit, "pre-write": pre_write, "pre-bash": pre_bash, "pre-stage": pre_stage,
+                "post-slice": post_slice}
     accion = acciones.get(modo)
     if accion is None:
         sys.exit(0)

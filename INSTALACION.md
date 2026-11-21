@@ -10,7 +10,7 @@ Antes de instalar, leé el [aviso de uso](DISCLAIMER.md).
 - Una PC con **Linux** (probado en Ubuntu 24.04) o **Windows 10/11** (instalador sin probar todavía en una PC real). macOS: a mano (sección C).
 - Una impresora 3D que OrcaSlicer soporte.
 - Blender es opcional (formas orgánicas o decorativas).
-- Para pedir solo diseños (`/diseno`) alcanza con Claude: no hace falta instalar nada en la PC.
+- Para pedir solo diseños (`/taller-3d:diseno`) alcanza con Claude: no hace falta instalar nada en la PC.
 
 ### Lo que pide la PC
 
@@ -33,7 +33,7 @@ Más adelante el taller va a estar también en el directorio de plugins de Anthr
 ## A. Linux, con el instalador
 
 1. Sumá el plugin a Claude (sección anterior), si todavía no lo hiciste.
-2. Conseguí el instalador: en Claude escribí `/instalar` y te lo deja en una carpeta de tu PC. También lo podés bajar de GitHub: en la página del repositorio, **Code → Download ZIP**; descomprimilo y usá la carpeta `instalador/`.
+2. Conseguí el instalador: en Claude escribí `/taller-3d:instalar` y te lo deja en una carpeta de tu PC. También lo podés bajar de GitHub: en la página del repositorio, **Code → Download ZIP**; descomprimilo y usá la carpeta `instalador/`.
 3. Abrí una terminal en esa carpeta y corré primero el modo prueba, que muestra todo lo que haría sin cambiar nada:
    ```bash
    bash instalar.sh --prueba
@@ -67,7 +67,7 @@ Opciones: `--orca RUTA` (un Orca que ya tengas: ejecutable, AppImage o el script
 > Todavía no se probó en una PC con Windows: se revisó la sintaxis y las funciones con PowerShell 7. Si algo falla, el registro queda en `%LOCALAPPDATA%\taller-3d\` y podés mandárselo al autor.
 
 1. Sumá el plugin a Claude (sección anterior), si todavía no lo hiciste.
-2. Conseguí el instalador: en Claude escribí `/instalar` y te lo deja en una carpeta de tu PC. También lo podés bajar de GitHub: en la página del repositorio, **Code → Download ZIP**; descomprimilo (clic derecho → **Extraer todo**) y usá la carpeta `instalador/`.
+2. Conseguí el instalador: en Claude escribí `/taller-3d:instalar` y te lo deja en una carpeta de tu PC. También lo podés bajar de GitHub: en la página del repositorio, **Code → Download ZIP**; descomprimilo (clic derecho → **Extraer todo**) y usá la carpeta `instalador/`.
 3. Para ver qué haría sin cambiar nada: abrí PowerShell en esa carpeta y corré `.\instalar-windows.bat -Prueba`.
 4. Hacé doble clic en **`instalar-windows.bat`**. Si Windows muestra "Windows protegió su PC", tocá "Más información" → "Ejecutar de todos modos".
    El instalador:
@@ -105,11 +105,11 @@ Opciones (en PowerShell): `-Orca "<ruta de orca-slicer.exe>"` (por ejemplo, uno 
 
 ## Después de instalar (todos los sistemas)
 
-1. **Abrí OrcaSlicer una vez** y agregá tu impresora con el asistente. Guardá una copia de usuario del perfil de cada impresora con la que quieras trabajar, por ejemplo `Mi <modelo> 0.4 nozzle`, y un perfil propio de proceso y de filamento: así Orca crea las carpetas de perfiles.
+1. **Abrí OrcaSlicer una vez** y agregá tu impresora con el asistente. Guardá una copia de usuario del perfil de cada impresora con la que quieras trabajar, por ejemplo `Mi <modelo> 0.4 nozzle` (o pedíselo a Claude después), y un perfil propio de proceso y de filamento: así Orca crea las carpetas de perfiles.
 2. **Conectá las carpetas** en la app de Claude (menú + → Agregar carpeta), con las rutas que te muestra el instalador al final:
    - la carpeta de trabajo;
-   - las carpetas `process` y `filament` de tus perfiles de Orca. Linux: `~/.config/OrcaSlicer/user/default/...` (Flatpak: `~/.var/app/com.orcaslicer.OrcaSlicer/config/OrcaSlicer/user/default/...`). Windows: `C:\Users\<vos>\OrcaSlicer\user\default\...` (**no** por AppData). macOS: `~/Library/Application Support/OrcaSlicer/user/default/...`.
-3. En Claude escribí **`/instalar`**: revisa que todo ande, te pregunta en qué impresora de tu Orca querés trabajar y la prepara (investiga sus datos oficiales y arma los perfiles), carga tus precios y tu tienda si querés, y hace una pieza de prueba.
+   - las carpetas `process`, `filament` y `machine` de tus perfiles de Orca (`machine` aparece cuando guardás la primera copia de una impresora). Linux: `~/.config/OrcaSlicer/user/default/...` (Flatpak: `~/.var/app/com.orcaslicer.OrcaSlicer/config/OrcaSlicer/user/default/...`). Windows: `C:\Users\<vos>\OrcaSlicer\user\default\...` (**no** por AppData). macOS: `~/Library/Application Support/OrcaSlicer/user/default/...`.
+3. En Claude escribí **`/taller-3d:instalar`**: revisa que todo ande, te pregunta en qué impresora de tu Orca querés trabajar y la prepara (investiga sus datos oficiales y arma los perfiles), carga tus precios y tu tienda si querés, y hace una pieza de prueba.
 
 ## Blender (opcional)
 
@@ -119,7 +119,7 @@ Para formas orgánicas o decorativas, instalá Blender desde https://www.blender
 
 | Problema | Qué hacer |
 |---|---|
-| Claude no ve Orca | Reiniciá la app de Claude. En `/instalar`, Claude te dice el estado de orca-mcp (y el error si no arranca). |
+| Claude no ve Orca | Reiniciá la app de Claude. En `/taller-3d:instalar`, Claude te dice el estado de orca-mcp (y el error si no arranca). |
 | "Preset not found" al laminar | Abrí Orca una vez; verificá que el perfil herede de uno de sistema. En Windows, que los datos de Orca estén fuera de AppData (paso B.4). |
 | Windows: Orca no muestra los perfiles AUTO | La carpeta de perfiles está conectada por AppData o los datos no se movieron: corré de nuevo el instalador y conectá la ruta `C:\Users\<vos>\OrcaSlicer\...`. |
 | Orca no abre (Linux): falta libOpenGL o WebKitGTK | `sudo apt install libopengl0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0` |

@@ -8,17 +8,19 @@ Plugin para Claude que arma un taller de impresión 3D con OrcaSlicer: diseña p
 
 ## Qué podés pedir
 
+En la app, los comandos llevan el nombre del plugin adelante: escribí `/taller-3d:pieza`, no `/pieza`. También podés pedir todo con tus palabras.
+
 | Comando | Para qué |
 |---|---|
-| `/pieza` | "Haceme un soporte para…", "imprimime esto", una foto o medidas → modelo, configuración, laminado, revisión, costo y, si querés, la publicación en paralelo |
-| `/diseno` | Solo el modelo 3D paramétrico (STL, archivo editable y vista), sin laminar; sirve sin la PC conectada |
-| `/calibrar` | Calibrar un filamento con los tests de Orca, leyendo los resultados en fotos |
-| `/impresoras` | Agregar o revisar impresoras (límites, perfiles, cama) y ver qué perfiles sobran |
-| `/publicar` | Armar el producto con precio por costo y margen y cargarlo como borrador en tu tienda |
-| `/instalar` | Instalar o revisar que todo ande (saltea lo que ya está) y hacer una pieza de prueba |
-| `/catalogo` | Ver todas tus piezas en una página (`catalogo.html`) con su vista, datos y archivos, buscarlas y marcarlas como impresas |
-| `/restaurar` | Volver atrás un perfil, ordenar perfiles de prueba, desinstalar |
-| `/ayuda` | Cómo pedir una pieza, el circuito y los comandos (el manual de uso) |
+| `/taller-3d:pieza` | "Haceme un soporte para…", "imprimime esto", una foto o medidas → modelo, configuración, laminado, revisión, costo y, si querés, la publicación en paralelo |
+| `/taller-3d:diseno` | Solo el modelo 3D paramétrico (STL, archivo editable y vista), sin laminar; sirve sin la PC conectada |
+| `/taller-3d:calibrar` | Calibrar un filamento con los tests de Orca, leyendo los resultados en fotos |
+| `/taller-3d:impresoras` | Agregar o revisar impresoras (límites, perfiles, cama) y ver qué perfiles sobran |
+| `/taller-3d:publicar` | Armar el producto con precio por costo y margen y cargarlo como borrador en tu tienda |
+| `/taller-3d:instalar` | Instalar o revisar que todo ande (saltea lo que ya está) y hacer una pieza de prueba |
+| `/taller-3d:catalogo` | Ver todas tus piezas en una página (`catalogo.html`) con su vista, datos y archivos, buscarlas y marcarlas como impresas |
+| `/taller-3d:restaurar` | Volver atrás un perfil, ordenar perfiles de prueba, desinstalar |
+| `/taller-3d:ayuda` | Cómo pedir una pieza, el circuito y los comandos (el manual de uso) |
 
 Además, la skill `impresion-3d` responde cualquier duda de configuración: conoce los 1015 parámetros de OrcaSlicer 2.5.1 (en español), recetas por tipo de pieza, materiales, calibración, diagnóstico de fallas y los plugins de Orca que valen la pena.
 
@@ -47,7 +49,7 @@ Por ahora el taller se instala desde este repositorio de GitHub. Se hace en **Cl
      ```
      Claude Code no actualiza solo los marketplaces que no son de Anthropic: activá **Enable auto-update** en `/plugin` → **Marketplaces**, o actualizalo a mano con `claude plugin marketplace update taller-3d` y `claude plugin update taller-3d@taller-3d`, y reiniciá Claude Code.
    - Si alguien te pasó el archivo `taller-3d.plugin`, también lo podés subir con **Plugins › Agregar › Subir plugin**, pero así no se actualiza: conviene sumarlo desde GitHub.
-2. **Prepará la PC:** con el plugin instalado, escribí `/instalar` en una conversación de Claude Desktop. Te deja el instalador para Linux o Windows, que primero revisa que la PC alcance (procesador, memoria, placa de video, disco e internet) y qué tenés instalado, y saltea lo que ya está. Usa versiones fijas con verificación SHA-256, tiene modo prueba y desinstalador. Detalles en [INSTALACION.md](INSTALACION.md).
+2. **Prepará la PC:** con el plugin instalado, escribí `/taller-3d:instalar` en una conversación de Claude Desktop. Te deja el instalador para Linux o Windows, que primero revisa que la PC alcance (procesador, memoria, placa de video, disco e internet) y qué tenés instalado, y saltea lo que ya está. Usa versiones fijas con verificación SHA-256, tiene modo prueba y desinstalador. Detalles en [INSTALACION.md](INSTALACION.md).
 
 ## Qué corre, qué manda y qué baja
 
@@ -71,7 +73,7 @@ Ubuntu 24.04, OrcaSlicer 2.5.1, orca-mcp 0.1.0, Creality Ender-3 V3 Plus. El ins
 
 ## Versión
 
-0.1.7. Cambios en [CHANGELOG.md](CHANGELOG.md).
+0.1.8. Cambios en [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 

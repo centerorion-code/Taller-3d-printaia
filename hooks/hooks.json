@@ -1,5 +1,5 @@
 {
-  "description": "Bloqueos de seguridad de taller-3d: revisa G-code, proyectos .3mf y perfiles antes de escribirlos, impide arrancar impresiones por red, subir modelos a internet y tocar la carpeta de Orca desde la terminal.",
+  "description": "Bloqueos de seguridad de taller-3d: revisa G-code, proyectos .3mf y perfiles antes de escribirlos, impide arrancar impresiones por red, subir modelos a internet, tocar la carpeta de Orca desde la terminal y traer la configuración de Orca, que guarda los códigos de acceso de las impresoras.",
   "hooks": {
     "PreToolUse": [
       {
@@ -9,6 +9,16 @@
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/guardia.py\" pre-commit",
             "timeout": 120
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*device_stage_files",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/guardia.py\" pre-stage",
+            "timeout": 10
           }
         ]
       },
