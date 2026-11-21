@@ -383,6 +383,8 @@ def main(argv=None) -> None:
     c.add_argument("--config", type=Path, help="config.json del usuario (para conocer sus perfiles)")
     c.add_argument("--cama", help="tipo de cama del usuario (filamentos): copia sus temperaturas a cool_plate_temp*, "
                                   "que es la que usa Orca por línea de comandos")
+    c.add_argument("--base-id", help="setting_id del perfil de sistema del que hereda, para el .info (si no, sale de "
+                                      "los datos de la impresora)")
     c.add_argument("--salida", type=Path, required=True, help="carpeta donde escribir el .json y el .info")
 
     v = sub.add_parser("validar")
@@ -449,11 +451,13 @@ def main(argv=None) -> None:
     if estado == RECHAZO:
         print("No escribí el perfil: corregí los rechazos.")
         comun.salir(estado)
+    sid = a.base_id or _setting_id(impresora, a.hereda)
+    if sid and not re.fullmatch(r"[A-Za-z0-9_.\-]{1,64}", str(sid)):
+        raise SystemExit(f"base_id '{sid}' no parece un setting_id de Orca (letras, números, _ . -): revisalo.")
     a.salida.mkdir(parents=True, exist_ok=True)
     destino = a.salida / f"{a.nombre}.json"
     destino.write_text(json.dumps(perfil, ensure_ascii=False, indent=4) + "\n", encoding="utf-8")
     print(f"Escrito: {destino}")
-    sid = _setting_id(impresora, a.hereda)
     if sid:
         info = a.salida / f"{a.nombre}.info"
         info.write_text(f"sync_info = create\nuser_id = \nsetting_id = \nbase_id = {sid}\n"

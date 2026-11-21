@@ -1,5 +1,18 @@
 # Cambios
 
+## 0.1.9 (2026-11-21)
+
+Correcciones de una revisión independiente de la 0.1.8.
+
+- **`OrcaSlicer.conf`, mejor protegido.** Ya no se puede sacar copiando, comprimiendo o buscando en toda la carpeta de datos de Orca, ni con comodines, nombres partidos o la copia `.bak` que Orca hace en Windows. Para leer la lista de impresoras solo pasan los dos comandos fijos de la guía, con la ruta absoluta. De la carpeta de datos de Orca solo se traen los perfiles (`user/` y `system/`). En Claude Code, `Read` y `Grep` también quedan bloqueados para ese archivo.
+- El bloqueo ya no frena comandos inofensivos que solo nombran el archivo (buscarlo en el código, un mensaje de commit) o miran si existe (`ls`, `stat`, `Test-Path`).
+- **La revisión del G-code no usa los límites de otra impresora.** Si el G-code dice el modelo, solo sirven los datos de ese modelo: una A1 mini ya no toma los de una A1. Sin modelo, la impresora tiene que estar al final del nombre del perfil, sin distinguir mayúsculas. Si no coincide ninguna, o coinciden dos, usa límites genéricos y ahora lo avisa.
+- El nombre con el que se reconocen los perfiles de una impresora ahora es el modelo completo (`Bambu Lab A1 mini`, no `Lab A1 mini`).
+- `impresora.py detectar` agrupa bien las boquillas entre paréntesis (`Creality K1 (0.4 nozzle)`), `HF0.4`, mayúsculas distintas y copias de copias, y no se cae con datos raros ni con archivos guardados por PowerShell (UTF-16).
+- Perfiles `AUTO` sin impresora: `@K1` ya no se confunde con una K1 Max, ni `@A1` con una A1 mini.
+- **Copia de la impresora:** lo más seguro es guardarla desde Orca, que además crea la carpeta `machine` si no existe. Claude la puede crear con `perfil_orca.py crear --tipo maquina --base-id <setting_id>`, sin necesitar los datos completos de la impresora.
+- Los comandos para leer la lista de Orca ignoran la línea de control (`# MD5 checksum`) que Orca agrega en Windows.
+
 ## 0.1.8 (2026-11-21)
 
 Correcciones de una prueba real con varias impresoras en Orca.

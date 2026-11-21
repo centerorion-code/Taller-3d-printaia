@@ -111,24 +111,55 @@ IMPRESORA_GENERICA = {
 }
 
 
+def _textos_de(datos: dict, *claves) -> list[str]:
+    return [datos[k] for k in claves if isinstance(datos.get(k), str) and datos[k].strip()]
+
+
 def elegir_impresora(modelo: str, perfil: str, candidatas) -> dict | None:
-    """Entre los datos de impresora del usuario, la que corresponde a ese printer_model y ese nombre de
-    perfil. Primero coincidencias exactas (perfil de máquina o modelo); después el patrón más largo,
-    como palabra entera."""
+    """Entre los datos de impresora del usuario, la que corresponde a ese printer_model y ese nombre de perfil.
+
+    1. El perfil de máquina exacto.
+    2. Si se sabe el modelo (printer_model del G-code), solo los datos de ese modelo: nunca los de uno parecido
+       (A1 y A1 mini, MK3 y MK3.5, Neptune 4 y Neptune 4 Pro).
+    3. Sin modelo, el patrón tiene que estar al final del nombre del perfil (@Modelo, @Modelo-all,
+       Modelo 0.4 nozzle); gana el más largo.
+    Si dos datos empatan, ninguno: mejor límites genéricos (con aviso) que los de otra impresora."""
     candidatas = [c for c in candidatas or [] if isinstance(c, dict)]
-    for datos in candidatas:
-        if perfil and perfil in (datos.get("perfiles_maquina") or []):
-            return datos
-    for datos in candidatas:
-        if modelo and modelo == datos.get("nombre"):
-            return datos
-    con_patron = [d for d in candidatas if d.get("patron_perfiles") and contiene_palabra(perfil, d["patron_perfiles"])]
-    return max(con_patron, key=lambda d: len(d["patron_perfiles"])) if con_patron else None
+    perfil_p, modelo_p = comun.plano(perfil), comun.plano(modelo)
+    if perfil_p:
+        exactas = [d for d in candidatas if perfil_p in {comun.plano(x) for x in d.get("perfiles_maquina") or []
+                                                         if isinstance(x, str)}]
+        if exactas:
+            return exactas[0] if len(exactas) == 1 else None
+    if modelo_p:
+        iguales = [d for d in candidatas if modelo_p in {comun.plano(x) for x in _textos_de(d, "nombre")}]
+        if not iguales:
+            iguales = [d for d in candidatas
+                       if any(modelo_p.endswith(" " + comun.plano(x)) for x in _textos_de(d, "nombre", "patron_perfiles"))]
+        return iguales[0] if len(iguales) == 1 else None
+    con_patron = [d for d in candidatas if _textos_de(d, "patron_perfiles") and termina_en(perfil, d["patron_perfiles"])]
+    if not con_patron:
+        return None
+    largo = max(len(comun.plano(d["patron_perfiles"])) for d in con_patron)
+    mejores = [d for d in con_patron if len(comun.plano(d["patron_perfiles"])) == largo]
+    return mejores[0] if len(mejores) == 1 else None
 
 
 def contiene_palabra(texto: str, patron: str) -> bool:
-    """El patrón aparece entero, no pegado a otras letras ("Hi" está en "@Creality Hi-all", no en "High Flow")."""
-    return bool(re.search(r"(?<!\w)" + re.escape(str(patron)) + r"(?!\w)", str(texto)))
+    """El patrón aparece entero, sin distinguir mayúsculas ("Hi" está en "@Creality Hi-all", no en "High Flow")."""
+    patron = comun.plano(patron)
+    return bool(patron) and bool(re.search(r"(?<!\w)" + re.escape(patron) + r"(?!\w)", comun.plano(texto)))
+
+
+# Lo que puede seguir al modelo al final del nombre de un perfil: -all y la boquilla.
+RE_FIN_PERFIL = r"(?:-all)?(?:\s*[(\[]?\s*(?:hf\s*)?\d+(?:[.,]\d+)?\s*(?:mm)?\s*(?:nozzle)?\s*(?:hf)?\s*[)\]]?)?\s*$"
+
+
+def termina_en(nombre: str, patron: str) -> bool:
+    """¿El nombre del perfil termina con el patrón de la impresora? Así 'A1' no toma 'A1 mini' ni 'MK3' toma
+    'MK3.5'."""
+    patron = comun.plano(patron)
+    return bool(patron) and bool(re.search(r"(?<!\w)" + re.escape(patron) + RE_FIN_PERFIL, comun.plano(nombre)))
 
 
 def detectar_impresora(ruta: Path | None, texto: str | None = None, candidatas=None) -> dict:
@@ -199,6 +230,9 @@ def revisar(ruta: Path | None, impresora: dict, material: str | None = None, cos
     """Revisa un G-code. Con texto= revisa ese texto en lugar del archivo; con fragmento=True (G-code
     de inicio o de fin de un perfil) no exige extrusión ni apagado y acepta variables de Orca."""
     rev = Revision()
+    if impresora.get("id") == IMPRESORA_GENERICA["id"] and not fragmento:
+        rev.agregar(ADVERTENCIA, "No reconocí la impresora del G-code entre tus datos (o coinciden varias): controlé "
+                    "las temperaturas con límites genéricos y no revisé el área de impresión.")
     area = impresora["area"]
     margen = float(impresora.get("margen_mm", 5))
     lim = impresora["limites"]

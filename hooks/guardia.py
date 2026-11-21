@@ -8,7 +8,11 @@ Modos:
               proyectos .3mf y perfiles de Orca que se van a escribir, y bloquea si no pasan.
   pre-write   Lo mismo para Write / Edit / MultiEdit (Claude Code en la propia PC).
   pre-bash    Antes de un comando de terminal (Bash o device_bash): bloquea arrancar impresiones
-              por red, subir modelos o G-code a internet y escribir en la carpeta de Orca.
+              por red, subir modelos o G-code a internet, escribir en la carpeta de Orca y leer,
+              copiar o empaquetar OrcaSlicer.conf (o la carpeta de datos de Orca entera).
+  pre-stage   Antes de traer archivos de la PC (device_stage_files): no deja traer OrcaSlicer.conf,
+              sus copias ni nada de la carpeta de datos de Orca fuera de user/ y system/.
+  pre-read    Lo mismo para Read y Grep (Claude Code en la propia PC).
   post-slice  Después de laminar: recuerda revisar el G-code antes de entregarlo.
 
 Nunca deja escribir en los perfiles de sistema de Orca, en sus plugins ni en su configuración.
@@ -18,6 +22,7 @@ pasar, para no trabar trabajos que no tienen que ver con la impresión 3D.
 """
 from __future__ import annotations
 
+import fnmatch
 import io
 import json
 import posixpath
@@ -96,7 +101,7 @@ def zona_prohibida(bajo: str) -> str | None:
         return "no se tocan los perfiles que vienen con Orca"
     if "/orca_plugins/" in bajo or bajo.endswith("/orca_plugins"):
         return "no se instalan plugins de Orca (si querés uno, instalalo vos desde Orca)"
-    if bajo.endswith("/orcaslicer.conf"):
+    if _es_nombre_conf(bajo.rsplit("/", 1)[-1], True):
         return "no se toca la configuración de Orca"
     return None
 
@@ -148,6 +153,22 @@ def _impresora_para(modelo: str, perfil: str) -> dict:
     return revisar_gcode.elegir_impresora(modelo, perfil, _impresoras_del_usuario()) or revisar_gcode.IMPRESORA_GENERICA
 
 
+def _impresora_de_perfil(perfil: dict) -> dict:
+    """La impresora de un perfil: por su perfil de máquina, su nombre, de quién hereda o sus impresoras compatibles."""
+    import revisar_gcode
+    candidatas = _impresoras_del_usuario()
+    modelo = perfil.get("printer_model") if isinstance(perfil.get("printer_model"), str) else ""
+    nombres = [perfil.get("printer_settings_id"), perfil.get("name"), perfil.get("inherits")]
+    compatibles = perfil.get("compatible_printers")
+    nombres += compatibles if isinstance(compatibles, list) else []
+    for nombre in nombres:
+        if isinstance(nombre, str) and nombre.strip():
+            datos = revisar_gcode.elegir_impresora(modelo, nombre, candidatas)
+            if datos:
+                return datos
+    return revisar_gcode.IMPRESORA_GENERICA
+
+
 def _revisar_gcode(texto: str) -> list[str]:
     import revisar_gcode
     impresora = revisar_gcode.detectar_impresora(None, texto=texto, candidatas=_impresoras_del_usuario())
@@ -197,8 +218,7 @@ def _revisar_perfil(bajo: str, datos: bytes) -> list[str]:
         return [f"no es un perfil válido (JSON roto: {error})"]
     if not isinstance(perfil, dict):
         return ["no es un perfil válido (se esperaba un objeto JSON)"]
-    impresora = _impresora_para("", f"{perfil.get('name', '')} {perfil.get('inherits', '')}")
-    return _rechazos(perfil_orca.validar(perfil, tipo, impresora))
+    return _rechazos(perfil_orca.validar(perfil, tipo, _impresora_de_perfil(perfil)))
 
 
 def revisar_archivo(destino: str, leer) -> list[str]:
@@ -326,36 +346,166 @@ def escribe_en_orca(comando: str) -> bool:
     return False
 
 
-AVISO_CONF = ("taller-3d: OrcaSlicer.conf guarda la IP y el código de acceso de las impresoras en red, así que no "
-              "se trae ni se lee entero. Con la terminal de la PC leé solo models y presets.machine con el comando "
-              "de references/impresoras.md (skill impresion-3d); si no hay terminal, preguntale al usuario qué "
-              "impresoras tiene.")
+# --- OrcaSlicer.conf -------------------------------------------------------------------------
+# Guarda la IP y el código de acceso de las impresoras en red. No se trae, no se copia ni se lee entero (tampoco la
+# carpeta de datos de Orca completa). En la terminal de la PC solo pasan los dos comandos de
+# references/impresoras.md (sección 1), exactos salvo la ruta absoluta, que sacan models y presets.machine.
+# Un bloqueo que lee el texto del comando no frena todo (nombres armados con variables, búsquedas desde carpetas
+# de más arriba, scripts guardados en archivos): es una red de seguridad; la regla está escrita en las skills.
+CONF = "orcaslicer.conf"
+AVISO_CONF = ("taller-3d: OrcaSlicer.conf guarda la IP y el código de acceso de las impresoras en red: no se trae, no "
+              "se copia ni se lee entero, y tampoco la carpeta de datos de Orca completa. Con la terminal de la PC usá "
+              "exactamente el comando de references/impresoras.md (skill impresion-3d), con la ruta absoluta: saca "
+              "solo models y presets.machine. Si no hay terminal, preguntale al usuario qué impresoras tiene.")
+LEER_CONF = {
+    "linux": ("python3 -c 'import json,sys; t=\"\".join(l for l in open(sys.argv[1], encoding=\"utf-8-sig\") "
+              "if not l.lstrip().startswith(\"#\")); c=json.loads(t); print(json.dumps({\"models\": "
+              "c.get(\"models\", []), \"machine\": (c.get(\"presets\") or {}).get(\"machine\")}, ensure_ascii=False))' "
+              "\"RUTA\""),
+    "windows": ("$c = (Get-Content -Encoding UTF8 \"RUTA\" | Where-Object { $_ -notmatch '^\\s*#' } | Out-String) | "
+                "ConvertFrom-Json; @{models = $c.models; machine = $c.presets.machine} | ConvertTo-Json -Depth 5 "
+                "-Compress"),
+}
+# Ruta absoluta sin comillas, $, `, comodines, ; | & < > ni saltos de línea, que termina en OrcaSlicer.conf.
+_RUTA_CONF = {
+    "linux": r"/[^\"'`$;|&<>*?\[\]{}!\\\n]*/orcaslicer\.conf",
+    "windows": r"[a-z]:\\[^\"'`$;|&<>*?\[\]{}!/\n]*\\orcaslicer\.conf",
+}
 
 
-def es_conf_de_orca(ruta: str) -> bool:
-    return re.split(r"[\\/]", str(ruta).strip())[-1].lower() == "orcaslicer.conf"
+def _permitido(sistema: str) -> re.Pattern:
+    antes, despues = LEER_CONF[sistema].lower().split('"ruta"')
+    antes = re.escape(antes).replace("python3", "python3?")
+    return re.compile(antes + '"' + _RUTA_CONF[sistema] + '"' + re.escape(despues))
 
 
-def lee_conf_entero(comando: str) -> bool:
-    """¿El comando lee OrcaSlicer.conf sin filtrarlo? Solo se acepta sacar models y presets.machine como JSON."""
-    c = comando.lower()
-    if "orcaslicer.conf" not in c:
+PERMITIDOS = [_permitido("linux"), _permitido("windows")]
+# Programas que miran sin leer el contenido. Sobre la carpeta de datos de Orca valen solos y sin recursión.
+SOLO_MIRAN = {"ls", "dir", "stat", "test", "[", "du", "test-path", "get-item", "gi", "get-childitem", "gci"}
+EMPAQUETAN = {"tar", "zip", "7z", "7za", "rar", "cp", "mv", "rsync", "scp", "ditto", "robocopy", "xcopy",
+              "copy-item", "cpi", "compress-archive"}
+_RE_TRAMO = re.compile(r"\|\||&&|[|;&\n]")
+# Una palabra de la terminal: partes entre comillas y sin comillas pegadas ("Orca"'Slicer'.conf es una sola).
+_RE_PALABRA = re.compile(r"""(?:"[^"]*"|'[^']*'|[^\s"'])+""")
+_RE_CORTE = re.compile(r"[=,()<>|;&`]")
+_RE_RECURSIVO = re.compile(r"(^|\s)(-[a-z]*r[a-z]*|--recursive|-recurse|/s)(\s|$)|\$\(|`|-exec")
+_RAICES = ("orcaslicer", "com.orcaslicer.orcaslicer", "data_dir")
+# Carpeta de datos de Orca: Linux (.config y Flatpak), macOS, Windows (AppData o la que deja el instalador) y portable.
+RE_DATOS_ORCA = re.compile(r"(?:^|/)(?:(?:\.config|config|application support|appdata/roaming|[a-z]:/users/[^/]+)"
+                           r"/orcaslicer|data_dir)(?:/(.*))?$")
+
+
+def es_comando_permitido(comando: str) -> bool:
+    """¿Es uno de los dos comandos documentados para leer models y presets.machine?"""
+    c = re.sub(r"\s+", " ", str(comando).strip().lower())
+    return ".." not in c and any(p.fullmatch(c) for p in PERMITIDOS)
+
+
+def _variantes(texto: str) -> list[str]:
+    """El texto sin comillas ni ^, con \\ como separador (Windows) y con \\ como escape (bash)."""
+    sin = re.sub(r"[\"'^]", "", texto.lower())
+    return [sin.replace("\\", "/"), sin.replace("\\", "")]
+
+
+def _es_nombre_conf(tramo_final: str, contexto_orca: bool) -> bool:
+    """¿El último tramo de una ruta es (o puede ser, con comodines) OrcaSlicer.conf o una copia suya?"""
+    t = str(tramo_final).lower().split(":")[0].rstrip(". ")  # flujos NTFS (::$DATA) y puntos finales de Windows
+    if t.startswith(CONF) or re.match(r"orcasl~\d", t):     # .bak, .tmp y nombre corto 8.3
+        return True
+    comodin = any(x in t for x in "*?[")
+    return comodin and contexto_orca and any(fnmatch.fnmatchcase(n, t) for n in (CONF, CONF + ".bak"))
+
+
+def _es_raiz_orca(ruta: str) -> bool:
+    """¿La ruta es la carpeta de datos de Orca entera (o un comodín sobre ella), no una subcarpeta?"""
+    r = re.sub(r"(/(\*\*?|\.))+$", "", str(ruta).lower().rstrip("/"))
+    ultimo = r.rsplit("/", 1)[-1].split(":")[-1]
+    if any(x in ultimo for x in "*?["):
+        return any(fnmatch.fnmatchcase(n, ultimo) for n in _RAICES)
+    return ultimo in _RAICES
+
+
+def _palabras(tramo: str) -> list[str]:
+    """Las palabras de un tramo, sin comillas ni ^, con los espacios que van dentro de la palabra (entre comillas o
+    escapados con \\)."""
+    texto = tramo.replace("\\ ", "\x00")
+    return [re.sub(r"[\"'^]", "", p).replace("\x00", " ") for p in _RE_PALABRA.findall(texto)]
+
+
+def toca_conf_de_orca(comando: str) -> bool:
+    """¿El comando puede leer, copiar o empaquetar OrcaSlicer.conf? Solo pasan los dos comandos documentados.
+    Nombrarlo sin ruta (un grep en el código, un mensaje de commit) no cuenta."""
+    if es_comando_permitido(comando):
         return False
-    filtrado = "json" in c and "models" in c and "machine" in c
-    return not filtrado or any(x in c for x in ("local_machines", "access_code", "dev_ip", "user_access"))
+    c = comando.lower()
+    contexto = any("orca" in v for v in _variantes(c)) or bool(re.search(r"[*?\[][^\s/\\]*[/\\]", c))
+    cambia_de_carpeta = bool(re.search(r"\b(cd|pushd|chdir|set-location|sl)\b[^;&|\n]*orca", c))
+    tramos = [x for x in _RE_TRAMO.split(c) if x.strip()]
+    for tramo in tramos:
+        palabras = _palabras(tramo)
+        while palabras and palabras[0] in PREFIJOS:
+            palabras = palabras[1:]
+        programa = re.split(r"[/\\]", palabras[0])[-1] if palabras else ""
+        programa = programa[:-4] if programa.endswith(".exe") else programa
+        mira = programa in SOLO_MIRAN
+        for n, palabra in enumerate(palabras):
+            for variante in {palabra.replace("\\", "/"), palabra.replace("\\", "")}:
+                for ruta in (x.strip() for x in _RE_CORTE.split(variante)):
+                    if not ruta or (n == 0 and "/" not in ruta.strip("/")):
+                        continue                          # el nombre del programa (orcaslicer --help)
+                    con_carpeta = "/" in ruta or ruta.startswith("~")
+                    final = ruta.rstrip("/").rsplit("/", 1)[-1]
+                    if _es_nombre_conf(final, contexto) and (con_carpeta or cambia_de_carpeta or "*" in final):
+                        if not mira or "*" in final or "?" in final:
+                            return True
+                    if _es_raiz_orca(ruta) and (con_carpeta or programa in EMPAQUETAN):
+                        if not (mira and len(tramos) == 1 and not _RE_RECURSIVO.search(tramo)):
+                            return True
+    return False
+
+
+def _textos(valor):
+    if isinstance(valor, str):
+        yield valor
+    elif isinstance(valor, dict):
+        for v in valor.values():
+            yield from _textos(v)
+    elif isinstance(valor, list):
+        for v in valor:
+            yield from _textos(v)
+
+
+def no_se_trae(ruta: str) -> bool:
+    """OrcaSlicer.conf y sus copias (.bak, .tmp, nombre corto), y todo lo de la carpeta de datos de Orca que no sea
+    user/ o system/ (ahí están los perfiles)."""
+    r = normalizar(ruta).rstrip("/")
+    if not r or r == ".":
+        return False
+    if _es_nombre_conf(r.rsplit("/", 1)[-1], True):
+        return True
+    m = RE_DATOS_ORCA.search(r)
+    return bool(m) and not re.match(r"(user|system|resources)(/|$)", m.group(1) or "")
 
 
 def pre_stage(datos: dict) -> None:
     entrada = datos.get("tool_input") or {}
-    rutas = entrada.get("paths") if isinstance(entrada.get("paths"), list) else []
-    if any(es_conf_de_orca(r) for r in rutas):
+    rutas = [x for clave, v in entrada.items() if clave != "artifact_ids" for x in _textos(v)]
+    if any(no_se_trae(r) for r in rutas):
         bloquear(AVISO_CONF)
+
+
+def pre_read(datos: dict) -> None:
+    entrada = datos.get("tool_input") or {}
+    for clave in ("file_path", "path", "notebook_path"):
+        ruta = entrada.get(clave)
+        if isinstance(ruta, str) and ruta.strip() and (no_se_trae(ruta) or _es_raiz_orca(normalizar(ruta))):
+            bloquear(AVISO_CONF)
 
 
 def pre_bash(datos: dict) -> None:
     comando = _comando(datos.get("tool_input") or {})
     c = comando.lower()
-    if lee_conf_entero(comando):
+    if toca_conf_de_orca(comando):
         bloquear(AVISO_CONF)
     if re.search(HERRAMIENTAS_RED, c) and any(re.search(p, c) for p in PATRONES_IMPRESION):
         bloquear("taller-3d: el plugin nunca arranca impresiones. Mandá el archivo a la impresora y "
@@ -390,6 +540,7 @@ def main() -> None:
     if not isinstance(datos, dict):
         sys.exit(0)
     acciones = {"pre-commit": pre_commit, "pre-write": pre_write, "pre-bash": pre_bash, "pre-stage": pre_stage,
+                "pre-read": pre_read,
                 "post-slice": post_slice}
     accion = acciones.get(modo)
     if accion is None:

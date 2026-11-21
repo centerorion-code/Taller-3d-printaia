@@ -118,8 +118,10 @@ def revisar_perfiles(rutas: list[Path], config: dict | None, maquinas: list[Path
     catalogo = comun.cargar_catalogo()
     base = set(comun.cargar_json(BASE_GCODE)["claves"])
     conocidas = set(catalogo) | base | META
-    impresoras = {str(i.get("perfil_maquina", "")) for i in (config or {}).get("impresoras", [])}
-    patrones = {str(i.get("nombre_corto") or i.get("id") or "") for i in (config or {}).get("impresoras", [])}
+    configuradas = [i for i in (config or {}).get("impresoras", []) if isinstance(i, dict)]
+    impresoras = {i["perfil_maquina"] for i in configuradas if isinstance(i.get("perfil_maquina"), str)}
+    patrones = {comun.plano(x) for i in configuradas for x in (i.get("patron_perfiles"), i.get("nombre_corto"),
+                                                                i.get("nombre")) if isinstance(x, str) and x.strip()}
     # Las copias de usuario de máquina también son impresoras presentes, aunque no estén preparadas en el taller.
     for archivo in _perfiles(maquinas or []):
         try:
@@ -127,7 +129,14 @@ def revisar_perfiles(rutas: list[Path], config: dict | None, maquinas: list[Path
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             continue
         if isinstance(datos, dict):
-            impresoras.update(str(datos[k]) for k in ("name", "inherits") if datos.get(k))
+            impresoras.update(datos[k] for k in ("name", "inherits") if isinstance(datos.get(k), str) and datos[k])
+    presentes = {comun.plano(comun.modelo_de_perfil(x)) for x in impresoras if x}
+
+    def tiene_impresora(destino: str) -> bool:
+        """¿Hay una impresora presente para ese @destino? Tiene que ser el mismo modelo o su final completo:
+        @K1 no es la K1 Max, @A1 no es la A1 mini."""
+        d = comun.plano(comun.modelo_de_perfil(destino))
+        return bool(d) and (d in patrones or d in presentes or any(m.endswith(" " + d) for m in presentes))
     en_config = set()
     for imp in (config or {}).get("impresoras", []):
         for valor in imp.values():
@@ -150,8 +159,7 @@ def revisar_perfiles(rutas: list[Path], config: dict | None, maquinas: list[Path
         if nombre.startswith("TEST ") and fecha and (dt.date.today() - fecha).days > DIAS_TEST:
             viejos.append(f"{nombre} (último cambio {fecha.isoformat()})")
         if config and nombre.startswith("AUTO ") and "@" in nombre and nombre not in en_config:
-            destino = nombre.split("@", 1)[1].strip()
-            if not any(destino and (destino in p or p in destino) for p in impresoras | patrones if p):
+            if not tiene_impresora(nombre.split("@", 1)[1]):
                 huerfanos.append(nombre)
     return {"claves_que_orca_no_usa": obsoletas, "test_viejos": viejos,
             "auto_sin_impresora": huerfanos, "ilegibles": ilegibles}

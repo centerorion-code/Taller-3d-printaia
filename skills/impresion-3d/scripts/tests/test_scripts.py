@@ -8,6 +8,7 @@ Requiere manifold3d y numpy para las pruebas de CAD y STL.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -145,7 +146,8 @@ class TestGcode(unittest.TestCase):
                         .replace("Marca Prueba 300", "Otra marca"))
         r = self.revisar(ruta)
         self.assertEqual(r["impresora"], "generica")
-        self.assertEqual(r["estado"], comun.APROBADO, self.mensajes(r))
+        self.assertEqual(r["estado"], comun.ADVERTENCIA, self.mensajes(r))
+        self.assertIn("límites genéricos", self.mensajes(r))
 
 
 class TestPerfil(unittest.TestCase):
@@ -408,7 +410,7 @@ class TestImpresora(unittest.TestCase):
         borrador = impresora.desde_gcode(ruta)
         self.assertEqual(borrador["area"], {"x_min": 0.0, "x_max": 300.0, "y_min": 0.0, "y_max": 300.0, "z_max": 330.0})
         self.assertEqual((borrador["firmware"], borrador["boquilla_mm"], borrador["patron_perfiles"]),
-                         ("klipper", 0.4, "Prueba 300"))
+                         ("klipper", 0.4, "Marca Prueba 300"))
         self.assertIsNone(borrador["limites"]["boquilla_max_c"])
         self.assertTrue(any("boquilla_max_c" in x for x in borrador["pendiente"]))
         self.assertTrue(comun.problemas_impresora(borrador))  # sin límites del fabricante no sirve
@@ -489,34 +491,149 @@ class TestVariasImpresoras(unittest.TestCase):
     def test_patron_sin_ambiguedad(self):
         import impresora
         self.assertEqual(impresora.patron_de("Creality Hi"), "Creality Hi")
-        self.assertEqual(impresora.patron_de("Creality Ender-3 V3 Plus"), "Ender-3 V3 Plus")
+        self.assertEqual(impresora.patron_de("Creality Ender-3 V3 Plus"), "Creality Ender-3 V3 Plus")
+        self.assertEqual(impresora.patron_de("Bambu Lab  A1 mini"), "Bambu Lab A1 mini")
         self.assertFalse(revisar_gcode.contiene_palabra("Generic PLA High Flow @Otra", "Hi"))
-        self.assertTrue(revisar_gcode.contiene_palabra("Generic PETG @Creality Hi-all", "Creality Hi"))
+        self.assertTrue(revisar_gcode.contiene_palabra("Generic PETG @creality hi-all", "Creality Hi"))
         hi = {**IMP, "id": "hi", "nombre": "Creality Hi", "patron_perfiles": "Hi", "perfiles_maquina": []}
         self.assertIsNone(revisar_gcode.elegir_impresora("", "Generic PLA High Flow @Otra", [hi]))
         _, _, avisos = impresora.validar(hi)
         self.assertTrue(any("muy corto" in a for a in avisos))
 
+    def test_modelo_de_perfil(self):
+        import impresora
+        casos = {"Creality Hi 0.4 nozzle": "Creality Hi", "Creality K1 (0.4 nozzle)": "Creality K1",
+                 "Original Prusa MK4S HF0.4 nozzle": "Original Prusa MK4S", "Prusa MK4S 0.4 nozzle HF": "Prusa MK4S",
+                 "Bambu Lab A1 0.4 Nozzle": "Bambu Lab A1", "MyKlipper 0.4mm nozzle": "MyKlipper",
+                 "Voron 2.4 350 0.4 nozzle": "Voron 2.4 350", "Casera": "Casera"}
+        for nombre, modelo in casos.items():
+            self.assertEqual(impresora.modelo_de_perfil(nombre), modelo, nombre)
+
+    def test_elegir_impresora_no_toma_otra(self):
+        def imp(id_, nombre, patron, x, cama, perfiles=()):
+            return {"id": id_, "nombre": nombre, "patron_perfiles": patron, "perfiles_maquina": list(perfiles),
+                    "area": {"x_min": 0, "x_max": x, "y_min": 0, "y_max": x, "z_max": x},
+                    "limites": {"boquilla_max_c": 300, "cama_max_c": cama}}
+        elegir = revisar_gcode.elegir_impresora
+        a1 = imp("a1", "Bambu Lab A1", "Bambu Lab A1", 256, 100, ["Mi A1 0.4 nozzle"])
+        ender3 = imp("e3", "Creality Ender-3", "Ender-3", 220, 100)
+        plus = imp("plus", "Creality Ender-3 V3 Plus", "Ender-3 V3 Plus", 300, 110)
+        hi = imp("hi", "Creality Hi", "Creality Hi", 260, 100)
+        # Con el modelo del G-code, nunca los datos de uno parecido
+        self.assertIsNone(elegir("Bambu Lab A1 mini", "Bambu Lab A1 mini 0.4 nozzle", [a1]))
+        self.assertIsNone(elegir("Bambu Lab A1 mini", "Mi Bambu Lab A1 mini 0.4 nozzle", [a1]))
+        self.assertIsNone(elegir("Creality Ender-3 V3", "Mi Ender-3 V3 0.4 nozzle", [ender3, plus]))
+        self.assertIsNone(elegir("Creality K1", "Creality K1 (0.4 nozzle)", [imp("k", "Creality K1 Max", "K1 Max", 300, 100)]))
+        self.assertIsNone(elegir("Elegoo Neptune 4 Pro", "x", [imp("n4", "Elegoo Neptune 4", "Neptune 4", 225, 110)]))
+        self.assertIsNone(elegir("Creality K1 Max", "K1 Max tuneado como Ender-3 V3 Plus", [plus]))
+        self.assertIs(elegir("Creality Ender-3 V3 Plus", "Mi Ender propia", [ender3, plus]), plus)
+        self.assertEqual(elegir("Creality Ender-3 V3 Plus", "x", [{**plus, "nombre": "Ender-3 V3 Plus"}])["id"], "plus")
+        self.assertIs(elegir("Bambu Lab A1", "Mi A1 0.4 nozzle", [a1]), a1)
+        self.assertIs(elegir("Marca Prueba 300", "Mi Prueba 300 0.4 nozzle", [IMP]), IMP)
+        # Sin modelo: el patrón al final del nombre, sin distinguir mayúsculas
+        self.assertIsNone(elegir("", "Original Prusa MK3.5 0.4 nozzle", [imp("mk3", "Original Prusa MK3", "MK3", 250, 100)]))
+        self.assertIs(elegir("", "0.20mm Standard @creality hi", [hi]), hi)
+        self.assertIs(elegir("", "Generic PLA @Creality Hi-all", [hi]), hi)
+        self.assertIs(elegir("", "AUTO proceso @Creality Hi", [hi, plus]), hi)
+        kobra = imp("k", "Anycubic Kobra 2 Plus", "Kobra 2 (Plus+)", 320, 100)
+        self.assertIs(elegir("", "Mi Kobra 2 (Plus+) 0.4 nozzle", [kobra]), kobra)
+        self.assertIsNone(elegir("", "AUTO proceso @Ender-3 V3 Plus",
+                                 [imp("uno", "X1", "Ender-3 V3 Plus", 300, 110), imp("dos", "X2", "Ender-3 V3 Plus", 200, 60)]))
+        self.assertIsNone(elegir("", "x 123 Hi", [imp("z", "Z", 123, 1, 1), imp("w", "W", ["Hi"], 1, 1)]))
+
     def test_conf_de_orca_no_se_trae(self):
+        sys.path.insert(0, str(RAIZ / "hooks"))
+        import guardia
+        D = "/home/leo/.config/OrcaSlicer"
+        C = D + "/OrcaSlicer.conf"
+        W = "C:\\Users\\leo\\OrcaSlicer\\OrcaSlicer.conf"
+        LIN = guardia.LEER_CONF["linux"].replace("RUTA", C)
+        WIN = guardia.LEER_CONF["windows"].replace("RUTA", W)
+        malos = [
+            f"grep -r access_code {D}/", f"find {D} -maxdepth 1 -type f -exec cat {{}} +", f"cd {D} && cat Orca*",
+            f"cat {D}/*.conf", f"tar czf '/home/leo/Documentos/Taller 3D/o.tgz' -C /home/leo/.config OrcaSlicer",
+            f"cp -r {D} '/home/leo/Documentos/Taller 3D/copia'", f"zip -r /home/leo/Documentos/o.zip {D}",
+            f"cat {D}/OrcaSlicer.con''f", f"cat {D}/OrcaSlicer.\\conf", f"cat {D}/ORCASLICER.CONF", f"cat {C}.bak",
+            f"cp {C} /tmp/x.txt", f"cat {D}/OrcaSlicer.c*", "cat ~/.config/OrcaSlicer/OrcaSlicer.conf", "cat ~/.config/O*/O*",
+            "Get-ChildItem $env:APPDATA\\OrcaSlicer -Filter *.conf | Get-Content",
+            "Select-String -Path C:\\Users\\leo\\OrcaSlicer\\* -Pattern access_code",
+            "type C:\\Users\\leo\\OrcaSlicer\\ORCASL~1.CON",
+            "robocopy C:\\Users\\leo\\OrcaSlicer C:\\Users\\leo\\Documents\\copia /E",
+            LIN + f"; cat {C}", WIN + "; $c", LIN + " > /tmp/orca.json", f"jq . {C} # models machine",
+            f"python3 -c 'import json; c=json.load(open(\"{C}\")); print(c)' # models machine",
+            LIN.replace(C, "~/.config/OrcaSlicer/OrcaSlicer.conf"), LIN.replace(C, "$HOME/.config/OrcaSlicer/OrcaSlicer.conf"),
+            LIN.replace(C, "/home/leo/../leo/.config/OrcaSlicer/OrcaSlicer.conf"), f"ls -R {D}", f"ls -la {D} | head",
+        ]
+        buenos = [
+            LIN, WIN, LIN.replace("python3 -c", "python -c"),
+            LIN.replace(C, "/Users/leo/Library/Application Support/OrcaSlicer/OrcaSlicer.conf"),
+            WIN.replace(W, "C:\\Users\\leo\\AppData\\Roaming\\OrcaSlicer\\OrcaSlicer.conf"),
+            f"ls -la {C}", f"test -f {C} && echo existe", f"stat -c %s {C}", "Test-Path C:\\Users\\leo\\OrcaSlicer\\OrcaSlicer.conf",
+            "grep -rn 'OrcaSlicer.conf' skills/ hooks/", "git commit -m 'guardia: protege OrcaSlicer.conf'",
+            f"ls {D}", f"ls {D}/user/default/machine", f"find {D}/user -name '*.json'", "pgrep -a orcaslicer",
+            f"cat '{D}/user/default/machine/Mi Ender-3 V3 Plus 0.4 nozzle.json'", "cat /etc/*.conf",
+            "ls '/home/leo/Documentos/OrcaSlicer Claude/taller-3d'",
+            "cat '/home/leo/Documentos/OrcaSlicer Claude/taller-3d/config.json'",
+            "cat /home/leo/Documentos/OrcaSlicer\\ Claude/taller-3d/config.json",
+        ]
+        for comando in malos:
+            self.assertTrue(guardia.toca_conf_de_orca(comando), comando)
+        for comando in buenos:
+            self.assertFalse(guardia.toca_conf_de_orca(comando), comando)
+        traer = [C, C + ".bak", D + "/OrcaSlicer.conf.tmp", "C:\\Users\\leo\\OrcaSlicer\\OrcaSlicer.conf.",
+                 "C:\\Users\\leo\\OrcaSlicer\\OrcaSlicer.conf::$DATA", "C:\\Users\\leo\\OrcaSlicer\\ORCASL~1.CON",
+                 C + "/", D + "/./OrcaSlicer.conf", D + "/log/debug.log", "/home/leo/Documentos/Taller 3D/OrcaSlicer.conf",
+                 "C:\\Users\\leo\\AppData\\Roaming\\OrcaSlicer\\log\\x.log"]
+        se_trae = ["/home/leo/Documentos/Taller 3D/x.json", D + "/user/default/machine/Mi Ender.json",
+                   D + "/system/Creality.json", "/home/leo/.config/BambuStudio/BambuStudio.conf",
+                   "/home/leo/Documentos/OrcaSlicer/impresiones/x.gcode",
+                   "C:\\Users\\leo\\OrcaSlicer\\user\\default\\process\\a.json"]
+        for ruta in traer:
+            self.assertTrue(guardia.no_se_trae(ruta), ruta)
+        for ruta in se_trae:
+            self.assertFalse(guardia.no_se_trae(ruta), ruta)
+
         def correr(modo, entrada):
             return subprocess.run([sys.executable, str(RAIZ / "hooks" / "guardia.py"), modo],
                                   input=json.dumps({"tool_input": entrada}), capture_output=True, text=True)
-        r = correr("pre-stage", {"paths": ["/home/leo/.config/OrcaSlicer/OrcaSlicer.conf"]})
+        r = correr("pre-stage", {"paths": [C]})
         self.assertEqual(r.returncode, 2, r.stderr)
         self.assertIn("código de acceso", r.stderr)
-        self.assertEqual(correr("pre-stage", {"paths": [r"C:\Users\leo\OrcaSlicer\orcaslicer.conf"]}).returncode, 2)
+        self.assertEqual(correr("pre-stage", {"paths": [{"path": C}]}).returncode, 2)
+        self.assertEqual(correr("pre-stage", {"artifact_ids": ["x"], "paths": [C]}).returncode, 2)
+        self.assertEqual(correr("pre-stage", {"artifact_ids": ["x"]}).returncode, 0)
         self.assertEqual(correr("pre-stage", {"paths": ["/home/leo/Documentos/Taller 3D/taller-3d/config.json"]}).returncode, 0)
-        self.assertEqual(correr("pre-bash", {"command": "cat ~/.config/OrcaSlicer/OrcaSlicer.conf"}).returncode, 2)
-        self.assertEqual(correr("pre-bash", {"command": "grep machine ~/.config/OrcaSlicer/OrcaSlicer.conf"}).returncode, 2)
-        filtrado = ("python3 -c 'import json,sys; c=json.load(open(sys.argv[1], encoding=\"utf-8\")); "
-                    "print(json.dumps({\"models\": c.get(\"models\", []), \"machine\": (c.get(\"presets\") or {}).get(\"machine\")}))' "
-                    "~/.config/OrcaSlicer/OrcaSlicer.conf")
-        self.assertEqual(correr("pre-bash", {"command": filtrado}).returncode, 0)
-        self.assertEqual(correr("pre-bash", {"command": filtrado.replace("models", "local_machines")}).returncode, 2)
-        ps = (r'$c = Get-Content -Raw -Encoding UTF8 "C:\Users\leo\AppData\Roaming\OrcaSlicer\OrcaSlicer.conf" '
-              r'| ConvertFrom-Json; @{models = $c.models; machine = $c.presets.machine} | ConvertTo-Json -Depth 5 -Compress')
-        self.assertEqual(correr("pre-bash", {"command": ps}).returncode, 0)
-        self.assertEqual(correr("pre-bash", {"command": r'type "C:\Users\leo\AppData\Roaming\OrcaSlicer\OrcaSlicer.conf"'}).returncode, 2)
+        self.assertEqual(correr("pre-bash", {"command": f"cat {C}"}).returncode, 2)
+        self.assertEqual(correr("pre-bash", {"command": LIN}).returncode, 0)
+        self.assertEqual(correr("pre-read", {"file_path": C}).returncode, 2)
+        self.assertEqual(correr("pre-read", {"path": D}).returncode, 2)
+        self.assertEqual(correr("pre-read", {"path": D + "/user"}).returncode, 0)
+        self.assertEqual(correr("pre-read", {"file_path": str(RAIZ / "hooks" / "guardia.py")}).returncode, 0)
+
+    def test_comandos_de_la_guia(self):
+        """Los comandos de references/impresoras.md pasan el bloqueo y sacan solo models y presets.machine."""
+        sys.path.insert(0, str(RAIZ / "hooks"))
+        import guardia
+        guia = (SCRIPTS.parent / "references" / "impresoras.md").read_text(encoding="utf-8")
+        lin = re.search(r"^- Linux o macOS: `(.+)`$", guia, re.M).group(1)
+        win = re.search(r"^- Windows \(PowerShell\): `(.+)`$", guia, re.M).group(1)
+        self.assertEqual(lin.replace("<carpeta de datos de Orca>/OrcaSlicer.conf", "RUTA"), guardia.LEER_CONF["linux"])
+        self.assertEqual(win.replace("<carpeta de datos de Orca>\\OrcaSlicer.conf", "RUTA"), guardia.LEER_CONF["windows"])
+        with tempfile.TemporaryDirectory() as d:
+            conf = Path(d) / "OrcaSlicer" / "OrcaSlicer.conf"
+            conf.parent.mkdir()
+            conf.write_text(json.dumps({"models": [{"model": "Creality Hi", "nozzle_diameter": "0.4"}],
+                                        "presets": {"machine": "Creality Hi 0.4 nozzle"},
+                                        "local_machines": {"x": {"dev_ip": "192.0.2.10", "access_code": "12345678"}}},
+                                       indent=4) + "\n# MD5 checksum 0123456789abcdef\n", encoding="utf-8")
+            comando = lin.replace("<carpeta de datos de Orca>", str(conf.parent))
+            self.assertTrue(guardia.es_comando_permitido(comando), comando)
+            r = subprocess.run(comando, shell=True, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout), {"models": [{"model": "Creality Hi", "nozzle_diameter": "0.4"}],
+                                                "machine": "Creality Hi 0.4 nozzle"})
+        self.assertNotIn("192.0.2.10", r.stdout)
+        self.assertTrue(guardia.es_comando_permitido(win.replace("<carpeta de datos de Orca>", "C:\\Users\\leo\\OrcaSlicer")))
 
     def test_auto_de_impresora_con_copia_no_es_huerfano(self):
         import novedades_orca
@@ -530,6 +647,81 @@ class TestVariasImpresoras(unittest.TestCase):
             con = novedades_orca.revisar_perfiles([d / "process"], config, [d / "machine"])
         self.assertEqual(sin["auto_sin_impresora"], ["AUTO proceso @Prueba 300"])
         self.assertEqual(con["auto_sin_impresora"], [])
+
+    def test_detectar_nombres_raros(self):
+        import impresora
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            mq, pr = d / "machine", d / "process"
+            self.escribir(mq, "a.json", {"name": "Mi Ender-3 V3 Plus 0.4 nozzle", "inherits": "Creality Ender-3 V3 Plus 0.4 nozzle"})
+            self.escribir(mq, "b.json", {"name": "Mi K1 0.6", "inherits": "Creality K1 (0.6 nozzle)"})
+            self.escribir(mq, "c.json", {"name": "Copia de copia", "inherits": "Mi Ender-3 V3 Plus 0.4 nozzle"})
+            (mq / "e.json").write_text("[1,2]", encoding="utf-8")
+            self.escribir(pr, "p.json", {"name": "AUTO", "compatible_printers": ["Mi Ender-3 V3 Plus 0.4 nozzle",
+                                                                                  "creality hi 0.4 nozzle"]})
+            self.escribir(pr, "q.json", {"name": "x", "compatible_printers": '"Creality Hi 0.4 nozzle";"Creality Hi 0.6 nozzle"'})
+            self.escribir(pr, "s.json", {"name": "y", "compatible_printers": [["a"], 3, None]})
+            orca = {"models": [{"vendor": "Creality", "model": "Creality K1", "nozzle_diameter": '"0.4";"0.6"'},
+                               {"model": "Creality Hi", "nozzle_diameter": "0.4"}, "suelto", None],
+                    "machine": "Mi K1 0.6"}
+            lista = impresora.detectar([mq], [pr], orca)
+        por_modelo = {e["modelo"]: e for e in lista}
+        self.assertEqual(sorted(por_modelo), ["Creality Ender-3 V3 Plus", "Creality Hi", "Creality K1"])
+        k1 = por_modelo["Creality K1"]
+        self.assertTrue(k1["seleccionada"])
+        self.assertEqual((k1["copias_usuario"], k1["boquillas"]), (["Mi K1 0.6"], ["0.4", "0.6"]))
+        self.assertEqual(sorted(por_modelo["Creality Ender-3 V3 Plus"]["copias_usuario"]),
+                         ["Copia de copia", "Mi Ender-3 V3 Plus 0.4 nozzle"])
+        self.assertEqual(por_modelo["Creality Hi"]["boquillas"], ["0.4", "0.6"])
+        for raro in ({"models": 5}, {"models": [{"model": "X", "nozzle_diameter": ["0.4"]}]}, {"machine": ["a"]},
+                     {"models": [{"model": 7}]}):
+            impresora.detectar([], [], raro)
+        self.assertEqual([e["modelo"] for e in impresora.detectar([], [], {"models": {"model": "Creality Hi"}})],
+                         ["Creality Hi"])
+
+    def test_detectar_desde_la_terminal(self):
+        with tempfile.TemporaryDirectory() as d:
+            u16 = Path(d) / "orca.json"
+            u16.write_bytes(json.dumps({"models": [{"model": "Creality Hi"}], "machine": None}).encode("utf-16"))
+            ok = subprocess.run([sys.executable, str(SCRIPTS / "impresora.py"), "detectar", "--orca", str(u16)],
+                                capture_output=True, text=True)
+            falta = subprocess.run([sys.executable, str(SCRIPTS / "impresora.py"), "detectar", "--orca",
+                                    str(Path(d) / "no-existe.json")], capture_output=True, text=True)
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+        self.assertIn("Creality Hi", ok.stdout)
+        self.assertNotEqual(falta.returncode, 0)
+        self.assertIn("No pude leer", falta.stderr)
+        self.assertNotIn("Traceback", falta.stderr)
+
+    def test_huerfanos_por_modelo(self):
+        import novedades_orca
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            for n in ["AUTO proceso @Ender-3 V3 Plus", "AUTO proceso @K1", "AUTO proceso @Hi", "AUTO proceso @Creality Hi",
+                      "AUTO proceso @A1", "AUTO proceso @K1 Max"]:
+                self.escribir(d / "process", f"{n}.json", {"name": n})
+            self.escribir(d / "machine", "a.json", {"name": "Mi Ender-3 V3 Plus 0.4 nozzle",
+                                                    "inherits": "Creality Ender-3 V3 Plus 0.4 nozzle"})
+            self.escribir(d / "machine", "b.json", {"name": "Mi K1 Max High Speed", "inherits": "Creality K1 Max (0.4 nozzle)"})
+            self.escribir(d / "machine", "c.json", {"name": "Bambu Lab A1 mini propia", "inherits": "Bambu Lab A1 mini 0.4 nozzle"})
+            self.escribir(d / "machine", "d.json", {"name": ["x"], "inherits": 5})
+            cfg = {"impresoras": [{"id": "ender-3-v3-plus", "perfil_maquina": "Mi Ender-3 V3 Plus 0.4 nozzle"}]}
+            huerfanos = novedades_orca.revisar_perfiles([d / "process"], cfg, [d / "machine"])["auto_sin_impresora"]
+        self.assertEqual(sorted(huerfanos), ["AUTO proceso @A1", "AUTO proceso @Creality Hi", "AUTO proceso @Hi",
+                                             "AUTO proceso @K1"])
+
+    def test_crear_copia_con_base_id(self):
+        base = [sys.executable, str(SCRIPTS / "perfil_orca.py"), "crear", "--tipo", "maquina",
+                "--nombre", "Mi Creality Hi 0.4 nozzle", "--hereda", "Creality Hi 0.4 nozzle"]
+        with tempfile.TemporaryDirectory() as d:
+            r = subprocess.run(base + ["--base-id", "GM_TEST-01", "--salida", d], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            info = (Path(d) / "Mi Creality Hi 0.4 nozzle.info").read_text(encoding="utf-8")
+            self.assertIn("base_id = GM_TEST-01", info)
+        with tempfile.TemporaryDirectory() as d:
+            r = subprocess.run(base + ["--base-id", "x\nuser_id = otro", "--salida", d], capture_output=True, text=True)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertEqual(list(Path(d).iterdir()), [])
 
     def test_crear_copia_de_maquina(self):
         with tempfile.TemporaryDirectory() as d:

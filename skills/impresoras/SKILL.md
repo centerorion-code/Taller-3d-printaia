@@ -19,7 +19,7 @@ Carpetas: la de trabajo y las de perfiles de usuario de Orca `process`, `filamen
 
 ## Elegir y preparar una impresora
 
-1. **En cuál trabajar** (`references/impresoras.md`, sección 1): si hay varias en Orca, preguntar en cuál, avisando que elegirla en la ventana de Orca no le llega a Claude. Si la elegida no tiene copia de usuario, ofrecer crearla (sección 1, paso 4). Si ya está preparada, usar sus datos y terminar acá.
+1. **En cuál trabajar** (`references/impresoras.md`, sección 1): si hay varias en Orca, preguntar en cuál, avisando que elegirla en la ventana de Orca no le llega a Claude. Si la elegida no tiene copia de usuario, ofrecer crearla (sección 1, paso 4: lo más seguro es guardarla desde Orca). Si ya está preparada, usar sus datos y terminar acá.
 2. **Investigarla** (sección 2): fabricante y perfiles de OrcaSlicer de ese modelo. Lo que falte se pregunta: no inventar límites. `python3 -I impresora.py validar <json>`.
 3. **Configurarla óptima** (sección 3): cama que usa, perfiles `AUTO proceso` y `AUTO filamento` con `perfil_orca.py crear --impresora <json>`, y sus perfiles propios si los tiene.
 4. **Probar y guardar** (sección 4): cubo de 20 mm, `impresora.py comparar` y `revisar_gcode.py` en APROBADO; el JSON en `taller-3d/impresoras/<id>.json` y la entrada en `config.json` (procedimiento de escritura con respaldo), como `impresora_por_defecto`.

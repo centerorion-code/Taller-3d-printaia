@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-VERSION_PLUGIN = "0.1.8"
+VERSION_PLUGIN = "0.1.9"
 VERSION_ORCA = "2.5.1"
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -29,8 +29,26 @@ TITULO = {
 
 
 def cargar_json(ruta: Path | str):
-    with open(ruta, encoding="utf-8") as f:
-        return json.load(f)
+    """JSON en UTF-8 (con o sin BOM) o UTF-16 (lo que deja PowerShell al redirigir con >)."""
+    datos = Path(ruta).read_bytes()
+    if datos[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return json.loads(datos.decode("utf-16"))
+    return json.loads(datos.decode("utf-8-sig"))
+
+
+# Boquilla al final del nombre de un perfil de máquina: "0.4 nozzle", "(0.4 nozzle)", "HF0.4 nozzle", "0.4mm nozzle".
+RE_BOQUILLA = re.compile(r"\s*[(\[]?\s*(?:hf\s*)?\d+(?:[.,]\d+)?\s*(?:mm)?\s*nozzle\s*(?:hf)?\s*[)\]]?\s*$", re.I)
+RE_NUMERO_BOQUILLA = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:mm)?\s*nozzle", re.I)
+
+
+def plano(texto) -> str:
+    """Texto para comparar nombres: sin espacios de más y sin distinguir mayúsculas."""
+    return re.sub(r"\s+", " ", str(texto or "")).strip().casefold()
+
+
+def modelo_de_perfil(nombre) -> str:
+    """'Creality Hi 0.4 nozzle' o 'Creality K1 (0.4 nozzle)' → el modelo, sin la boquilla."""
+    return RE_BOQUILLA.sub("", re.sub(r"\s+", " ", str(nombre or "")).strip()).strip()
 
 
 def _numero(v) -> bool:
