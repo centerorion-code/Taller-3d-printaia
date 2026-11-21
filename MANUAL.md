@@ -106,6 +106,7 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
 En tu carpeta de trabajo, la que elegiste al instalar (si apretaste Enter, `Documentos/Taller 3D`). Para usar otra, movela vos a donde quieras y decile a Claude la ruta nueva: te pide acceso y sigue desde ahí.
 
 ```
+catalogo.html           todas tus piezas en una página: abrila con doble clic
 impresiones/2026-11-21_soporte-router/
     pieza.py            modelo editable (las medidas están arriba de todo)
     pieza.stl           el modelo
@@ -117,8 +118,10 @@ disenos/2026-11-21_organizador/
     pieza.py, pieza.stl, vista.png, parametros.md   pedidos de solo diseño
 respaldos/              copias de lo que se cambió
 calibraciones/          resultados de calibración por filamento
-taller-3d/              tu configuración, el historial, los aprendizajes y las novedades de tu Orca
+taller-3d/              tu configuración, el historial, el índice del catálogo, los aprendizajes y las novedades de tu Orca
 ```
+
+El catálogo (`catalogo.html`) se actualiza solo cada vez que Claude guarda, lamina o publica una pieza. Muestra la vista (o la foto, si le mandaste una de la pieza impresa), las medidas, el material, el tiempo, los gramos, el costo, el precio y los archivos de cada una, ordenadas por mes, con buscador. Si tenías piezas de antes, pedí "armá el catálogo" y las suma.
 
 ## Cambiar una pieza ya hecha
 
@@ -132,6 +135,7 @@ Pedilo con tus palabras: "Hacé el soporte del router 1 cm más ancho" o "el agu
 | Calibrar un rollo nuevo | `/calibrar` o "calibrá el PETG nuevo" |
 | Agregar otra impresora | `/impresoras` |
 | Vender una pieza | `/publicar` |
+| Ver todas tus piezas o buscar una | `/catalogo` |
 | Volver atrás un cambio de perfil | `/restaurar` |
 | Revisar que todo ande | `/instalar` |
 | Una duda de configuración | "¿Qué es la costura en bisel?", "¿por qué salen hilos?" |

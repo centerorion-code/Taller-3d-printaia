@@ -307,6 +307,38 @@ class TestProducto(unittest.TestCase):
         self.assertEqual(p["faltan_datos"], [])
 
 
+class TestCatalogo(unittest.TestCase):
+    def test_agregar_listado_y_pagina(self):
+        import catalogo as cat
+        c = {"version": 1, "piezas": []}
+        nuevas = cat.desde_listado(c, {"entries": [
+            {"name": "impresiones/2026-09-15_llavero/foto.jpg", "type": "file"},
+            {"name": "impresiones/2026-09-15_llavero/vista.png", "type": "file"},
+            {"name": "impresiones/2026-11-21_soporte/pieza-1/plate_1.gcode", "type": "file"},
+            {"name": "disenos/2026-10-02_caja/vista.png", "type": "file"},
+            {"name": "taller-3d/config.json", "type": "file"}]})
+        self.assertEqual(len(nuevas), 3)
+        estados = {p["carpeta"]: p["estado"] for p in c["piezas"]}
+        self.assertEqual(estados["impresiones/2026-11-21_soporte"], "laminada")
+        self.assertEqual(estados["disenos/2026-10-02_caja"], "disenada")
+        llavero = next(p for p in c["piezas"] if "llavero" in p["carpeta"])
+        self.assertEqual(cat.imagen_de(llavero), "foto.jpg")  # la foto real va antes que la vista
+        extra = cat.datos_de_informes(
+            {"estado": "aprobado", "material": "PETG", "estimaciones": {"segundos": 3600, "gramos": 10},
+             "costo": {"moneda": "ARS", "total": 500}}, {"medidas_mm": [10, 20, 30]}, {})
+        pieza = cat.agregar(c, "impresiones/2026-11-21_soporte", nombre='<script>alert(1)</script>',
+                            url_tienda="javascript:alert(1)", **extra)
+        self.assertEqual(pieza["tiempo"], "1 h 00 min")
+        self.assertNotIn("url_tienda", pieza)
+        pagina = cat.generar_html(c)
+        self.assertNotIn("<script>alert", pagina)
+        self.assertNotIn("javascript:", pagina)
+        self.assertIn("&lt;script&gt;", pagina)
+        self.assertLess(pagina.index("noviembre 2026"), pagina.index("septiembre 2026"))
+        with self.assertRaises(SystemExit):
+            cat.agregar(c, "../afuera")
+
+
 class TestGuardia(unittest.TestCase):
     def correr(self, modo, datos):
         return subprocess.run([sys.executable, str(RAIZ / "hooks" / "guardia.py"), modo],

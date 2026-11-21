@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.1.5 (2026-11-21)
+
+- **Catálogo de piezas** (`/catalogo` y `catalogo.py`): `catalogo.html` en la carpeta de trabajo muestra todas las piezas con su vista (o la foto real, si la mandaste), medidas, material, tiempo, gramos, costo, precio, estado y enlaces a sus archivos, ordenadas por mes, con buscador y filtros. Se actualiza solo cuando `/pieza`, `/diseno` o `/publicar` guardan algo, y "armá el catálogo" suma las piezas que ya tenías. El índice queda en `taller-3d/catalogo.json`.
+- La página funciona sin internet y escapa todo lo que muestra; los enlaces a la tienda solo se aceptan con `http` o `https`.
+- 46 pruebas automáticas.
+
 ## 0.1.4 (2026-11-21)
 
 - **Licencia GNU AGPL 3.0** (`LICENSE`), con encabezado de licencia en cada script y `AVISOS-DE-TERCEROS.md`, que detalla qué sale de OrcaSlicer (el catálogo de parámetros) y las licencias de lo que usa o instala el taller.

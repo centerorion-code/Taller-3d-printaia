@@ -16,6 +16,7 @@ Plugin para Claude que arma un taller de impresión 3D con OrcaSlicer: diseña p
 | `/impresoras` | Agregar o revisar impresoras (límites, perfiles, cama) y ver qué perfiles sobran |
 | `/publicar` | Armar el producto con precio por costo y margen y cargarlo como borrador en tu tienda |
 | `/instalar` | Instalar o revisar que todo ande (saltea lo que ya está) y hacer una pieza de prueba |
+| `/catalogo` | Ver todas tus piezas en una página (`catalogo.html`) con su vista, datos y archivos, buscarlas y marcarlas como impresas |
 | `/restaurar` | Volver atrás un perfil, ordenar perfiles de prueba, desinstalar |
 | `/ayuda` | Cómo pedir una pieza, el circuito y los comandos (el manual de uso) |
 
@@ -57,7 +58,7 @@ Ubuntu 24.04, OrcaSlicer 2.5.1, orca-mcp 0.1.0, Creality Ender-3 V3 Plus. El ins
 
 ## Versión
 
-0.1.4. Cambios en [CHANGELOG.md](CHANGELOG.md).
+0.1.5. Cambios en [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 

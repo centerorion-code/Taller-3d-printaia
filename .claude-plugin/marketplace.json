@@ -11,7 +11,7 @@
       "name": "taller-3d",
       "source": "./",
       "description": "Taller de impresión 3D con Claude y OrcaSlicer: diseña piezas, elige la configuración según el uso, lamina, revisa el G-code por seguridad, calcula costos, calibra filamentos y arma la publicación para tu tienda. Nunca arranca una impresión.",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "author": {
         "name": "Leo"
       },

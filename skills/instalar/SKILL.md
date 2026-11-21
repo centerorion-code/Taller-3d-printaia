@@ -65,4 +65,4 @@ La app de Claude de Windows es un paquete MSIX: Windows manda a una carpeta priv
 2. Laminar con los perfiles de la impresora predeterminada: `AUTO proceso` y `AUTO filamento` creado con `--cama` de la configuración (como en `/pieza`).
 3. Traer el G-code y correr `revisar_gcode.py --cama-primera-capa <temperatura>`: tiene que salir APROBADO, con las temperaturas y la cama correctas.
 4. Mostrar tiempo, gramos y costo (si hay precios) y dejar todo en `impresiones/AAAA-MM-DD_cubo-prueba/`.
-5. Cerrar con: qué quedó listo, qué falta (si algo), los comandos disponibles (`/pieza`, `/diseno`, `/calibrar`, `/impresoras`, `/publicar`, `/restaurar`, `/ayuda`) y cómo pedir una pieza con un ejemplo de `MANUAL.md`. Ofrecer dejar el manual en la carpeta de trabajo.
+5. Cerrar con: qué quedó listo, qué falta (si algo), los comandos disponibles (`/pieza`, `/diseno`, `/calibrar`, `/impresoras`, `/publicar`, `/catalogo`, `/restaurar`, `/ayuda`) y cómo pedir una pieza con un ejemplo de `MANUAL.md`. Ofrecer dejar el manual en la carpeta de trabajo.

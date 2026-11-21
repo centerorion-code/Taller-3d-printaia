@@ -48,4 +48,5 @@ Cargar antes la skill `impresion-3d` y seguir sus reglas. Script: `<raíz del pl
 
 1. Dejar en `<carpeta de la pieza>/producto/`: `producto.json`, `producto_woocommerce.csv`, `ficha.md` (y `plantilla_completa.csv` si corresponde), más las fotos.
 2. Decir dónde quedó el borrador (enlace al producto en el administrador si se creó) y qué falta revisar antes de publicarlo.
+3. Actualizar el catálogo (skill `catalogo`) con `--producto <carpeta>/producto/producto.json` y, si hay, el enlace público del producto en `--url-tienda`.
 3. Registrar en `historial.csv`.

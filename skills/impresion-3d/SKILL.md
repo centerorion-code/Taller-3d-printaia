@@ -29,6 +29,7 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
   - `perfil_orca.py`: `crear`, `validar` y `diff` de perfiles de usuario.
   - `revisar_gcode.py`: revisión de seguridad del G-code; con `--json` y precios, también calcula el costo.
   - `producto_tienda.py`: ficha de producto y precio (lo usa `/publicar`).
+  - `catalogo.py`: índice de las piezas (`taller-3d/catalogo.json`) y página `catalogo.html` con vistas, datos y archivos (skill `catalogo`).
   - `novedades_orca.py`: compara el Orca del usuario con lo que conoce el taller (parámetros nuevos o que ya no están, claves viejas en perfiles, perfiles TEST o AUTO que sobran) y dice cuándo toca revisar en la web (sección 7).
   - Dependencias de CAD y vistas: `pip install --break-system-packages -q manifold3d numpy matplotlib`.
   - Otras skills llegan a estos scripts por `<raíz del plugin>/skills/impresion-3d/scripts/`. La raíz es la carpeta que contiene `skills/`. Si no se sabe: `find / -path '*skills/impresion-3d/scripts/comun.py' -not -path '/proc/*' 2>/dev/null | head -1`.
@@ -47,7 +48,8 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
   - `disenos/AAAA-MM-DD_nombre/`: pedidos de solo diseño (`/diseno`): `pieza.py`, STL, vista y `parametros.md`.
   - `respaldos/AAAA-MM-DD_HHMMSS/`: copias previas de lo que se cambió.
   - `calibraciones/<filamento>.md`: resultados de calibración.
-  - `taller-3d/`: `config.json`, `historial.csv`, `aprendizajes.md`, `novedades-orca.json` (lo que se aprendió del Orca del usuario; sección 7).
+  - `taller-3d/`: `config.json`, `historial.csv`, `aprendizajes.md`, `novedades-orca.json` (lo que se aprendió del Orca del usuario; sección 7), `catalogo.json` (índice de piezas).
+  - `catalogo.html`: la página con todas las piezas. **Cada vez que se guarda, lamina, imprime o publica una pieza, actualizar el catálogo** (`catalogo.py agregar` y `html`, y escribir los dos archivos; skill `catalogo`).
 - Perfiles de usuario de Orca: `~/.config/OrcaSlicer/user/default/{machine,process,filament}/` en Linux (Flatpak: `~/.var/app/<id>/config/OrcaSlicer/user/default/...`; portable: la carpeta de datos que diga `config.json` en `orca.carpeta_usuario`). Si el usuario inició sesión en Orca, `default` es su número de usuario: confirmar con las rutas que devuelve `list_profiles`. macOS: `~/Library/Application Support/OrcaSlicer/user/...`.
 - **Windows:** la app de Claude (MSIX) no puede crear archivos dentro de `AppData` que Orca vea. El instalador deja los datos de Orca en `C:\Users\<usuario>\OrcaSlicer` (con una unión en `%APPDATA%\OrcaSlicer`). Escribir perfiles solo por esa ruta; si los perfiles están bajo `AppData` sin la unión, no escribir y derivar a `/instalar` (sección 2).
 

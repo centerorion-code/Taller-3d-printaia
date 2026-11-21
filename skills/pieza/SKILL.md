@@ -94,7 +94,7 @@ En la carpeta de la pieza en la PC dejar: `pieza.py` (si se modeló), `pieza.stl
 - Qué mirar durante la impresión (primera capa, voladizos en tal altura) y el recordatorio de no dejarla sin supervisión.
 - Cómo imprimir: pasar el G-code por USB o por la app de la impresora y arrancar desde la impresora. También puede abrir `pieza.stl` en Orca y elegir los perfiles `AUTO`: quedan configurados igual. **No arrancarla nunca desde acá.**
 
-Registrar la entrega en `historial.csv`.
+Registrar la entrega en `historial.csv` y actualizar el catálogo (skill `catalogo`, "Agregar o actualizar una pieza") con `informe_gcode.json`, `informe_stl.json` y los archivos de la carpeta.
 
 ### En paralelo: la publicación
 
@@ -106,4 +106,5 @@ Si el usuario cuenta cómo salió o manda una foto:
 1. Diagnosticar con `references/diagnostico.md`.
 2. Anotar en `taller-3d/aprendizajes.md`: fecha, pieza, perfil, material, resultado, problema y ajuste que funcionó (por ejemplo, la holgura real de un encastre).
 3. Si el ajuste sirve para todo el material, proponer llevarlo al perfil con `/calibrar` o al AUTO de la próxima pieza.
-4. Si quiere venderla, ofrecer `/publicar`.
+4. Marcarla como impresa en el catálogo (`--estado impresa`); si mandó una foto, guardarla como `foto.jpg` en la carpeta de la pieza y sumarla.
+5. Si quiere venderla, ofrecer `/publicar`.
