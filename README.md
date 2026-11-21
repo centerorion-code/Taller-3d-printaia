@@ -35,19 +35,28 @@ Además, la skill `impresion-3d` responde cualquier duda de configuración: cono
 ## Instalación
 
 1. **Sumá el plugin a Claude** (cualquiera de estas):
-   - **Desde GitHub, con actualizaciones automáticas:** en claude.ai o en la app de escritorio, **Customize → Plugins → Add → Add marketplace**, escribí `noamix/Taller-3d-printaia` e instalá **taller-3d**.
+   - **Desde GitHub, con actualizaciones automáticas:** en la app de escritorio de Claude (o en claude.ai), **Customize → Plugins → Add → Add marketplace**, pegá la dirección de este repositorio, `noamix/Taller-3d-printaia` (o `https://github.com/noamix/Taller-3d-printaia`), e instalá **taller-3d**. Cada vez que se sube una versión nueva, Claude la toma sola.
    - **En Claude Code:**
      ```
      /plugin marketplace add noamix/Taller-3d-printaia
      /plugin install taller-3d@taller-3d
      ```
-   - **Desde el archivo:** bajá `taller-3d.plugin` de [Releases](https://github.com/noamix/Taller-3d-printaia/releases) y subilo en **Customize → Plugins → Add → Upload plugin**. Las versiones nuevas las tenés que bajar de nuevo.
+   - **Desde el archivo:** con `taller-3d.plugin` (de [Releases](https://github.com/noamix/Taller-3d-printaia/releases) o el que te pasaron), en **Customize → Plugins → Add → Upload plugin**. Las versiones nuevas las tenés que bajar de nuevo.
+   - **Desde el directorio de plugins de Claude:** está en revisión en Anthropic; cuando lo aprueben, se va a poder buscar ahí como **taller-3d**.
 2. **Prepará la PC:** en Claude escribí `/instalar`. Te deja el instalador para Linux o Windows, que primero revisa que la PC alcance (procesador, memoria, placa de video, disco e internet) y qué tenés instalado, y saltea lo que ya está. Usa versiones fijas con verificación SHA-256, tiene modo prueba y desinstalador. Detalles en [INSTALACION.md](INSTALACION.md).
+
+## Qué corre, qué manda y qué baja
+
+- **En el espacio de Claude:** los scripts de Python de `skills/impresion-3d/scripts/` diseñan las piezas (`cad.py`), revisan el STL y el G-code, validan los perfiles de Orca, calculan costos y precios, comparan tu Orca con lo que conoce el taller y arman el catálogo. Para el CAD y las imágenes instala `manifold3d`, `numpy`, `matplotlib` y `Pillow` con pip, ahí mismo.
+- **En tu PC, los bloqueos automáticos** (`hooks/guardia.py`, en Cowork y Claude Code): corren con Python antes de que Claude escriba un archivo o use la terminal, leen solo ese archivo o ese comando y bloquean si no pasan la revisión. No mandan nada a ningún lado.
+- **Qué toca en tu PC:** solo las carpetas que conectás (la de trabajo y las de perfiles de usuario de Orca), con respaldo antes de cambiar algo. Lamina con tu OrcaSlicer a través de orca-mcp, que se instala aparte; no viene en el plugin. Blender (por su MCP) es opcional.
+- **Qué baja el instalador**, solo si lo corrés vos: OrcaSlicer 2.5.1 desde el GitHub de OrcaSlicer y uv 0.13.9 desde el GitHub de Astral (solo Windows), los dos con huella SHA-256 fija; orca-mcp 0.1.0 y sus dependencias desde PyPI; en Linux, si aceptás, paquetes del sistema con apt (fuse3, bibliotecas de Orca, pipx, xvfb). Agrega orca-mcp a la configuración de la app de Claude, con respaldo, y en Windows mueve la carpeta de datos de Orca fuera de AppData.
+- **Qué manda a internet:** nada por su cuenta y sin telemetría. Lo único que sale es la publicación de un producto en **tu** tienda (WooCommerce, Tiendanube, Shopify o Mercado Libre), cuando lo pedís y siempre como borrador, por la conexión o el navegador que uses vos. Claude también busca en la web cuando revisa si hay versiones o plugins nuevos de Orca.
 
 ## Componentes
 
-- `skills/impresion-3d/`: conocimiento, reglas de seguridad, scripts (`cad.py`, `revisar_stl.py`, `vista_previa.py`, `perfil_orca.py`, `revisar_gcode.py`, `producto_tienda.py`, `novedades_orca.py`), datos de impresoras y materiales, catálogo de parámetros de Orca, guía de plugins de Orca y pruebas (`scripts/tests/`).
-- `skills/pieza`, `diseno`, `calibrar`, `impresoras`, `publicar`, `instalar`, `restaurar`, `ayuda`: flujos de trabajo.
+- `skills/impresion-3d/`: conocimiento, reglas de seguridad, scripts (`cad.py`, `revisar_stl.py`, `vista_previa.py`, `perfil_orca.py`, `revisar_gcode.py`, `producto_tienda.py`, `novedades_orca.py`, `catalogo.py`), datos de impresoras y materiales, catálogo de parámetros de Orca, guía de plugins de Orca y pruebas (`scripts/tests/`).
+- `skills/pieza`, `diseno`, `calibrar`, `impresoras`, `publicar`, `catalogo`, `instalar`, `restaurar`, `ayuda`: flujos de trabajo.
 - `MANUAL.md`: manual de uso.
 - `hooks/`: bloqueos automáticos de seguridad.
 - `instalador/`: instaladores y desinstaladores para Linux y Windows.
@@ -58,7 +67,7 @@ Ubuntu 24.04, OrcaSlicer 2.5.1, orca-mcp 0.1.0, Creality Ender-3 V3 Plus. El ins
 
 ## Versión
 
-0.1.5. Cambios en [CHANGELOG.md](CHANGELOG.md).
+0.1.6. Cambios en [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 

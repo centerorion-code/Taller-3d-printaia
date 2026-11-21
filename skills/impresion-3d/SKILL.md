@@ -37,7 +37,7 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
   - `orca-mcp`: `list_profiles`, `get_profile`, `get_model_info`, `slice_model`, `get_slice_estimates`, `analyze_gcode_layers`, `check_installation`.
   - Blender (MCP, opcional): para formas orgánicas o decorativas.
   - Archivos: `get_device_info` (carpetas conectadas y estado de los MCP), `device_list_dir`, `device_stage_files` (copia de la PC a `/mnt/user-data/uploads/<carpeta>/...`), `device_commit_files` (escribe en la PC desde `/mnt/user-data/outputs/...`; para archivos existentes pasar `expectedMtimeMs`), `device_request_folder_access`.
-- **Datos del plugin:** `datos/impresoras/<id>.json` (límites, área, perfiles de sistema), `datos/materiales.json` (rangos de temperatura), `datos/claves-gcode-2.5.1.json` (las 750 claves que Orca 2.5.1 escribe en el G-code), `references/catalogo-orca-2.5.1.json` (1015 parámetros con nombre, explicación en español, tipo, rango y valores posibles).
+- **Datos del plugin:** `datos/impresoras/<id>.json` (límites, área, perfiles de sistema), `datos/materiales.json` (rangos de temperatura), `datos/claves-gcode-2.5.1.json` (las 750 claves que Orca 2.5.1 escribe en el G-code), `references/catalogo-orca-2.5.1/parametros-*.json` (1015 parámetros con nombre, explicación en español, tipo, rango y valores posibles; en partes, un parámetro por línea).
 
 ## 3. Configuración del usuario y carpeta de trabajo
 
@@ -74,9 +74,9 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
 Detalle de los parámetros que más pesan: `references/parametros-clave.md`. Cualquier otro: buscarlo en el catálogo antes de explicarlo o tocarlo:
 
 ```bash
-C=<scripts>/../references/catalogo-orca-2.5.1.json
-jq '.parametros["seam_gap"]' "$C"
-jq -r '.parametros|to_entries[]|select((.value.label//"")+(.value.tooltip//"")|test("costura";"i"))|"\(.key): \(.value.label)"' "$C"
+C=<scripts>/../references/catalogo-orca-2.5.1
+grep -h '^"seam_gap"' "$C"/parametros-*.json            # un parámetro por línea
+jq -rs 'map(.parametros)|add|to_entries[]|select((.value.label//"")+(.value.tooltip//"")|test("costura";"i"))|"\(.key): \(.value.label)"' "$C"/parametros-*.json
 ```
 
 ## 6. Mañas conocidas

@@ -8,14 +8,15 @@ import re
 import sys
 from pathlib import Path
 
-VERSION_PLUGIN = "0.1.5"
+VERSION_PLUGIN = "0.1.6"
 VERSION_ORCA = "2.5.1"
 
 SCRIPTS = Path(__file__).resolve().parent
 SKILL = SCRIPTS.parent
 DATOS = SKILL / "datos"
 REFERENCIAS = SKILL / "references"
-CATALOGO = REFERENCIAS / "catalogo-orca-2.5.1.json"
+# El catálogo va en partes de menos de 200 KB (límite de archivos del directorio de plugins de Anthropic)
+CATALOGO = REFERENCIAS / f"catalogo-orca-{VERSION_ORCA}"
 
 APROBADO, ADVERTENCIA, RECHAZO = "aprobado", "advertencia", "rechazo"
 CODIGO_SALIDA = {APROBADO: 0, ADVERTENCIA: 1, RECHAZO: 2}
@@ -77,8 +78,21 @@ def normalizar_material(texto: str | None) -> str | None:
     return None
 
 
+_catalogo: dict | None = None
+
+
 def cargar_catalogo() -> dict:
-    return cargar_json(CATALOGO)["parametros"]
+    """Los 1015 parámetros de Orca, juntando las partes de references/catalogo-orca-<versión>/."""
+    global _catalogo
+    if _catalogo is None:
+        partes = sorted(CATALOGO.glob("parametros-*.json"), key=lambda p: int(p.stem.rsplit("-", 1)[1]))
+        if not partes:
+            raise FileNotFoundError(f"No encuentro el catálogo de parámetros en {CATALOGO}")
+        juntos: dict = {}
+        for parte in partes:
+            juntos.update(cargar_json(parte)["parametros"])
+        _catalogo = juntos
+    return _catalogo
 
 
 def salir(estado: str) -> None:

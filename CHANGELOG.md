@@ -1,5 +1,13 @@
 # Cambios
 
+## 0.1.6 (2026-11-21)
+
+- Listo para el directorio de plugins de Anthropic:
+  - el catálogo de parámetros va en partes de menos de 200 KB, con un parámetro por línea;
+  - el README cuenta qué corre el plugin, qué toca, qué baja y qué manda;
+  - nombre visible "Taller 3D".
+- Instalación: el README pone primero instalarlo desde GitHub, con la dirección del repositorio.
+
 ## 0.1.5 (2026-11-21)
 
 - **Catálogo de piezas** (`/catalogo` y `catalogo.py`): `catalogo.html` en la carpeta de trabajo muestra todas las piezas con su vista (o la foto real, si la mandaste), medidas, material, tiempo, gramos, costo, precio, estado y enlaces a sus archivos, ordenadas por mes, con buscador y filtros. Se actualiza solo cuando `/pieza`, `/diseno` o `/publicar` guardan algo, y "armá el catálogo" suma las piezas que ya tenías. El índice queda en `taller-3d/catalogo.json`.

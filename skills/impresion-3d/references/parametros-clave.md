@@ -1,6 +1,6 @@
 # Parámetros que más pesan (OrcaSlicer 2.5.1)
 
-Para cualquier otro, buscar en `catalogo-orca-2.5.1.json` (tiene nombre en español, explicación, tipo, rango, valores posibles y en qué perfil va).
+Para cualquier otro, buscar en el catálogo (`references/catalogo-orca-2.5.1/parametros-*.json`, un parámetro por línea) (tiene nombre en español, explicación, tipo, rango, valores posibles y en qué perfil va).
 
 ## Calidad visible
 - `layer_height`; anchos `*_line_width` (externo 0.42, interno 0.45 para boquilla 0.4).
