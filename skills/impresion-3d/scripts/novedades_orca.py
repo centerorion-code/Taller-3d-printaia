@@ -72,8 +72,11 @@ def revisar_gcode(ruta: Path, estado: dict) -> dict:
     version, claves = leer_gcode(ruta)
     base = set(comun.cargar_json(BASE_GCODE)["claves"])
     catalogo = comun.cargar_catalogo()
+    otra_version = bool(version) and version != comun.VERSION_ORCA
     nuevas = sorted(claves - base - set(catalogo))
-    quitadas = sorted(base - claves)
+    # Con la misma versión de Orca, que falte una clave no es que la hayan quitado: depende de la impresora y del
+    # filamento (por ejemplo, las filament_* de retracción). Solo cuenta con otra versión.
+    quitadas = sorted(base - claves) if otra_version else []
     cuando = f"{hoy()} (Orca {version or '?'})"
     antes_nuevas, antes_quitadas = set(estado.get("claves_nuevas", {})), set(estado.get("claves_quitadas", {}))
     for c in nuevas:
@@ -87,7 +90,7 @@ def revisar_gcode(ruta: Path, estado: dict) -> dict:
     return {
         "version_orca": version,
         "version_taller": comun.VERSION_ORCA,
-        "otra_version": bool(version) and version != comun.VERSION_ORCA,
+        "otra_version": otra_version,
         "claves_nuevas": nuevas,
         "claves_quitadas": quitadas,
         "nuevas_desde_la_ultima_vez": sorted(set(nuevas) - antes_nuevas),
@@ -202,7 +205,8 @@ def main(argv=None) -> None:
         if r["otra_version"]:
             print("  Es otra versión: revisar sus notas de versión antes de usar parámetros nuevos.")
         for titulo, clave in (("Parámetros nuevos que el taller no conoce", "claves_nuevas"),
-                              ("Parámetros del taller que este Orca ya no tiene", "claves_quitadas")):
+                              ("Parámetros del taller que no aparecen en este G-code (quizá los quitó esta "
+                               "versión; algunos dependen de la impresora o el filamento)", "claves_quitadas")):
             if r[clave]:
                 recientes = set(r[clave.replace("claves_", "") + "_desde_la_ultima_vez"])
                 print(f"  {titulo} ({len(r[clave])}): "

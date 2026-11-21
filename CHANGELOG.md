@@ -1,5 +1,14 @@
 # Cambios
 
+## 0.1.11 (2026-11-21)
+
+Correcciones de la prueba con la Creality Hi en una PC real.
+
+- **El bloqueo de la terminal ya no frena comandos que solo nombran la carpeta de perfiles de Orca.** Un script que arma un `config.json` con esa ruta adentro ya pasa: ahora se mira a dónde escribe (`open(..., "w")`, `write_text`, `shutil.copy`, `Set-Content -Path`), no lo que escribe. Escribir de verdad en esa carpeta sigue bloqueado.
+- Un comodín (`cat carpeta/*`) solo cuenta como intento de leer `OrcaSlicer.conf` si apunta a la carpeta de datos de Orca, no a otra que se llame parecido (como `OrcaSlicer Claude`).
+- **`M5001`, el timelapse de Creality** (Hi, SPARKX i7), ya no sale como comando desconocido: la revisión lo explica y revisa el movimiento o la pausa que va detrás como cualquier otro (una posición fuera de la cama se rechaza igual).
+- `novedades_orca.py` ya no da como "ya no están" las claves que simplemente no trae un G-code de la misma versión de Orca (por ejemplo, las `filament_*` de retracción): eso depende de la impresora y del filamento. Solo se fija en las que faltan cuando el G-code es de otra versión.
+
 ## 0.1.10 (2026-11-21)
 
 - **Carpeta de trabajo más fácil.** Antes de preguntar, `/taller-3d:instalar` se fija si el instalador ya la creó. Si no existe, la crea: con la terminal de la PC, directamente; si no, te da a elegir entre que la cree Claude (con un permiso sobre Documentos que dura esa conversación y se usa solo para la carpeta nueva) o crearla vos desde el **+** → **Agregar carpeta**, con los pasos exactos, y así queda creada y conectada a la vez.

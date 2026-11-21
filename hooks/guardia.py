@@ -312,6 +312,44 @@ def _comando(entrada: dict) -> str:
     return " ".join(str(v) for v in entrada.values() if isinstance(v, str))
 
 
+RE_ABRE = re.compile(r"\bopen\(([^)]*)\)")
+RE_COPIA_SCRIPT = re.compile(r"(?:shutil\.(?:copy\w*|move)|copyfile|writefilesync|\[io\.file\]::write\w*)\s*\(([^)]*)\)")
+RE_WRITE_METODO = re.compile(r"\.write_(?:text|bytes)\s*\(")
+ESCRIBEN_PS = {"set-content", "add-content", "out-file", "sc", "ac", "new-item", "ni"}
+SWITCHES_PS = {"-force", "-nonewline", "-append", "-whatif", "-confirm", "-passthru", "-noclobber"}
+
+
+def _escribe_script_en_orca(c: str) -> bool:
+    """¿Un script escribe en la carpeta de Orca? Mira a dónde escribe, no qué escribe: armar un config.json que
+    nombra esa carpeta no es escribir en ella."""
+    for m in RE_ABRE.finditer(c):
+        if re.search(r"['\"][wax]", m.group(1)) and CARPETA_ORCA.search(m.group(1)):
+            return True
+    if any(CARPETA_ORCA.search(m.group(1)) for m in RE_COPIA_SCRIPT.finditer(c)):
+        return True
+    for m in RE_WRITE_METODO.finditer(c):
+        inicio = max(c.rfind(";", 0, m.start()), c.rfind("\n", 0, m.start())) + 1
+        if CARPETA_ORCA.search(c[inicio:m.start()]):
+            return True
+    return False
+
+
+def _destino_ps(argumentos: list[str]) -> str | None:
+    """El archivo que escribe un Set-Content, Add-Content, Out-File o New-Item de PowerShell."""
+    for i, a in enumerate(argumentos):
+        if a in ("-path", "-literalpath", "-filepath") and i + 1 < len(argumentos):
+            return argumentos[i + 1]
+    saltar = False
+    for a in argumentos:
+        if saltar:
+            saltar = False
+        elif a.startswith("-"):
+            saltar = a not in SWITCHES_PS
+        else:
+            return a
+    return None
+
+
 def escribe_en_orca(comando: str) -> bool:
     """¿El comando escribe, mueve o borra algo en la carpeta de datos de Orca? (leer sí se puede)."""
     c = comando.lower()
@@ -321,7 +359,7 @@ def escribe_en_orca(comando: str) -> bool:
     for m in re.finditer(r"(?<![0-9&>])>{1,2}\s*(\"[^\"]*\"|'[^']*'|[^\s|;&<>]+)", c):
         if CARPETA_ORCA.search(m.group(1)):
             return True
-    if ESCRIBE_SCRIPT.search(c):
+    if _escribe_script_en_orca(c):
         return True
     for tramo in re.split(r"\|\||&&|[|;&\n]", c):
         tokens = [x.strip("\"'") for x in RE_TOKEN.findall(tramo)]
@@ -336,6 +374,11 @@ def escribe_en_orca(comando: str) -> bool:
             return True
         if programa in COPIAN and argumentos and CARPETA_ORCA.search(argumentos[-1]):
             return True
+        if programa in ESCRIBEN_PS:
+            destino = _destino_ps(tokens[1:])
+            if destino and CARPETA_ORCA.search(destino):
+                return True
+            continue
         if programa in TOCAN and any(CARPETA_ORCA.search(a) for a in tokens[1:]):
             return True
         en_lugar = any(re.fullmatch(r"-[a-z]*i\S*", x) or x.startswith("--in-place") for x in tokens[1:])
@@ -432,15 +475,31 @@ def _palabras(tramo: str) -> list[str]:
     return [re.sub(r"[\"'^]", "", p).replace("\x00", " ") for p in _RE_PALABRA.findall(texto)]
 
 
+_CD = {"cd", "pushd", "chdir", "set-location", "sl"}
+
+
+def _puede_ser_raiz(carpeta: str) -> bool:
+    """¿Esa carpeta es (o, con comodines, puede ser) la carpeta de datos de Orca?"""
+    ultimo = carpeta.rstrip("/").rsplit("/", 1)[-1].split(":")[-1]
+    if any(x in ultimo for x in "*?["):
+        return any(fnmatch.fnmatchcase(n, ultimo) for n in _RAICES)
+    return ultimo in _RAICES
+
+
+def _comodin_de_conf(final: str) -> bool:
+    """¿Un comodín que puede tomar OrcaSlicer.conf (o su .bak)?"""
+    t = final.split(":")[0]
+    return any(x in t for x in "*?[") and any(fnmatch.fnmatchcase(n, t) for n in (CONF, CONF + ".bak"))
+
+
 def toca_conf_de_orca(comando: str) -> bool:
     """¿El comando puede leer, copiar o empaquetar OrcaSlicer.conf? Solo pasan los dos comandos documentados.
-    Nombrarlo sin ruta (un grep en el código, un mensaje de commit) no cuenta."""
+    Nombrarlo sin ruta (un grep en el código, un mensaje de commit) no cuenta, y un comodín solo cuenta sobre la
+    carpeta de datos de Orca (no sobre otra que se llame parecido, como "OrcaSlicer Claude")."""
     if es_comando_permitido(comando):
         return False
-    c = comando.lower()
-    contexto = any("orca" in v for v in _variantes(c)) or bool(re.search(r"[*?\[][^\s/\\]*[/\\]", c))
-    cambia_de_carpeta = bool(re.search(r"\b(cd|pushd|chdir|set-location|sl)\b[^;&|\n]*orca", c))
-    tramos = [x for x in _RE_TRAMO.split(c) if x.strip()]
+    tramos = [x for x in _RE_TRAMO.split(comando.lower()) if x.strip()]
+    en_raiz = False                                       # después de un cd a la carpeta de datos de Orca
     for tramo in tramos:
         palabras = _palabras(tramo)
         while palabras and palabras[0] in PREFIJOS:
@@ -454,13 +513,16 @@ def toca_conf_de_orca(comando: str) -> bool:
                     if not ruta or (n == 0 and "/" not in ruta.strip("/")):
                         continue                          # el nombre del programa (orcaslicer --help)
                     con_carpeta = "/" in ruta or ruta.startswith("~")
-                    final = ruta.rstrip("/").rsplit("/", 1)[-1]
-                    if _es_nombre_conf(final, contexto) and (con_carpeta or cambia_de_carpeta or "*" in final):
-                        if not mira or "*" in final or "?" in final:
-                            return True
+                    carpeta, _, final = ruta.rstrip("/").rpartition("/")
+                    if not mira and _es_nombre_conf(final, False) and (con_carpeta or en_raiz):
+                        return True                       # OrcaSlicer.conf o una copia, con su carpeta
+                    if not mira and _comodin_de_conf(final) and (_puede_ser_raiz(carpeta) if carpeta else en_raiz):
+                        return True                       # un comodín sobre la carpeta de datos de Orca
                     if _es_raiz_orca(ruta) and (con_carpeta or programa in EMPAQUETAN):
                         if not (mira and len(tramos) == 1 and not _RE_RECURSIVO.search(tramo)):
-                            return True
+                            return True                   # la carpeta entera: copiarla, empaquetarla, recorrerla
+        if programa in _CD and len(palabras) > 1:
+            en_raiz = _puede_ser_raiz(palabras[1].replace("\\", "/"))
     return False
 
 

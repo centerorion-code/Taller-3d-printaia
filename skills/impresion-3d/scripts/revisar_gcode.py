@@ -257,6 +257,7 @@ def revisar(ruta: Path | None, impresora: dict, material: str | None = None, cos
     linea_primera_extrusion = None
     ventilador_max = 0.0
     desconocidos: Counter = Counter()
+    timelapse_creality = 0
     peligrosos: dict[str, list[int]] = {}
     variables: list[int] = []
     capas = 0
@@ -282,6 +283,13 @@ def revisar(ruta: Path | None, impresora: dict, material: str | None = None, cos
             cmd, resto = partir(linea_cmd)
             if not cmd:
                 continue
+            if cmd == "M5001":
+                # Timelapse de Creality (Hi, SPARKX i7): va adelante de los movimientos y pausas para la foto
+                # de cada capa ("M5001 G1 X267 Y110"). Se revisa el comando de atrás como cualquier otro.
+                timelapse_creality += 1
+                cmd, resto = partir(resto) if RE_CMD_GM.match(resto.strip()) else ("", "")
+                if not cmd:
+                    continue  # "M5001 P15": dispara la foto
             if fragmento and (re.fullmatch(r"T[\[{].*", cmd) or not RE_COMANDO_VALIDO.fullmatch(cmd)):
                 continue  # cambio de herramienta con variable, o restos de la plantilla
 
@@ -485,6 +493,9 @@ def revisar(ruta: Path | None, impresora: dict, material: str | None = None, cos
     for cmd, lineas in peligrosos.items():
         gravedad, explicacion = PELIGROSOS[cmd]
         rev.agregar(gravedad, f"{cmd} {explicacion} ({len(lineas)} vez/veces).", lineas[0])
+    if timelapse_creality and not fragmento:
+        rev.agregar(APROBADO, f"M5001 ×{timelapse_creality}: timelapse de Creality (Hi, SPARKX i7). Va adelante de "
+                    "los movimientos y pausas para sacar la foto de cada capa; los revisé como al resto.")
     if desconocidos:
         lista = ", ".join(f"{c} ×{k}" for c, k in desconocidos.most_common(10))
         rev.agregar(ADVERTENCIA, f"Comandos que no conozco (revisalos): {lista}.")
