@@ -41,7 +41,7 @@ Además, la skill `impresion-3d` responde cualquier duda de configuración: cono
 Por ahora el taller se instala desde este repositorio de GitHub. Se hace en **Claude Desktop** (la app de escritorio, https://claude.ai/download), desde su menú **Plugins**: no se hace pidiéndoselo a Claude en el chat. Más adelante va a estar también en el directorio de plugins de Anthropic, y esta sección va a explicar cómo sumarlo desde ahí.
 
 1. **Sumá el plugin a Claude desde GitHub.** Usá solo esta dirección: una copia (fork) puede traer cambios que nadie revisó.
-   - **En Claude Desktop:** en el menú de la app (no en el chat), andá a **Plugins › Agregar › Agregar marketplace › Agregar desde un repositorio** (en inglés: *Customize → Plugins → Add marketplace*), pegá `noamix/Taller-3d-printaia` (o `https://github.com/noamix/Taller-3d-printaia`), tocá **Sincronizar** e instalá **taller-3d**. Para ver qué versión tenés: **Plugins → Taller 3D**, abajo de todo dice **Versión**. Para recibir una versión nueva, en **Plugins** buscá el marketplace **Taller-3d-printaia** y, en su menú, buscá actualizaciones (en inglés, *Check for updates*). La sincronización automática (*Sync automatically*) puede no dispararse sola, porque depende de un aviso de GitHub a Claude que no siempre queda configurado: si no ves la versión nueva, buscá actualizaciones a mano.
+   - **En Claude Desktop:** en el menú de la app (no en el chat), andá a **Plugins › Agregar › Agregar marketplace › Agregar desde un repositorio** (en inglés: *Customize → Plugins → Add marketplace*), pegá `noamix/Taller-3d-printaia` (o `https://github.com/noamix/Taller-3d-printaia`), tocá **Sincronizar** e instalá **taller-3d**. Para ver qué versión tenés: **Plugins → Taller 3D**, abajo de todo dice **Versión**. Para recibir una versión nueva: **Plugins › Agregar › Administrar marketplaces**, menú **⋯** de **Taller-3d-printaia** → **Buscar actualizaciones** (en inglés, *Check for updates*). Hacelo a mano: en un marketplace agregado desde la app, la sincronización automática (*Sync automatically*) no se dispara sola.
    - **En Claude Code:**
      ```
      /plugin marketplace add noamix/Taller-3d-printaia
@@ -73,7 +73,7 @@ Ubuntu 24.04, OrcaSlicer 2.5.1, orca-mcp 0.1.0, Creality Ender-3 V3 Plus. El ins
 
 ## Versión
 
-0.1.9. Cambios en [CHANGELOG.md](CHANGELOG.md).
+0.1.10. Cambios en [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 

@@ -9,7 +9,7 @@ Cargar antes la skill `impresion-3d` y seguir sus reglas. Guía completa: `refer
 
 El plugin no trae impresoras: los datos de cada una se arman cuando el usuario elige trabajar en ella, investigando en internet, y quedan en su carpeta de trabajo (`taller-3d/impresoras/<id>.json`). No se preparan todas las de Orca de entrada: solo la que va a usar.
 
-Carpetas: la de trabajo y las de perfiles de usuario de Orca `process`, `filament` y `machine`, en un solo pedido.
+Carpetas: la de trabajo y la de perfiles de usuario de Orca (`user/<id>`, que tiene `process`, `filament` y `machine`), en un solo pedido (`/instalar`, sección 3).
 
 ## Ver las impresoras
 

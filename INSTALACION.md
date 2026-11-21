@@ -24,7 +24,7 @@ Después **revisan qué tenés** (Orca, orca-mcp, la app de Claude, la carpeta d
 
 1. Instalá **Claude Desktop**, la app de escritorio de Claude (https://claude.ai/download), e iniciá sesión. El plugin se instala desde el menú de esa app: no se hace escribiendo en el chat.
 2. En el menú de la app, andá a **Plugins › Agregar › Agregar marketplace › Agregar desde un repositorio** (en inglés: *Customize → Plugins → Add marketplace*), pegá `noamix/Taller-3d-printaia` (o `https://github.com/noamix/Taller-3d-printaia`) y tocá **Sincronizar**. Usá solo esta dirección: una copia (fork) puede traer cambios que nadie revisó.
-3. Instalá **taller-3d**. Para ver qué versión tenés: **Plugins → Taller 3D**, abajo de todo dice **Versión**. Para recibir una versión nueva, en **Plugins** buscá el marketplace **Taller-3d-printaia** y, en su menú, buscá actualizaciones (en inglés, *Check for updates*). La sincronización automática (*Sync automatically*) puede no dispararse sola, porque depende de un aviso de GitHub a Claude que no siempre queda configurado: si no ves la versión nueva, buscá actualizaciones a mano.
+3. Instalá **taller-3d**. Para ver qué versión tenés: **Plugins → Taller 3D**, abajo de todo dice **Versión**. Para recibir una versión nueva: **Plugins › Agregar › Administrar marketplaces**, menú **⋯** de **Taller-3d-printaia** → **Buscar actualizaciones** (en inglés, *Check for updates*). Hacelo a mano: en un marketplace agregado desde la app, la sincronización automática (*Sync automatically*) no se dispara sola.
 
 En Claude Code: `/plugin marketplace add noamix/Taller-3d-printaia` y `/plugin install taller-3d@taller-3d`; para las actualizaciones, ver el [README](README.md#instalación).
 
@@ -106,9 +106,11 @@ Opciones (en PowerShell): `-Orca "<ruta de orca-slicer.exe>"` (por ejemplo, uno 
 ## Después de instalar (todos los sistemas)
 
 1. **Abrí OrcaSlicer una vez** y agregá tu impresora con el asistente. Guardá una copia de usuario del perfil de cada impresora con la que quieras trabajar, por ejemplo `Mi <modelo> 0.4 nozzle` (o pedíselo a Claude después), y un perfil propio de proceso y de filamento: así Orca crea las carpetas de perfiles.
-2. **Conectá las carpetas** en la app de Claude (menú + → Agregar carpeta), con las rutas que te muestra el instalador al final:
+2. **Conectá las carpetas** en la app de Claude (el **+** del cuadro de mensaje → **Agregar carpeta**), con las rutas que te muestra el instalador al final (o dejá que te las pida Claude en el paso 3):
    - la carpeta de trabajo;
-   - las carpetas `process`, `filament` y `machine` de tus perfiles de Orca (`machine` aparece cuando guardás la primera copia de una impresora). Linux: `~/.config/OrcaSlicer/user/default/...` (Flatpak: `~/.var/app/com.orcaslicer.OrcaSlicer/config/OrcaSlicer/user/default/...`). Windows: `C:\Users\<vos>\OrcaSlicer\user\default\...` (**no** por AppData). macOS: `~/Library/Application Support/OrcaSlicer/user/default/...`.
+   - la carpeta de tus perfiles de Orca, `user/default` (adentro están `process`, `filament` y `machine`). Linux: `~/.config/OrcaSlicer/user/default` (Flatpak: `~/.var/app/com.orcaslicer.OrcaSlicer/config/OrcaSlicer/user/default`). Windows: `C:\Users\<vos>\OrcaSlicer\user\default` (**no** por AppData). macOS: `~/Library/Application Support/OrcaSlicer/user/default`.
+
+   **Si no usaste el instalador** y no tenés la carpeta de trabajo, no hace falta crearla antes: en el paso 3 Claude te pregunta dónde la querés (lo normal es `Documentos/Taller 3D`) y la crea él, con tu permiso sobre Documentos solo para esa conversación. Si preferís crearla vos: en el **+** → **Agregar carpeta**, entrá a Documentos, creá una carpeta nueva llamada `Taller 3D` con el botón de esa ventana, entrá y elegila; así queda creada y conectada a la vez.
 3. En Claude escribí **`/taller-3d:instalar`**: revisa que todo ande, te pregunta en qué impresora de tu Orca querés trabajar y la prepara (investiga sus datos oficiales y arma los perfiles), carga tus precios y tu tienda si querés, y hace una pieza de prueba.
 
 ## Blender (opcional)

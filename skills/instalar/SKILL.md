@@ -17,7 +17,7 @@ Con `get_device_info` y las herramientas de Orca, armar una tabla corta de estad
 | orca-mcp | `localMcpServers`: `announced`; si está `failed`, mostrar el error que reporta |
 | Orca instalado | `check_installation`: ruta, tipo (nativo, AppImage, Flatpak) y versión del banner |
 | Perfiles de Orca | `list_profiles`: hay un perfil de máquina de usuario; anotar la carpeta real de los perfiles |
-| Carpetas conectadas | `connectedFolders` incluye la carpeta de trabajo y `process`/`filament` de Orca |
+| Carpetas conectadas | `connectedFolders` incluye la carpeta de trabajo y la de perfiles de usuario de Orca (`user/<id>`, o `process` y `filament` por separado) |
 | Configuración | existe `<trabajo>/taller-3d/config.json` y tiene `aceptacion` e `impresoras` |
 | Impresoras | `list_profiles` (machine): cuáles hay en Orca; en `config.json`, cuáles están preparadas (su `datos` es un JSON en `taller-3d/impresoras/` que pasa `impresora.py validar`). Si `datos` es un id viejo (`ender-3-v3-plus`), prepararla de nuevo con `/impresoras` |
 | Windows: datos de Orca | si la plataforma es Windows, la carpeta de perfiles conectada **no** tiene que estar bajo `AppData` (ver sección 2) |
@@ -43,14 +43,33 @@ Dejar el instalador del sistema en la PC y explicar en 5 líneas qué hace: ante
 
 La app de Claude de Windows es un paquete MSIX: Windows manda a una carpeta privada los archivos **nuevos** que la app crea dentro de `AppData`, y Orca no los ve. Por eso el instalador mueve la carpeta de datos de Orca a `C:\Users\<usuario>\OrcaSlicer` y deja una unión de carpetas en `%APPDATA%\OrcaSlicer`.
 
-- Conectar siempre las carpetas de perfiles por la ruta nueva (`C:\Users\<usuario>\OrcaSlicer\user\default\process` y `...\filament`), nunca por `AppData`.
+- Conectar siempre la carpeta de perfiles por la ruta nueva (`C:\Users\<usuario>\OrcaSlicer\user\default`), nunca por `AppData`.
 - Si la carpeta de perfiles conectada está bajo `AppData` o `list_profiles` muestra rutas bajo `AppData` sin la unión, **no escribir perfiles nuevos**: explicar el motivo y pedir que corra de nuevo el instalador (ofrece mover los datos).
 - Después de escribir el primer perfil `AUTO`, pedir que confirme que aparece en Orca (reiniciándolo). Si no aparece, es este problema.
 
 ## 3. Carpetas
 
-1. Si no hay carpeta de trabajo, **preguntar dónde quiere guardar sus archivos** antes de crear nada: explicar en una línea qué va ahí (diseños, impresiones con sus vistas y G-code, respaldos y configuración) y ofrecer opciones (`AskUserQuestion` si está): `Documentos/Taller 3D` (recomendada), una carpeta que ya use para impresión 3D (si se ve una entre las conectadas) u otra que diga. No usar AppData en Windows ni la carpeta de Orca. Si el instalador ya la creó, usar esa sin volver a preguntar. Pedir acceso a la elegida junto con las carpetas `process`, `filament` y `machine` de los perfiles de Orca en **un solo pedido**. `device_request_folder_access` solo acepta carpetas que ya existen: comprobarlas antes con `device_list_dir`. Si la carpeta de trabajo no existe, pedirle que la cree, o que la cree y la conecte desde el menú + → Agregar carpeta de la app; no pedir acceso a todo Documentos para crearla. Si `machine` no existe, es que nunca guardó una impresora propia en Orca: pedir las otras y, cuando elija la impresora, pedirle que guarde su copia desde Orca, que crea la carpeta (`references/impresoras.md`, sección 1, paso 4); después conectarla. Rutas: Linux `~/.config/OrcaSlicer/user/default/...` (Flatpak: `~/.var/app/<id>/config/OrcaSlicer/user/default/...`); Windows, la ruta nueva de la sección 2; macOS `~/Library/Application Support/OrcaSlicer/user/default/...`. Confirmar la ruta real con `list_profiles`.
-2. Crear `impresiones/`, `disenos/`, `respaldos/`, `calibraciones/`, `taller-3d/` y `taller-3d/impresoras/` escribiendo un `LEEME.md` corto en cada una (si no existen).
+Hacen falta dos: la **carpeta de trabajo** (diseños, impresiones con sus vistas y G-code, respaldos y configuración) y la **carpeta de perfiles de usuario de Orca** (`user/<id>`, que tiene `process`, `filament` y `machine`). La app solo conecta carpetas que ya existen: primero ubicarlas, después crear la de trabajo si falta y recién ahí pedir acceso a las dos en **un solo pedido**.
+
+1. **Ubicar la carpeta de trabajo.**
+   - Si una carpeta conectada tiene `taller-3d/config.json`, es esa: no preguntar nada.
+   - Si no, ver si el instalador ya la creó: `device_list_dir` sobre la carpeta de documentos (`Documentos` o `Documents`, según `homeDirectories` de `get_device_info`; sin permiso muestra solo los nombres de las carpetas) y buscar `Taller 3D`. Si está, usarla sin preguntar.
+   - Si no existe, **preguntar dónde guardar los archivos** (`AskUserQuestion` si está): `Documentos/Taller 3D` (recomendada), una carpeta que ya use para impresión 3D u otra que diga. Nunca AppData en Windows ni la carpeta de Orca. Si en la carpeta personal están `Documentos` y `Documents`, preguntar cuál usa.
+2. **Si la elegida no existe, crearla** antes de pedir el acceso:
+   - **Con terminal en la PC** (`device_bash`): crearla directamente con sus subcarpetas (`mkdir -p "<ruta>/impresiones" "<ruta>/disenos" "<ruta>/respaldos" "<ruta>/calibraciones" "<ruta>/taller-3d/impresoras"`; en PowerShell, `New-Item -ItemType Directory -Force -Path` con cada una).
+   - **Sin terminal**, ofrecer las dos formas en una pregunta (`AskUserQuestion` si está; si no, en el texto):
+     - **"Que la cree Claude"** (recomendada): pedir acceso a la carpeta de documentos solo para crearla, diciendo en el motivo que el permiso dura esta conversación y que se usa solo para la carpeta nueva. Crearla con sus subcarpetas escribiendo el `LEEME.md` de cada una (paso 4) y, de ahí en adelante, trabajar solo dentro de ella. En las próximas conversaciones se pide solo esa.
+     - **"La creo yo"**: pedírselo en un mensaje propio, con estos pasos (así queda creada y conectada a la vez):
+       1. En la app de Claude, tocá el **+** del cuadro de mensaje y elegí **Agregar carpeta**.
+       2. En la ventana que se abre, entrá a **Documentos**.
+       3. Creá una carpeta nueva con el botón de esa ventana (en Windows y macOS dice **Nueva carpeta**; en Linux es el ícono de carpeta con un **+**, arriba) y ponele **Taller 3D**.
+       4. Entrá a **Taller 3D** y elegila (**Seleccionar** o **Abrir**). Después escribime "listo".
+     Si rechaza el permiso o no responde, no volver a pedirlo: mandarle esos mismos pasos.
+3. **Pedir acceso en un solo pedido** (`device_request_folder_access`) a la carpeta de trabajo y a la de perfiles de usuario de Orca, `user/<id>`: con esa alcanzan `process`, `filament` y `machine`, aunque `machine` todavía no exista (ahí se puede guardar después la copia de la impresora). Comprobar antes con `device_list_dir` que las dos existan. Rutas de la carpeta de perfiles: Linux `~/.config/OrcaSlicer/user/default` (Flatpak: `~/.var/app/com.orcaslicer.OrcaSlicer/config/OrcaSlicer/user/default`); Windows, la ruta nueva de la sección 2 (`C:\Users\<usuario>\OrcaSlicer\user\default`); macOS `~/Library/Application Support/OrcaSlicer/user/default`. Confirmar la ruta real con `list_profiles`.
+   - Si ya tiene conectadas `process` y `filament` por separado, sirven igual; sumar `user/<id>` cuando haga falta `machine`.
+   - Si `user/<id>` no existe, Orca todavía no guardó ningún perfil propio: pedirle que abra Orca, elija su impresora y guarde una copia (`references/impresoras.md`, sección 1, paso 4), y después conectarla.
+   - Si rechaza el permiso, no repetir el pedido: explicarle cómo conectarlas desde el **+** → **Agregar carpeta**.
+4. Crear `impresiones/`, `disenos/`, `respaldos/`, `calibraciones/`, `taller-3d/` y `taller-3d/impresoras/` escribiendo un `LEEME.md` corto en cada una (si no existen).
 
 ## 4. Configuración inicial
 

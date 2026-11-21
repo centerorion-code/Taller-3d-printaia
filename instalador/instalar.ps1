@@ -49,7 +49,7 @@ param(
 Set-StrictMode -Version 1.0
 $ErrorActionPreference = 'Stop'
 
-$VersionPlugin = '0.1.9'
+$VersionPlugin = '0.1.10'
 $OrcaVersion = '2.5.1'
 $OrcaBase = "https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v$OrcaVersion"
 $OrcaArchivos = @{
@@ -875,9 +875,7 @@ try {
     Info "orca-mcp: $orcaMcp"
     Info "Carpeta de trabajo: $CarpetaTrabajo"
     if (-not $Prueba) { Info "Registro de la instalación: $Registro" }
-    $proceso = Join-Path $DatosOrca 'user\default\process'
-    $filamento = Join-Path $DatosOrca 'user\default\filament'
-    $maquina = Join-Path $DatosOrca 'user\default\machine'
+    $perfiles = Join-Path $DatosOrca 'user\default'
     Write-Host ''
     Write-Host 'Próximos pasos:'
     Write-Host '  1. Abrí OrcaSlicer una vez y agregá tu impresora con el asistente. Guardá una copia de usuario del'
@@ -885,9 +883,7 @@ try {
     Write-Host '     filamento: así Orca crea las carpetas de perfiles.'
     Write-Host '  2. En la app de Claude, conectá estas carpetas (menú + > Agregar carpeta), con estas rutas exactas:'
     Write-Host "     - $CarpetaTrabajo"
-    Write-Host "     - $proceso"
-    Write-Host "     - $filamento"
-    Write-Host "     - $maquina (aparece cuando guardás la copia de la impresora)"
+    Write-Host "     - $perfiles (tus perfiles de Orca: process, filament y machine)"
     if ($DatosOrca -ne $datosReales) {
         Write-Host '     No las conectes pasando por AppData: Orca no vería lo que escribe Claude.'
     }

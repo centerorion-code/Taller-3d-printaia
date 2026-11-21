@@ -30,7 +30,7 @@
 #     --sin-app         no tocar la configuración de la app de Claude
 set -euo pipefail
 
-VERSION_PLUGIN="0.1.9"
+VERSION_PLUGIN="0.1.10"
 ORCA_VERSION="2.5.1"
 ORCA_ARCHIVO="OrcaSlicer_Linux_AppImage_Ubuntu2404_V${ORCA_VERSION}.AppImage"
 ORCA_URL="https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v${ORCA_VERSION}/${ORCA_ARCHIVO}"
@@ -622,9 +622,7 @@ Próximos pasos:
      y de filamento: así Orca crea las carpetas de perfiles.
   2. En la app de Claude, conectá estas carpetas (menú + → Agregar carpeta):
      - $CARPETA_TRABAJO
-     - $DATOS_MOSTRAR/user/default/process
-     - $DATOS_MOSTRAR/user/default/filament
-     - $DATOS_MOSTRAR/user/default/machine (aparece cuando guardás la copia de la impresora)
+     - $DATOS_MOSTRAR/user/default (tus perfiles de Orca: process, filament y machine)
   3. Instalá el plugin taller-3d en Claude (si no lo hiciste) y escribí: /taller-3d:instalar
      Claude revisa que todo ande, te pregunta en qué impresora trabajar y hace una pieza de prueba.
 EOF_FIN

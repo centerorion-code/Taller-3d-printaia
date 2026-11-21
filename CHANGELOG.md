@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.1.10 (2026-11-21)
+
+- **Carpeta de trabajo más fácil.** Antes de preguntar, `/taller-3d:instalar` se fija si el instalador ya la creó. Si no existe, la crea: con la terminal de la PC, directamente; si no, te da a elegir entre que la cree Claude (con un permiso sobre Documentos que dura esa conversación y se usa solo para la carpeta nueva) o crearla vos desde el **+** → **Agregar carpeta**, con los pasos exactos, y así queda creada y conectada a la vez.
+- **Una sola carpeta de perfiles de Orca:** se conecta `user/default`, que tiene adentro `process`, `filament` y `machine`. Sirve aunque `machine` todavía no exista, y ahí se puede guardar después la copia de la impresora. Si ya tenías conectadas `process` y `filament` por separado, siguen sirviendo. Los instaladores muestran esa sola ruta.
+- La guía y el README dicen dónde está **Buscar actualizaciones** (Plugins › Agregar › Administrar marketplaces): en un marketplace agregado desde la app, la sincronización automática no se dispara sola.
+
 ## 0.1.9 (2026-11-21)
 
 Correcciones de una revisión independiente de la 0.1.8.
