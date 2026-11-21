@@ -6,7 +6,7 @@
 - El README cuenta qué corre el plugin, qué toca, qué baja y qué manda.
 - Nombre visible "Taller 3D". Se quitó el campo `network` de `plugin.json`, que Claude no lee.
 - El directorio de plugins de Anthropic solo acepta scripts y bloqueos automáticos de organizaciones verificadas: por ahora el taller se distribuye solo por GitHub.
-- Instalación: el README pone primero instalarlo desde GitHub, con la dirección del repositorio.
+- Instalación desde GitHub: el README, `INSTALACION.md` y el manual explican cómo sumarlo en la app de Claude o en Claude Code y cómo recibir las versiones nuevas (en Claude Code las actualizaciones automáticas de este marketplace hay que activarlas). El instalador también se puede bajar del repositorio con **Code → Download ZIP**. El archivo `.plugin` queda como alternativa, sin actualizaciones.
 
 ## 0.1.5 (2026-11-21)
 

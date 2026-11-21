@@ -34,14 +34,17 @@ Además, la skill `impresion-3d` responde cualquier duda de configuración: cono
 
 ## Instalación
 
-1. **Sumá el plugin a Claude** (cualquiera de estas):
-   - **Desde GitHub, con actualizaciones automáticas:** en la app de escritorio de Claude (o en claude.ai), **Customize → Plugins → Add → Add marketplace**, pegá la dirección de este repositorio, `noamix/Taller-3d-printaia` (o `https://github.com/noamix/Taller-3d-printaia`), e instalá **taller-3d**. Cada vez que se sube una versión nueva, Claude la toma sola.
+Por ahora el taller se instala desde este repositorio de GitHub. Más adelante va a estar también en el directorio de plugins de Anthropic, y esta sección va a explicar cómo sumarlo desde ahí.
+
+1. **Sumá el plugin a Claude desde GitHub.** Usá solo esta dirección: una copia (fork) puede traer cambios que nadie revisó.
+   - **En la app de escritorio de Claude:** andá a **Customize → Plugins**, elegí **Add marketplace**, pegá `noamix/Taller-3d-printaia` (o `https://github.com/noamix/Taller-3d-printaia`) e instalá **taller-3d**. Para recibir las versiones nuevas, activá **Sync automatically** en ese marketplace, o tocá **Check for updates** cuando quieras.
    - **En Claude Code:**
      ```
      /plugin marketplace add noamix/Taller-3d-printaia
      /plugin install taller-3d@taller-3d
      ```
-   - **Desde el archivo:** con `taller-3d.plugin` (de [Releases](https://github.com/noamix/Taller-3d-printaia/releases) o el que te pasaron), en **Customize → Plugins → Add → Upload plugin**. Las versiones nuevas las tenés que bajar de nuevo.
+     Claude Code no actualiza solo los marketplaces que no son de Anthropic: activá **Enable auto-update** en `/plugin` → **Marketplaces**, o actualizalo a mano con `claude plugin marketplace update taller-3d` y `claude plugin update taller-3d@taller-3d`, y reiniciá Claude Code.
+   - Si alguien te pasó el archivo `taller-3d.plugin`, también lo podés subir desde **Customize → Plugins**, pero así no se actualiza: conviene sumarlo desde GitHub.
 2. **Prepará la PC:** en Claude escribí `/instalar`. Te deja el instalador para Linux o Windows, que primero revisa que la PC alcance (procesador, memoria, placa de video, disco e internet) y qué tenés instalado, y saltea lo que ya está. Usa versiones fijas con verificación SHA-256, tiene modo prueba y desinstalador. Detalles en [INSTALACION.md](INSTALACION.md).
 
 ## Qué corre, qué manda y qué baja

@@ -4,7 +4,7 @@ Cómo pedirle una pieza a Claude y qué pasa desde que la pedís hasta que la im
 
 ## Antes de empezar (una sola vez)
 
-1. Instalá el plugin y lo necesario en tu PC (ver [INSTALACION.md](INSTALACION.md)).
+1. Sumá el plugin a Claude desde GitHub (`noamix/Taller-3d-printaia`) e instalá lo necesario en tu PC (ver [INSTALACION.md](INSTALACION.md)).
 2. En Claude escribí `/instalar`: revisa que todo ande, carga tu impresora y hace una pieza de prueba.
 3. La primera vez te pide que leas el [aviso de uso](DISCLAIMER.md) y escribas ACEPTO.
 

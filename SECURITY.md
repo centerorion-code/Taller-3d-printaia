@@ -17,6 +17,7 @@
 6. **Privacidad:** sin telemetría. No sube modelos, G-code ni perfiles a internet (bloqueado desde la terminal). La única salida es la publicación de un producto en la tienda del propio usuario, a su pedido y como borrador. No guarda contraseñas.
 7. **Instaladores verificables:** OrcaSlicer 2.5.1 y uv 0.13.9 (Windows) se bajan de sus publicaciones oficiales en GitHub y se comparan con una huella SHA-256 fija antes de usarlos; en Windows también se verifica la firma digital del instalador de Orca (ORCASLICER PTE. LTD.). orca-mcp 0.1.0 se instala desde PyPI con uv o pipx en versión fija, sin huella propia: ahí se confía en PyPI, y sus dependencias toman la última versión compatible. Modo prueba; sin `curl | sh`; `sudo` o permisos de administrador solo con consentimiento; registro de lo instalado y desinstalador que solo quita lo anotado (y nada fuera de tu carpeta personal). Usan lo que ya está instalado en lugar de reemplazarlo.
 8. **Plugins de Orca:** el taller solo los sugiere; nunca los instala ni los activa. No hay plugins "oficiales": son de la comunidad, con una revisión automática, y pueden leer archivos y cambiar el laminado.
+9. **Un solo origen:** el taller se distribuye desde https://github.com/noamix/Taller-3d-printaia. Sus bloqueos automáticos corren en tu PC, así que instalalo solo desde ahí: una copia (fork) o un archivo `.plugin` que te pasen pueden traer cambios que nadie revisó.
 
 ## Bloqueos automáticos (hooks)
 

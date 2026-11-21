@@ -20,10 +20,20 @@ Los dos instaladores, **antes de cambiar nada**, revisan que la PC alcance: sist
 
 Después **revisan qué tenés** (Orca, orca-mcp, la app de Claude, la carpeta de trabajo) y saltean lo que ya está. Si usás un Orca portable o en un contenedor, te preguntan la ruta.
 
+## Primero: sumá el plugin a Claude desde GitHub
+
+1. Instalá la app de escritorio de Claude (https://claude.ai/download) e iniciá sesión.
+2. Andá a **Customize → Plugins**, elegí **Add marketplace** y pegá `noamix/Taller-3d-printaia` (o `https://github.com/noamix/Taller-3d-printaia`). Usá solo esta dirección: una copia (fork) puede traer cambios que nadie revisó.
+3. Instalá **taller-3d**. Para recibir las versiones nuevas, activá **Sync automatically** en ese marketplace, o tocá **Check for updates** cuando quieras.
+
+En Claude Code: `/plugin marketplace add noamix/Taller-3d-printaia` y `/plugin install taller-3d@taller-3d`; para las actualizaciones, ver el [README](README.md#instalación).
+
+Más adelante el taller va a estar también en el directorio de plugins de Anthropic; cuando esté, esta guía lo va a explicar.
+
 ## A. Linux, con el instalador
 
-1. Instalá la app de escritorio de Claude e iniciá sesión.
-2. Conseguí el instalador: en Claude, con el plugin ya instalado, escribí `/instalar` y te lo deja en una carpeta de tu PC. También está en la carpeta `instalador/` del plugin.
+1. Sumá el plugin a Claude (sección anterior), si todavía no lo hiciste.
+2. Conseguí el instalador: en Claude escribí `/instalar` y te lo deja en una carpeta de tu PC. También lo podés bajar de GitHub: en la página del repositorio, **Code → Download ZIP**; descomprimilo y usá la carpeta `instalador/`.
 3. Abrí una terminal en esa carpeta y corré primero el modo prueba, que muestra todo lo que haría sin cambiar nada:
    ```bash
    bash instalar.sh --prueba
@@ -56,8 +66,8 @@ Opciones: `--orca RUTA` (un Orca que ya tengas: ejecutable, AppImage o el script
 
 > Todavía no se probó en una PC con Windows: se revisó la sintaxis y las funciones con PowerShell 7. Si algo falla, el registro queda en `%LOCALAPPDATA%\taller-3d\` y podés mandárselo al autor.
 
-1. Instalá la app de escritorio de Claude (https://claude.ai/download) e iniciá sesión.
-2. Conseguí el instalador: en Claude escribí `/instalar` y te lo deja en una carpeta de tu PC (o copiá la carpeta `instalador/` del plugin junto con `DISCLAIMER.md`).
+1. Sumá el plugin a Claude (sección anterior), si todavía no lo hiciste.
+2. Conseguí el instalador: en Claude escribí `/instalar` y te lo deja en una carpeta de tu PC. También lo podés bajar de GitHub: en la página del repositorio, **Code → Download ZIP**; descomprimilo (clic derecho → **Extraer todo**) y usá la carpeta `instalador/`.
 3. Para ver qué haría sin cambiar nada: abrí PowerShell en esa carpeta y corré `.\instalar-windows.bat -Prueba`.
 4. Hacé doble clic en **`instalar-windows.bat`**. Si Windows muestra "Windows protegió su PC", tocá "Más información" → "Ejecutar de todos modos".
    El instalador:
@@ -96,11 +106,10 @@ Opciones (en PowerShell): `-Orca "<ruta de orca-slicer.exe>"` (por ejemplo, uno 
 ## Después de instalar (todos los sistemas)
 
 1. **Abrí OrcaSlicer una vez** y agregá tu impresora con el asistente. Guardá una copia de usuario del perfil de la impresora, por ejemplo `Mi Ender-3 V3 Plus 0.4 nozzle`, y un perfil propio de proceso y de filamento: así Orca crea las carpetas de perfiles.
-2. **Instalá el plugin** en Claude, si no lo hiciste: desde GitHub con **Customize → Plugins → Add → Add marketplace** (`noamix/Taller-3d-printaia`), o subiendo el archivo `taller-3d.plugin` con **Add → Upload plugin**.
-3. **Conectá las carpetas** en la app de Claude (menú + → Agregar carpeta), con las rutas que te muestra el instalador al final:
+2. **Conectá las carpetas** en la app de Claude (menú + → Agregar carpeta), con las rutas que te muestra el instalador al final:
    - la carpeta de trabajo;
    - las carpetas `process` y `filament` de tus perfiles de Orca. Linux: `~/.config/OrcaSlicer/user/default/...` (Flatpak: `~/.var/app/com.orcaslicer.OrcaSlicer/config/OrcaSlicer/user/default/...`). Windows: `C:\Users\<vos>\OrcaSlicer\user\default\...` (**no** por AppData). macOS: `~/Library/Application Support/OrcaSlicer/user/default/...`.
-4. En Claude escribí **`/instalar`**: revisa que todo ande, registra tu impresora, carga tus precios y tu tienda si querés, y hace una pieza de prueba.
+3. En Claude escribí **`/instalar`**: revisa que todo ande, registra tu impresora, carga tus precios y tu tienda si querés, y hace una pieza de prueba.
 
 ## Blender (opcional)
 
@@ -117,7 +126,7 @@ Para formas orgánicas o decorativas, instalá Blender desde https://www.blender
 | Orca no abre (Windows): pide WebView2 | Instalá Microsoft Edge WebView2 desde https://developer.microsoft.com/microsoft-edge/webview2/ |
 | Orca de Flatpak no lamina archivos de la carpeta de trabajo | `flatpak override --user --filesystem="<carpeta de trabajo>" com.orcaslicer.OrcaSlicer` |
 | Orca no muestra un perfil nuevo | Cerralo y abrilo: lee los perfiles al iniciar. |
-| Claude no puede escribir en la PC | Conectá las carpetas (paso 3) o aprobá el permiso cuando lo pida. |
+| Claude no puede escribir en la PC | Conectá las carpetas (paso 2 de "Después de instalar") o aprobá el permiso cuando lo pida. |
 
 ## Desinstalar
 
