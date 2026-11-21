@@ -2,10 +2,10 @@
 
 ## 0.1.6 (2026-11-21)
 
-- Listo para el directorio de plugins de Anthropic:
-  - el catálogo de parámetros va en partes de menos de 200 KB, con un parámetro por línea;
-  - el README cuenta qué corre el plugin, qué toca, qué baja y qué manda;
-  - nombre visible "Taller 3D".
+- El catálogo de parámetros va en partes de menos de 200 KB, con un parámetro por línea.
+- El README cuenta qué corre el plugin, qué toca, qué baja y qué manda.
+- Nombre visible "Taller 3D". Se quitó el campo `network` de `plugin.json`, que Claude no lee.
+- El directorio de plugins de Anthropic solo acepta scripts y bloqueos automáticos de organizaciones verificadas: por ahora el taller se distribuye solo por GitHub.
 - Instalación: el README pone primero instalarlo desde GitHub, con la dirección del repositorio.
 
 ## 0.1.5 (2026-11-21)

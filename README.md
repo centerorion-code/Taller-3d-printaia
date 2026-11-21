@@ -42,7 +42,6 @@ Además, la skill `impresion-3d` responde cualquier duda de configuración: cono
      /plugin install taller-3d@taller-3d
      ```
    - **Desde el archivo:** con `taller-3d.plugin` (de [Releases](https://github.com/noamix/Taller-3d-printaia/releases) o el que te pasaron), en **Customize → Plugins → Add → Upload plugin**. Las versiones nuevas las tenés que bajar de nuevo.
-   - **Desde el directorio de plugins de Claude:** está en revisión en Anthropic; cuando lo aprueben, se va a poder buscar ahí como **taller-3d**.
 2. **Prepará la PC:** en Claude escribí `/instalar`. Te deja el instalador para Linux o Windows, que primero revisa que la PC alcance (procesador, memoria, placa de video, disco e internet) y qué tenés instalado, y saltea lo que ya está. Usa versiones fijas con verificación SHA-256, tiene modo prueba y desinstalador. Detalles en [INSTALACION.md](INSTALACION.md).
 
 ## Qué corre, qué manda y qué baja

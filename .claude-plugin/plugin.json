@@ -17,14 +17,5 @@
     "cad",
     "gcode",
     "woocommerce"
-  ],
-  "network": {
-    "hosts": [
-      "github.com",
-      "objects.githubusercontent.com",
-      "release-assets.githubusercontent.com",
-      "pypi.org",
-      "files.pythonhosted.org"
-    ]
-  }
+  ]
 }

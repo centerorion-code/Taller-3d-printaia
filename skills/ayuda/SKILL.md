@@ -1,6 +1,6 @@
 ---
 name: ayuda
-description: Explica cómo usar el taller 3D, con el manual de uso: cómo pedirle una pieza a Claude, qué datos dar, ejemplos de pedidos, el circuito completo de la pieza y los comandos disponibles. Se usa cuando el usuario pregunta "cómo te pido una pieza", "cómo funciona el taller", "qué podés hacer", "cuál es el circuito", "manual" o "ayuda con el taller".
+description: "Explica cómo usar el taller 3D, con el manual de uso: cómo pedirle una pieza a Claude, qué datos dar, ejemplos de pedidos, el circuito completo de la pieza y los comandos disponibles. Se usa cuando el usuario pregunta \"cómo te pido una pieza\", \"cómo funciona el taller\", \"qué podés hacer\", \"cuál es el circuito\", \"manual\" o \"ayuda con el taller\"."
 ---
 
 # /ayuda: manual de uso del taller
