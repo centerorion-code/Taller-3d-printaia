@@ -24,7 +24,7 @@ Después **revisan qué tenés** (Orca, orca-mcp, la app de Claude, la carpeta d
 
 1. Instalá **Claude Desktop**, la app de escritorio de Claude (https://claude.ai/download), e iniciá sesión. El plugin se instala desde el menú de esa app: no se hace escribiendo en el chat.
 2. En el menú de la app, andá a **Plugins › Agregar › Agregar marketplace › Agregar desde un repositorio** (en inglés: *Customize → Plugins → Add marketplace*), pegá `noamix/Taller-3d-printaia` (o `https://github.com/noamix/Taller-3d-printaia`) y tocá **Sincronizar**. Usá solo esta dirección: una copia (fork) puede traer cambios que nadie revisó.
-3. Instalá **taller-3d**. Para recibir las versiones nuevas, activá la sincronización automática del marketplace (*Sync automatically*) o buscá actualizaciones (*Check for updates*) cuando quieras.
+3. Instalá **taller-3d**. Para ver qué versión tenés: **Plugins → Taller 3D**, abajo de todo dice **Versión**. Para recibir una versión nueva, en **Plugins** buscá el marketplace **Taller-3d-printaia** y, en su menú, buscá actualizaciones (en inglés, *Check for updates*). La sincronización automática (*Sync automatically*) puede no dispararse sola, porque depende de un aviso de GitHub a Claude que no siempre queda configurado: si no ves la versión nueva, buscá actualizaciones a mano.
 
 En Claude Code: `/plugin marketplace add noamix/Taller-3d-printaia` y `/plugin install taller-3d@taller-3d`; para las actualizaciones, ver el [README](README.md#instalación).
 
