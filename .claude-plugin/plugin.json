@@ -1,0 +1,29 @@
+{
+  "name": "taller-3d",
+  "version": "0.1.4",
+  "description": "Taller de impresión 3D con Claude y OrcaSlicer: diseña piezas, elige la configuración según el uso, lamina, revisa el G-code por seguridad, calcula costos, calibra filamentos y arma la publicación para tu tienda. Nunca arranca una impresión.",
+  "author": {
+    "name": "Leo"
+  },
+  "homepage": "https://github.com/noamix/Taller-3d-printaia",
+  "repository": "https://github.com/noamix/Taller-3d-printaia",
+  "license": "AGPL-3.0-only",
+  "keywords": [
+    "impresion-3d",
+    "3d-printing",
+    "orcaslicer",
+    "slicer",
+    "cad",
+    "gcode",
+    "woocommerce"
+  ],
+  "network": {
+    "hosts": [
+      "github.com",
+      "objects.githubusercontent.com",
+      "release-assets.githubusercontent.com",
+      "pypi.org",
+      "files.pythonhosted.org"
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+# Los scripts de Windows van con CRLF y BOM tal como están; los de Linux, con LF.
+*.ps1 -text
+*.bat -text
+*.sh text eol=lf

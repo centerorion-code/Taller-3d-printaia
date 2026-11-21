@@ -1,0 +1,30 @@
+{
+  "name": "taller-3d",
+  "owner": {
+    "name": "Leo"
+  },
+  "metadata": {
+    "description": "Taller de impresión 3D con Claude y OrcaSlicer."
+  },
+  "plugins": [
+    {
+      "name": "taller-3d",
+      "source": "./",
+      "description": "Taller de impresión 3D con Claude y OrcaSlicer: diseña piezas, elige la configuración según el uso, lamina, revisa el G-code por seguridad, calcula costos, calibra filamentos y arma la publicación para tu tienda. Nunca arranca una impresión.",
+      "version": "0.1.4",
+      "author": {
+        "name": "Leo"
+      },
+      "license": "AGPL-3.0-only",
+      "keywords": [
+        "impresion-3d",
+        "3d-printing",
+        "orcaslicer",
+        "slicer",
+        "cad",
+        "gcode",
+        "woocommerce"
+      ]
+    }
+  ]
+}

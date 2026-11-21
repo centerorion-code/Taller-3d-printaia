@@ -1,0 +1,24 @@
+# Fuentes
+
+- Creality Ender-3 V3 Plus (especificaciones): https://www.creality.com/products/creality-ender-3-v3-plus
+- Wiki de OrcaSlicer, guía de calibración: https://www.orcaslicer.com/wiki/guides/calibration_guide.html
+- Wiki de OrcaSlicer, costuras: https://www.orcaslicer.com/wiki/print_settings/quality/quality_settings_seam
+- Código y perfiles de OrcaSlicer 2.5.1: https://github.com/OrcaSlicer/OrcaSlicer
+- Ellis' Print Tuning Guide: https://ellis3dp.com/Print-Tuning-Guide/
+- Klipper, pressure advance: https://www.klipper3d.org/Pressure_Advance.html
+- Barrios y Romero (2019), rugosidad superficial en piezas de PETG por FDM. Materials 12(15), 2499. https://doi.org/10.3390/ma12152499
+- Mishra y otros (2023), PETG por FDM: rugosidad y precisión dimensional. Polymers 15(3), 546. https://doi.org/10.3390/polym15030546
+- Tunçel y otros (2024), flexión en PETG impreso. Polymers 16(14), 2020. https://doi.org/10.3390/polym16142020
+- manifold3d (CAD por código): https://github.com/elalish/manifold
+- WooCommerce, esquema de importación de productos por CSV: https://woocommerce.com/document/product-csv-importer-exporter/
+- Tiendanube, carga masiva de productos: https://ayuda.tiendanube.com/es_AR/122710-importar-y-exportar-productos/como-cargar-una-gran-cantidad-de-productos
+- OrcaSlicer 2.5.1, notas de versión y descargas (instaladores de Windows x64 y ARM64): https://www.orcaslicer.com/wiki/releases/release_2_5_1
+- OrcaSlicer, descargas oficiales (GitHub, Microsoft Store y Flathub): https://www.orcaslicer.com/download/
+- Plugins de OrcaSlicer: https://www.orcaslicer.com/wiki/plugins/plugins_getting_started y https://www.orcaslicer.com/wiki/plugins/plugins_cloud
+- Sistema de plugins (Python embebido, permisos, auditoría): https://www.orcaslicer.com/wiki/developer_reference/plugin_development/plugin_system
+- Orca Cloud, guía del Plugin Hub (revisión automática, sin nivel oficial): https://cloud.orcaslicer.com/wiki/
+- Listados del Plugin Hub revisados: PrintPal https://cloud.orcaslicer.com/p/4db75d597d3a, Vase Maker https://cloud.orcaslicer.com/p/3e9de58df37d, ModelFinder https://cloud.orcaslicer.com/p/11899e4ac817, Support Fins (del autor) https://cloud.orcaslicer.com/p/42ac9184c523, Filament Saver https://cloud.orcaslicer.com/p/5e52e4c28813, FilamentHub https://cloud.orcaslicer.com/p/3f33524e9682, FHSL Hard Surface https://cloud.orcaslicer.com/p/30496a904822
+- Meshy for OrcaSlicer (solo Windows y macOS): https://docs.meshy.ai/en/webapp/plugins/orcaslicer/introduction
+- Microsoft, virtualización de archivos en apps MSIX (AppData): https://learn.microsoft.com/windows/msix/desktop/flexible-virtualization
+- App de Claude en Windows (MSIX), ubicación real de claude_desktop_config.json: https://github.com/anthropics/claude-code/issues/26073
+- uv (instalador de Python de Astral), versión 0.13.9: https://github.com/astral-sh/uv/releases

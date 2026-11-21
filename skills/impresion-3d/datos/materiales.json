@@ -1,0 +1,78 @@
+{
+  "_nota": "Rangos generales de partida. 'boquilla' y 'cama' son el rango recomendado; '*_tope' es el máximo que el revisor acepta sin rechazar (siempre se aplica además el máximo de la impresora). Ajustar con la ficha del fabricante del rollo.",
+  "PLA": {
+    "boquilla": [190, 235], "boquilla_tope": 250,
+    "cama": [45, 65], "cama_tope": 75,
+    "densidad": 1.24,
+    "notas": [
+      "No apto para sol, autos ni calor: se ablanda desde ~55 °C.",
+      "Ventilador alto (80-100 %)."
+    ]
+  },
+  "PETG": {
+    "boquilla": [220, 260], "boquilla_tope": 275,
+    "cama": [65, 90], "cama_tope": 95,
+    "densidad": 1.27,
+    "notas": [
+      "Absorbe humedad: si salen hilos o burbujas, secarlo (65 °C, 4-6 h).",
+      "Ventilador moderado (30-50 %); más ventilador debilita la unión entre capas.",
+      "Se pega demasiado al PEI liso: usar pegamento en barra como separador."
+    ]
+  },
+  "TPU": {
+    "boquilla": [210, 240], "boquilla_tope": 255,
+    "cama": [25, 60], "cama_tope": 70,
+    "densidad": 1.21,
+    "notas": [
+      "Lento (20-35 mm/s), retracción corta y lenta, sin z-hop.",
+      "Absorbe humedad."
+    ]
+  },
+  "ABS": {
+    "boquilla": [235, 270], "boquilla_tope": 290,
+    "cama": [90, 105], "cama_tope": 110,
+    "densidad": 1.04,
+    "notas": [
+      "Emite vapores (estireno): solo con buena ventilación.",
+      "Sin cerramiento se agrieta y se despega; la Ender-3 V3 Plus es abierta."
+    ]
+  },
+  "ASA": {
+    "boquilla": [235, 275], "boquilla_tope": 290,
+    "cama": [90, 105], "cama_tope": 110,
+    "densidad": 1.07,
+    "notas": [
+      "Resiste sol y exterior mejor que el PETG.",
+      "Emite vapores: buena ventilación. Sin cerramiento tiende a deformarse."
+    ]
+  },
+  "PC": {
+    "boquilla": [260, 300], "boquilla_tope": 300,
+    "cama": [100, 110], "cama_tope": 115,
+    "densidad": 1.20,
+    "notas": [
+      "Necesita cerramiento y cama a más de 100 °C: no recomendado en la Ender-3 V3 Plus."
+    ]
+  },
+  "PA": {
+    "boquilla": [250, 290], "boquilla_tope": 300,
+    "cama": [70, 100], "cama_tope": 110,
+    "densidad": 1.14,
+    "notas": [
+      "Nylon: secado obligatorio antes y durante la impresión.",
+      "Tiende a deformarse sin cerramiento."
+    ]
+  },
+  "PLA-CF": {
+    "boquilla": [200, 240], "boquilla_tope": 255,
+    "cama": [45, 65], "cama_tope": 75,
+    "densidad": 1.30,
+    "notas": ["Abrasivo: requiere boquilla endurecida (la V3 Plus la trae)."]
+  },
+  "PETG-CF": {
+    "boquilla": [230, 265], "boquilla_tope": 280,
+    "cama": [65, 90], "cama_tope": 95,
+    "densidad": 1.30,
+    "notas": ["Abrasivo: requiere boquilla endurecida (la V3 Plus la trae)."]
+  }
+}
