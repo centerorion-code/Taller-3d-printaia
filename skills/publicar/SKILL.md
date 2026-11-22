@@ -93,4 +93,11 @@ Los datos del producto están en `publicacion.json`, clave `producto`: nombre, S
 3. Actualizar el panel (skill `panel`): si se cargó en la tienda, `catalogo.py agregar … --id-tienda <número del producto>` (queda como borrador en "Publicaciones", y la próxima vez se actualiza ese producto en vez de crear otro) y el enlace en `--url-tienda`; si no se cargó, queda como vista previa. Cuando el usuario cuente que la publicó, `--estado-publicacion publicada`.
 4. Registrar en `historial.csv`.
 5. **Ofrecer el reel:** en una línea, si quiere un video para Instagram, TikTok o Shorts de la pieza (skill `video`, sale de lo que ya está en `producto/`). Si dice que sí, seguir con `/taller-3d:video`.
-6. Terminar con una línea "Te toca: …" (revisar el borrador y publicarlo, o imprimir la pieza y sacarle fotos).
+6. **Avisar al bot de video.** Cuando la pieza queda cargada como borrador en la tienda (camino 1 de la sección 5), avisarle al motor de video con el link de la pieza. Solo si `config.json` tiene `motor_video.url` (`http://172.31.77.1:8787/pieza-publicada`). La clave no va en el chat ni en `config.json`: se lee de la variable de entorno `MOTOR_CLAVE` de la PC del usuario, que él carga en su configuración del taller.
+   ```bash
+   curl -sS -X POST "$MOTOR_URL" -H "x-clave: $MOTOR_CLAVE" -H "Content-Type: application/json" \
+     -d "$(python3 -c 'import json,sys; print(json.dumps({"link": sys.argv[1], "nombre": sys.argv[2]}))' "<link de la pieza>" "<nombre>")"
+   ```
+   El link es `https://york3d.es/producto/<slug>` (el `slug` que devuelve la tienda al crear el producto). Si el bot responde con error, o no hay `MOTOR_CLAVE`, decirlo y seguir: la publicación ya quedó en la tienda, y el aviso se puede repetir después. Si el bot dice que la pieza todavía no tiene foto, avisar que el video espera esa foto.
+   Si la PC no llega al bot desde donde corre el taller, decirlo y dejar el comando listo para que el usuario lo ejecute en su red.
+7. Terminar con una línea "Te toca: …" (revisar el borrador y publicarlo, o imprimir la pieza y sacarle fotos).
