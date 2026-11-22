@@ -25,7 +25,8 @@ Uso:
       --nombre "Soporte para router" [--tipo impresion|diseno] [--material PETG] [--color negro] \\
       [--informe-gcode informe_gcode.json] [--informe-stl informe_stl.json] [--producto publicacion.json] \\
       [--archivos pieza.stl pieza.py vista.png informe.md] [--imagen vista.png] \\
-      [--estado disenada|laminada|impresa|en_tienda] [--nota "..."] [--url-tienda https://...] [--id-tienda 123] [--estado-publicacion borrador] [--moneda ARS]
+      [--estado disenada|laminada|impresa|en_tienda] [--nota "..."] [--url-tienda https://...] [--id-tienda 123] [--estado-publicacion borrador] [--moneda ARS] \\
+      [--origen stl_propio|stl_descargado --fuente https://... --licencia "CC BY"]
 
   # Anotar una idea para más adelante (y quitarla si el usuario la descarta)
   python3 catalogo.py idea --catalogo catalogo.json --nombre "Soporte para la tele" [--nota "..."] [--impresora X]
@@ -241,10 +242,12 @@ def agregar(catalogo: dict, carpeta: str, de_idea: str | None = None, **campos) 
         if clave == "archivos":
             nuevos = [normalizar_carpeta(a) for a in valor]
             pieza["archivos"] = sorted(set(pieza.get("archivos", [])) | set(nuevos))
-        elif clave == "url_tienda":
+        elif clave in ("url_tienda", "fuente"):              # solo direcciones http(s)
             segura = url_segura(valor)
             if segura:
-                pieza["url_tienda"] = segura
+                pieza[clave] = segura
+        elif clave == "origen" and valor not in ORIGENES:
+            raise SystemExit(f"Origen desconocido: {valor} ({', '.join(ORIGENES)}).")
         elif clave == "tipo" and valor not in TIPOS:
             raise SystemExit(f"Tipo desconocido: {valor} (impresion o diseno).")
         elif clave == "estado" and valor not in ESTADOS:
@@ -361,6 +364,11 @@ def _en_una_linea(texto, largo: int = 80) -> str:
 ABRIR_EN_ORCA = "Abrila en Orca"
 # El botón de arriba del panel: las fotos no se pueden mandar desde la página, se adjuntan en el chat.
 PEDIDO_FOTO = "Quiero una pieza a partir de una foto: te la adjunto en el chat."
+# Otro botón de arriba: un STL que el usuario ya tiene (suyo o bajado) sigue el mismo circuito, sin modelar.
+PEDIDO_STL = "Quiero hacer una pieza con un STL que ya tengo: te lo adjunto en el chat o te digo dónde está."
+# De dónde salió el modelo de una pieza (lo que no es "diseñada acá" se muestra en la tarjeta).
+ORIGENES = {"diseno": "Diseñada por Claude", "stl_propio": "STL tuyo", "stl_descargado": "STL de internet",
+            "foto": "Desde una foto"}
 # Los botones que arrancan una pieza: el panel les suma la impresora elegida arriba («Impresora: «X».») o, con
 # «Que me pregunte Claude», «Preguntame en qué impresora.». Con una sola impresora no suman nada.
 CON_IMPRESORA = {"Diseñala", "Dejala lista para imprimir"}
@@ -596,7 +604,9 @@ GUION = """
   var modo=document.getElementById('modo'),com=null;
   function lugar(el){return el.closest('article')||el.closest('details')||el.closest('header');}
   function avisar(el,texto){var a=lugar(el).querySelector('.aviso');if(a){a.textContent=texto;}}
-  function foto(el){return el.hasAttribute('data-adjuntar')?' y adjuntá la foto (si tenés varias de distintos ángulos, mejor)':'';}
+  var adjuntos={stl:'el STL (o decile en qué carpeta está)'};
+  function adjunto(el){return adjuntos[el.getAttribute('data-adjuntar')]||'la foto (si tenés varias de distintos ángulos, mejor)';}
+  function foto(el){return el.hasAttribute('data-adjuntar')?' y adjuntá '+adjunto(el):'';}
   function copiar(el,texto){
     function mostrar(){avisar(el,'Copiá este pedido y pegalo en el chat con Claude'+foto(el)+': '+texto);}
     try{navigator.clipboard.writeText(texto).then(function(){
@@ -612,7 +622,7 @@ GUION = """
       if(estado!=='available'){el.disabled=false;copiar(el,texto);return;}
       return com.anchorFor(lugar(el)).then(function(ancla){return com.sendToClaude({anchor:ancla,text:texto});})
         .then(function(){avisar(el,el.hasAttribute('data-adjuntar')?
-                'Enviado. Ahora adjuntá la foto en el chat con Claude (si tenés varias de distintos ángulos, mejor).':
+                'Enviado. Ahora, en el chat con Claude, adjuntá '+adjunto(el)+'.':
                 'Enviado. Claude lo hace y te contesta en el chat.');},
               function(err){var c=err&&err.code;
                 avisar(el,'No se envió: '+(motivos[c]||'algo falló ('+(c||'error')+')')+'. Si querés, pegalo en el chat: '+texto);});
@@ -718,6 +728,9 @@ def _tarjeta(p: dict, modo: str = "archivo", imagenes: dict | None = None) -> st
     if p.get("material"):
         material = p["material"] + (f' {p["color"]}' if p.get("color") else "")
         chips.append(f'<span class="chip">{e(material)}</span>')
+    if p.get("origen") in ORIGENES and p["origen"] != "diseno":
+        licencia = f' · {_en_una_linea(p["licencia"], 40)}' if p.get("licencia") else ""
+        chips.append(f'<span class="chip">{e(ORIGENES[p["origen"]] + licencia)}</span>')
     h = hechos(p)
     ultimo = max((i for i, (clave, _) in enumerate(PASOS) if clave in h), default=0)
     camino = "".join(f'<li class="{"hecho" if clave in h else ""}{" actual" if i == ultimo else ""}"'
@@ -976,7 +989,8 @@ def generar_html(catalogo: dict, titulo: str = "Panel del taller", modo: str = "
 </form>
 {_selector(impresoras)}
 <div class="desde-foto"><button type="button" data-pedido="{e(PEDIDO_FOTO)}" data-impresora data-adjuntar>Pieza desde una foto</button>
-<span>Para copiar algo que tenés: tocá el botón y adjuntá la foto en el chat.</span></div>
+<button type="button" data-pedido="{e(PEDIDO_STL)}" data-impresora data-adjuntar="stl">Pieza desde un STL</button>
+<span>Con una foto, copia algo que tenés. Con un STL tuyo o bajado, lo deja listo para imprimir y publicar. El archivo se adjunta en el chat.</span></div>
 <p class="aviso" role="status" aria-live="polite"></p>
 {_taller(estado_taller)}
 <p class="modo" id="modo">{"Buscando el chat con Claude…" if modo == "claude" else "Los botones copian el pedido para que lo pegues en el chat con Claude."}</p>
@@ -1086,6 +1100,9 @@ def main(argv=None) -> None:
     a.add_argument("--estado-publicacion", choices=sorted(ESTADOS_PUBLICACION),
                    help="dónde está la publicación: vista_previa (armada), borrador (cargada) o publicada")
     a.add_argument("--moneda", help="moneda del precio, si no sale del costo")
+    a.add_argument("--origen", choices=sorted(ORIGENES), help="de dónde salió el modelo (un STL del usuario, por ejemplo)")
+    a.add_argument("--fuente", help="la página de donde se bajó el modelo (http o https)")
+    a.add_argument("--licencia", help="la licencia del modelo bajado, como la dice su página (CC BY, CC BY-NC…)")
 
     i = sub.add_parser("idea", help="anota una idea para más adelante")
     i.add_argument("--catalogo", required=True, type=Path)
@@ -1164,7 +1181,8 @@ def main(argv=None) -> None:
                         material=args.material or extra.pop("material", None), color=args.color,
                         impresora=args.impresora, de_idea=args.de_idea,
                         archivos=args.archivos, imagen=args.imagen, nota=args.nota, url_tienda=args.url_tienda,
-                        id_tienda=args.id_tienda,
+                        id_tienda=args.id_tienda, origen=args.origen, fuente=args.fuente,
+                        licencia=_en_una_linea(args.licencia, 80) if args.licencia else None,
                         **{k: v for k, v in extra.items() if k != "material"})
         guardar(args.catalogo, catalogo)
         print(f"Catálogo: {pieza['nombre']} ({ESTADOS.get(pieza['estado'], pieza['estado'])}) — "

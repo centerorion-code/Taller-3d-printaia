@@ -1,5 +1,12 @@
 # Cambios
 
+## 0.1.32 (2026-11-22)
+
+- **Pieza desde un STL que ya tenés:** adjuntás el `.stl` en el chat (o decís en qué carpeta está) y sigue el mismo circuito que una pieza diseñada: revisión, configuración, G-code, proyecto de Orca, costo y publicación. En el panel hay un botón **Pieza desde un STL**. Claude no le cambia la forma; guarda tu archivo como `original.stl` y lamina `pieza.stl`, ya orientado.
+- **Cómo apoyarla:** `revisar_stl.py --orientar` compara las seis caras de apoyo (superficie de apoyo, voladizos, alto y si entra en la cama) y dice qué rotación usar.
+- **Unidades:** si el STL es diminuto, avisa que seguramente está en metros, pulgadas o centímetros y cómo escalarlo.
+- **De quién es el modelo:** el panel guarda si el STL es tuyo o bajado, de dónde y con qué licencia, y lo muestra en la tarjeta. Para vender un modelo bajado la licencia tiene que permitir uso comercial.
+
 ## 0.1.31 (2026-11-22)
 
 - **Sector «Publicaciones» en el panel:** cada pieza con la publicación armada tiene su tarjeta con la foto, el título, el precio, lo que ganás y dónde está: vista previa sin cargar, borrador en la tienda o publicada. «Ver cómo queda» abre la página del producto como se vería en la tienda (en `panel.html`, el archivo de la pieza; al costado del chat, se lo pide a Claude), y hay botones para cargarla como borrador y para cambiar el precio o el texto. También hay un filtro «Publicaciones».

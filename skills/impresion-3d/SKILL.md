@@ -120,6 +120,7 @@ Los archivos del plugin no cambian solos. Lo que se aprende del Orca del usuario
 - `references/cad.md`: reglas de diseño para imprimir y uso de `cad.py`.
 - `references/modelado.md`: con qué modelar (código, Blender o un modelo que ya existe), Blender por código, piezas mixtas y cómo revisar y mostrar una pieza decorativa.
 - `references/foto-a-3d.md`: pieza desde una foto (o una imagen aprobada) con Hunyuan 3D en el Chrome del usuario, dejarla imprimible y combinarla con una parte diseñada.
+- `references/stl-del-usuario.md`: pieza desde un STL que el usuario ya tiene (suyo o bajado): revisarlo, orientarlo y seguir el circuito hasta la publicación.
 - `references/textos-con-gemini.md`: el texto de venta de `/publicar` escrito por el Gemini gratis del usuario (o por Claude) y su revisión.
 - `references/fotos-de-producto.md`: las fotos de producto de `/publicar` con Blender, en la PC o en el espacio de Claude.
 - `references/panel-al-costado.md`: el panel publicado al costado del chat en claude.ai y cómo se atienden sus pedidos.

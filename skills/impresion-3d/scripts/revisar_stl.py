@@ -158,6 +158,12 @@ def analizar(tri: np.ndarray, impresora: dict, material: str | None, esperado=No
     minimo, maximo = pts.min(axis=0), pts.max(axis=0)
     medidas = maximo - minimo
 
+    # Un STL no dice en qué unidad está: si es diminuta, casi seguro vino en metros o en pulgadas.
+    if 0 < float(medidas.max()) < 5:
+        agregar(ADVERTENCIA, f"La pieza mide {medidas[0]:.2f}×{medidas[1]:.2f}×{medidas[2]:.2f} mm: si no es tan "
+                "chica, el archivo está en otra unidad (metros: --escala 1000; pulgadas: --escala 25.4; "
+                "centímetros: --escala 10). Preguntar cuánto tiene que medir.")
+
     # Malla cerrada y orientada
     claves = np.round(pts / 1e-4).astype(np.int64)
     _, primeros, idx = np.unique(claves, axis=0, return_index=True, return_inverse=True)
@@ -313,6 +319,41 @@ ESPESOR_FINO = 1.6     # mm de pared promedio: menos es una cáscara frágil
 ESPESOR_MINIMO = 0.6   # menos de una línea y media de una boquilla de 0,4 mm: no sale bien
 
 
+# Las seis maneras de apoyar una pieza sobre una de sus caras: lo que hay que pasarle a --rotar y qué queda abajo.
+ORIENTACIONES = [("0,0,0", "como viene"), ("180,0,0", "dada vuelta"), ("90,0,0", "el frente abajo"),
+                 ("-90,0,0", "el fondo abajo"), ("0,90,0", "un costado abajo"), ("0,-90,0", "el otro costado abajo")]
+
+
+def orientaciones(tri: np.ndarray, impresora: dict | None = None, umbral: float = 45.0) -> list[dict]:
+    """Para un STL que no se diseñó acá: cómo queda apoyado sobre cada una de sus seis caras (superficie de apoyo,
+    voladizos que pedirían soporte, alto y si entra en la cama), de la más conveniente a la menos. Es una guía: la
+    dirección de la carga y la cara que se ve las decide quien conoce la pieza."""
+    salida = []
+    for grados, nombre in ORIENTACIONES:
+        t = rotar(tri, [float(g) for g in grados.split(",")])
+        z_min = float(t[:, :, 2].min())
+        cruz = np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0])
+        doble = np.linalg.norm(cruz, axis=1)
+        area = doble / 2
+        normal_z = np.divide(cruz[:, 2], doble, out=np.zeros_like(doble), where=doble > 0)
+        en_cama = np.all(np.abs(t[:, :, 2] - z_min) < 0.05, axis=1) & (normal_z < -0.99)
+        centro_z = t[:, :, 2].mean(axis=1)
+        pendiente = np.degrees(np.arccos(np.clip(-normal_z, -1, 1)))
+        critico = (normal_z < -1e-6) & (centro_z > z_min + 0.6) & (pendiente < umbral)
+        medidas = t.reshape(-1, 3).max(axis=0) - t.reshape(-1, 3).min(axis=0)
+        apoyo, voladizo, alto = float(area[en_cama].sum()) / 100, float(area[critico].sum()) / 100, float(medidas[2])
+        entra = None
+        if impresora:
+            a = impresora["area"]
+            x, y = a["x_max"] - a["x_min"], a["y_max"] - a["y_min"]
+            entra = bool(alto <= a["z_max"] + 1e-6 and ((medidas[0] <= x + 1e-6 and medidas[1] <= y + 1e-6)
+                                                        or (medidas[1] <= x + 1e-6 and medidas[0] <= y + 1e-6)))
+        salida.append({"rotar": grados, "como": nombre, "apoyo_cm2": round(apoyo, 2), "voladizo_cm2": round(voladizo, 2),
+                       "alto_mm": round(alto, 1), "entra": entra,
+                       "puntaje": round(voladizo - 0.5 * apoyo + alto / 50 + (1e6 if entra is False else 0), 3)})
+    return sorted(salida, key=lambda o: o["puntaje"])
+
+
 def entra_en(medidas, impresora: dict) -> str | None:
     """'tal cual', 'girándola' o None si la pieza no entra en esa impresora."""
     a = impresora["area"]
@@ -388,6 +429,8 @@ def main(argv=None) -> None:
     ap.add_argument("--apoyar", action="store_true", help="bajar la pieza hasta Z=0")
     ap.add_argument("--centrar", action="store_true", help="centrar la pieza en la cama")
     ap.add_argument("--salida", type=Path, help="guardar la malla transformada")
+    ap.add_argument("--orientar", action="store_true",
+                    help="para un STL traído: compara las seis maneras de apoyarlo y dice qué pasarle a --rotar")
     ap.add_argument("--otras", type=Path, action="append", default=[],
                     help="carpeta con los datos de las otras impresoras del usuario (taller-3d/impresoras): si no "
                          "entra en la elegida, dice en cuál entra")
@@ -433,6 +476,12 @@ def main(argv=None) -> None:
         escribir_stl(a.salida, tri)
         r["salida"] = str(a.salida)
     print(informe_texto(r, a.stl.name))
+    if a.orientar:
+        r["orientaciones"] = orientaciones(tri, impresora, a.umbral_voladizo)
+        print("Cómo apoyarla (de más a menos conveniente; la carga y la cara vista las decidís vos):")
+        for o in r["orientaciones"]:
+            print(f"  --rotar {o['rotar']:<8} {o['como']}: apoyo {o['apoyo_cm2']} cm², voladizos {o['voladizo_cm2']} cm², "
+                  f"alto {o['alto_mm']} mm" + ("" if o["entra"] is not False else " — no entra en la cama"))
     if a.json:
         a.json.write_text(json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
     comun.salir(r["estado"])

@@ -57,6 +57,12 @@ Para copiar algo que existe (una máscara, una figura, una escultura, un adorno)
 - **Con algo diseñado al lado** (un soporte, una base con nombre): Claude te dice antes qué parte hace cada herramienta. La parte diseñada se mide sobre el modelo generado: por ejemplo, la base trae un hueco con la forma exacta del borde de la máscara. Por defecto van separadas, así cada una se imprime en su mejor posición.
 - **Para vender:** confirmá que podés vender lo que generó Hunyuan (sus términos de uso) y que el objeto de la foto no es de otro.
 
+### Pieza desde un STL que ya tenés
+
+Si ya tenés el modelo (lo hiciste vos, te lo pasaron o lo bajaste), no hace falta diseñar nada: adjuntá el `.stl` en el chat, o decile a Claude en qué carpeta está, y pedí «dejame este STL listo para imprimir». En el panel está el botón **Pieza desde un STL**. Claude lo revisa (que esté cerrado, cuánto mide, si entra en tu impresora), elige cómo apoyarlo en la cama y te lo muestra antes de seguir. Después hace lo mismo que con una pieza diseñada: la configuración, el G-code revisado, el proyecto de Orca, el costo y, si querés, la publicación.
+
+Te va a preguntar si el modelo es tuyo o bajado. Imprimir para vos un modelo bajado no tiene vueltas; para **venderlo** la licencia tiene que permitir uso comercial. Por ahora solo STL: un `.3mf`, `.obj` o `.step` hay que exportarlo como STL (en Orca, clic derecho sobre la pieza → Exportar como STL).
+
 ### Si no sabés algo
 
 No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las medidas: si una importa y no la sabés, te va a pedir que la midas.

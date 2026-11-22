@@ -518,6 +518,59 @@ class TestProducto(unittest.TestCase):
         self.assertTrue(any("recargo" in s for s in p["supuestos"]))
 
 
+class TestStlDelUsuario(unittest.TestCase):
+    """0.1.32: un STL que trae el usuario sigue el mismo circuito."""
+
+    def _escuadra(self):
+        import cad
+        # Una L acostada "mal": la cara grande queda vertical y la pieza, parada sobre un canto
+        pieza = cad.unir(cad.caja(60, 40, 4), cad.caja(4, 40, 45))
+        return pieza
+
+    def test_orientar_unidades_y_origen(self):
+        import cad
+        import catalogo
+        import revisar_stl
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            cad.exportar_stl(self._escuadra(), d / "bien.stl")
+            tri = revisar_stl.leer_stl(d / "bien.stl")
+            # El usuario la trae dada vuelta y en metros
+            mal = revisar_stl.rotar(tri, [180, 0, 0]) / 1000
+            revisar_stl.escribir_stl(d / "mal.stl", mal)
+            r = subprocess.run([sys.executable, str(SCRIPTS / "revisar_stl.py"), str(d / "mal.stl"), "--orientar",
+                                "--json", str(d / "mal.json")], capture_output=True, text=True)
+            informe = json.loads((d / "mal.json").read_text(encoding="utf-8"))
+            ops = revisar_stl.orientaciones(revisar_stl.rotar(tri, [180, 0, 0]))
+            mejor = ops[0]
+            arreglada = subprocess.run([sys.executable, str(SCRIPTS / "revisar_stl.py"), str(d / "mal.stl"),
+                                        "--rotar", mejor["rotar"], "--escala", "1000", "--apoyar",
+                                        "--salida", str(d / "pieza.stl"), "--json", str(d / "pieza.json")],
+                                       capture_output=True, text=True)
+            final = json.loads((d / "pieza.json").read_text(encoding="utf-8"))
+            c = {"version": 1, "piezas": []}
+            catalogo.agregar(c, "impresiones/2026-11-22_escuadra_ender", nombre="Escuadra", origen="stl_descargado",
+                             fuente="https://www.printables.com/model/1", licencia="CC BY-NC",
+                             archivos=["original.stl", "pieza.stl"])
+            catalogo.agregar(c, "impresiones/2026-11-22_otra_ender", nombre="Otra", fuente="javascript:alert(1)")
+            pagina = catalogo.generar_html(c)
+            with self.assertRaises(SystemExit):
+                catalogo.agregar(c, "impresiones/2026-11-22_otra_ender", origen="robado")
+        self.assertIn("otra unidad", r.stdout)                         # diminuta: seguro no está en milímetros
+        self.assertIn("--rotar", r.stdout)
+        self.assertEqual(len(informe["orientaciones"]), 6)
+        self.assertEqual(mejor["rotar"], "180,0,0")                    # la devuelve a como estaba: apoyada en la base
+        self.assertLess(mejor["voladizo_cm2"], ops[-1]["voladizo_cm2"] + 1e-9)
+        self.assertGreater(mejor["apoyo_cm2"], 20)
+        self.assertIsNone(mejor["entra"])                              # sin impresora no opina si entra
+        self.assertEqual(arreglada.returncode, 0, arreglada.stdout + arreglada.stderr)
+        self.assertEqual(sorted(round(m) for m in final["medidas_mm"]), [40, 45, 60])
+        self.assertNotIn("otra unidad", arreglada.stdout)
+        self.assertIn("STL de internet · CC BY-NC", pagina)
+        self.assertEqual(c["piezas"][0]["fuente"], "https://www.printables.com/model/1")
+        self.assertNotIn("fuente", c["piezas"][1])                     # solo direcciones http(s)
+
+
 class TestOrden030(unittest.TestCase):
     def test_un_solo_formato_de_plata(self):
         import catalogo
@@ -1359,7 +1412,11 @@ class TestPanelEnClaude(unittest.TestCase):
         for pagina in (archivo, claude):
             self.assertIn(f'data-pedido="{cat.PEDIDO_FOTO}" data-impresora data-adjuntar>Pieza desde una foto</button>',
                           pagina)
-            self.assertIn("adjuntá la foto", pagina)
+            self.assertIn("la foto (si tenés varias de distintos ángulos, mejor)", pagina)
+            # La pieza desde un STL del usuario (0.1.32): otro botón, que recuerda adjuntar el STL
+            self.assertIn(f'data-pedido="{cat.PEDIDO_STL}" data-impresora data-adjuntar="stl">Pieza desde un STL</button>',
+                          pagina)
+            self.assertIn("el STL (o decile en qué carpeta está)", pagina)
         with self.assertRaises(ValueError):
             cat.generar_html(c, modo="otro")
         # Datos raros en el índice: el enlace a la tienda y las imágenes se revisan al armar la página, los
@@ -1439,7 +1496,7 @@ class TestPanelEnClaude(unittest.TestCase):
                           '<option value="">Que me pregunte Claude</option></select>', pagina)
             self.assertIn("La que elegís en la ventana de Orca no le llega a Claude", pagina)
             # Solo los botones que arrancan una pieza llevan la impresora
-            self.assertEqual(pagina.count(" data-impresora"), 3, modo)
+            self.assertEqual(pagina.count(" data-impresora"), 4, modo)
             for etiqueta in ("Diseñala", "Dejala lista para imprimir"):
                 self.assertIn(f" data-impresora>{etiqueta}</button>", pagina)
             for etiqueta in ("Solo el modelo", "Abrila en Orca", "Ya la imprimí"):
