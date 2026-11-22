@@ -99,7 +99,7 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
 5. **Laminado.** Lamina en tu Orca y mira el resultado: tiempo, gramos, voladizos y temperaturas. Si algo no cierra, ajusta y vuelve a laminar, hasta tres veces antes de consultarte.
 6. **Revisión de seguridad.** Revisa el G-code: temperaturas, que no salga de la cama, que no tenga comandos que cambien la configuración de la impresora y que apague todo al terminar. **Si no pasa, no se entrega.**
 7. **Entrega.** Deja todo en una carpeta con el nombre de la pieza y de la impresora (te deja un enlace para ir directo a la carpeta y otro al `.3mf`), y te resume tiempo, gramos, costo real (con lo que cargaste; si falta algo, te dice qué), las decisiones con el porqué y qué mirar durante la impresión. **Para verla o tocarla en Orca, abrí el proyecto (`.3mf`) con doble clic:** se abre con tu impresora, el filamento, el proceso AUTO y tu tipo de cama ya elegidos. Si Claude tiene terminal en tu PC, te pregunta si querés que te abra Orca con la pieza.
-   **En paralelo, la publicación:** si tenés tienda configurada, Claude te ofrece armar el producto en ese momento: fotos de producto hechas con Blender (fondo blanco, como pide Mercado Libre, y otra con sombra), la descripción y el precio con el tiempo y los gramos reales. **Te pregunta qué margen querés en ese producto**, con tres opciones y lo que ganás en cada canal, o le decís un precio. Lo aprobás vos, también desde la app de Claude en el celular, y queda como borrador.
+   **En paralelo, la publicación:** si tenés tienda configurada, Claude te ofrece armar el producto en ese momento: fotos de producto hechas con Blender (fondo blanco, como pide Mercado Libre, y otra con sombra), la descripción y el precio con el tiempo y los gramos reales. **Te pregunta qué margen querés en ese producto**, con tres opciones y lo que ganás en cada canal, o le decís un precio. El texto de venta lo puede escribir tu Gemini gratis (Claude lo revisa contra los datos de la pieza) o Claude. Antes de cargarlo te muestra una **vista previa** de cómo se vería la página del producto en tu tienda, con lo que conviene revisar: si las fotos son ilustrativas, el título para Mercado Libre, el precio y la ganancia en cada canal. Lo aprobás vos con el botón de la vista previa o en el chat, también desde la app de Claude en el celular, y queda como borrador.
 8. **Imprimís vos.** Pasás el G-code a la impresora (por USB o con la app de la marca) y la arrancás desde ahí. **Claude nunca arranca una impresión.** Mirá la primera capa completa y no dejes la impresora sola.
 9. **Contale cómo salió.** Mandale una foto, aunque haya salido bien. Si algo falló, lo diagnostica y lo corrige. Lo que funcionó queda anotado y mejora las próximas piezas.
 10. **Vender.** Cuando tengas la pieza impresa, mandale la foto: la suma al producto como imagen principal (las fotos de Blender son ilustrativas). El borrador lo publicás vos desde tu tienda. Si no lo armaste antes, `/taller-3d:publicar` lo hace en cualquier momento.
@@ -127,7 +127,7 @@ impresiones/2026-11-21_soporte-router_ender-3-v3-plus/
     pieza.stl           el modelo
     vista.png           la vista previa
     informe.md          tiempo, gramos, costo, decisiones y qué mirar
-    producto/           la publicación: fotos de producto, ficha y precio
+    producto/           la publicación: fotos de producto, ficha, precio y vista-previa.html
     config_usada.json   configuración usada y por qué
     laminado/           las vueltas de prueba de Orca (se pueden borrar)
 disenos/2026-11-21_organizador/
@@ -234,6 +234,8 @@ Los comandos llevan el nombre del plugin adelante (`/taller-3d:...`): si escrib�
 **¿Cómo pone el precio?** Con tu margen **sobre el precio**: de cada venta, qué parte te queda después de las comisiones. Un 40 % quiere decir que de cada $ 1.000 te quedan $ 400 de ganancia. Ojo: un recargo del 50 % sobre el costo es un margen del 33 %. El precio sale por canal (tu tienda, Mercado Libre con su comisión e IVA…), y en cada producto elegís el margen o le decís un precio y te muestra cuánto ganás en cada canal.
 
 **¿Las fotos de producto son reales?** Son renders 3D de tu pieza, con el color y el tipo de plástico, para tener la publicación lista antes de imprimir. La descripción aclara que son ilustrativas; cuando la imprimas, mandale una foto real y va primera.
+
+**¿Quién escribe el texto de la publicación?** Si en la instalación elegiste Gemini, lo escribe tu Gemini gratis, en el navegador y con tu cuenta de Google; si no, Claude. En los dos casos Claude lo revisa antes de usarlo: que no invente medidas ni usos, que no prometa cosas que no se pueden sostener (apto para alimentos, irrompible, garantías) y que el título entre en Mercado Libre. Las medidas, el material y los cuidados no los escribe ninguna IA: salen de los datos reales de la pieza. Si Gemini no está disponible, escribe Claude y te lo dice.
 
 **¿Puedo vender piezas de modelos bajados de internet?** Solo si la licencia del modelo lo permite: muchos son de uso no comercial. Revisala antes de publicar.
 

@@ -6,7 +6,7 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
 {
   "version": 1,
   "carpeta_trabajo": "/home/usuario/Documentos/Taller 3D",
-  "aceptacion": {"fecha": "2026-11-21T10:00:00-03:00", "version_plugin": "0.1.25", "texto": "ACEPTO", "medio": "instalar.sh"},
+  "aceptacion": {"fecha": "2026-11-21T10:00:00-03:00", "version_plugin": "0.1.26", "texto": "ACEPTO", "medio": "instalar.sh"},
   "orca": {"version": "2.5.1", "ejecutable": "/home/usuario/Aplicaciones/OrcaSlicer_Linux_AppImage_Ubuntu2404_V2.5.1.AppImage",
            "origen": "oficial", "carpeta_usuario": "/home/usuario/.config/OrcaSlicer/user/default"},
   "impresora_por_defecto": "marca-modelo",
@@ -40,7 +40,7 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
                                           "cargo_fijo": 1000, "cargo_fijo_hasta": 20000}},
              "embalaje": 400, "redondeo": 100, "demora_dias": 3, "peso_embalaje_g": 50,
              "categoria_por_defecto": "Piezas a medida"},
-  "generadores_ia": {"hunyuan": true, "imagenes": "gemini"}
+  "generadores_ia": {"hunyuan": true, "imagenes": "gemini", "textos": "gemini"}
 }
 ```
 
@@ -60,7 +60,8 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
 - `tienda.margen_precio_pct`: el margen habitual sobre el precio. El `margen_pct` de antes era un recargo sobre el costo: `costos.py` lo convierte y avisa.
 - `tienda.canales`: comisión, cuotas, IVA sobre la comisión y cargo fijo de cada canal de venta (`references/costos.md`).
 - `tienda.costo_hora_maquina` (de antes de la 0.1.14): se usa solo si la impresora no tiene precio.
-- `generadores_ia` (opcional): para hacer piezas desde una foto (`references/foto-a-3d.md`). `hunyuan`: si tiene cuenta en Hunyuan 3D (la sesión queda en su Chrome; acá no se guarda nada de la cuenta). `imagenes`: con qué genera imágenes cuando no hay foto o faltan ángulos, `gemini`, `flow` o null. Si falta, se pregunta la primera vez que hace falta.
+- `generadores_ia` (opcional): para hacer piezas desde una foto (`references/foto-a-3d.md`). `hunyuan`: si tiene cuenta en Hunyuan 3D (la sesión queda en su Chrome; acá no se guarda nada de la cuenta). `imagenes`: con qué genera imágenes cuando no hay foto o faltan ángulos, `gemini`, `flow` o null. `textos`: quién escribe los textos de venta en `/publicar`, `gemini` (su Gemini gratis, revisado por Claude: `references/textos-con-gemini.md`) o `claude` (lo mismo si falta). Si falta algo, se pregunta la primera vez que hace falta.
+- `vista_previa_claude` (opcional): la página de claude.ai donde `/publicar` muestra la vista previa de la publicación (`{"slug": "…", "url": "…"}`); se reusa en cada producto.
 
 ## Reglas
 

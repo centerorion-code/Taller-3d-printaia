@@ -23,7 +23,7 @@ Con `get_device_info` y las herramientas de Orca, armar una tabla corta de estad
 | Windows: datos de Orca | si la plataforma es Windows, la carpeta de perfiles conectada **no** tiene que estar bajo `AppData` (ver sección 2) |
 | Abrir Orca desde Claude y el panel (opcional, Linux) | `localMcpServers`: `taller3d-orca` `announced`. Si falta, decir que corriendo de nuevo el instalador (paso "Abrir Orca desde Claude y desde el panel") Claude y los botones del panel le abren Orca con la pieza |
 | Blender (opcional) | `localMcpServers` |
-| Piezas desde una foto (opcional) | `config.json` tiene `generadores_ia` (cuenta de Hunyuan 3D y generador de imágenes); Claude in Chrome conectado |
+| Piezas desde una foto y textos de venta (opcional) | `config.json` tiene `generadores_ia` (cuenta de Hunyuan 3D, generador de imágenes y quién escribe los textos); Claude in Chrome conectado |
 
 Si todo está bien, decirlo y ofrecer la pieza de prueba (paso 5). Si algo falta, seguir solo con lo que corresponda.
 
@@ -84,7 +84,7 @@ Hacen falta dos: la **carpeta de trabajo** (diseños, impresiones con sus vistas
    - **Su tiempo:** cuánto vale su hora y cuántos minutos le dedica a cada pieza (preparar, sacar soportes, embalar). Fallas: 10 % si no sabe.
 4. **Tienda (opcional):** plataforma (WooCommerce, Tiendanube, Shopify, Mercado Libre u otra), URL, dónde vende (`tienda.canales`: la comisión de cada canal; la de Mercado Libre, buscarla en la web para su categoría), su margen habitual **sobre el precio** (explicar que un recargo del 50 % es un margen del 33 %; en cada producto se vuelve a elegir), embalaje, redondeo y demora. Sin contraseñas.
    Al final, `costos.py estado --config config.json` muestra lo que quedó listo y lo que falta: decirlo en pocas líneas, con la frase para completarlo después.
-5. **Piezas desde una foto (opcional):** preguntar si tiene cuenta en Hunyuan 3D (https://3d.hunyuan.tencent.com, gratis, con puntos por día) y si usa Gemini o Flow para generar imágenes. Guardarlo en `generadores_ia`. Si tiene Hunyuan, decirle que deje la sesión abierta en Chrome y que apague en Chrome «Preguntar dónde guardar cada archivo» (Configuración → Descargas), así los modelos se bajan solos (`references/foto-a-3d.md`).
+5. **Piezas desde una foto (opcional):** preguntar si tiene cuenta en Hunyuan 3D (https://3d.hunyuan.tencent.com, gratis, con puntos por día) y si usa Gemini o Flow para generar imágenes. Preguntar también si quiere que los textos de venta de sus publicaciones los escriba su Gemini gratis (con su cuenta de Google, en el navegador; Claude los revisa) o Claude. Guardarlo en `generadores_ia` (`textos`: `gemini` o `claude`). Si tiene Hunyuan, decirle que deje la sesión abierta en Chrome y que apague en Chrome «Preguntar dónde guardar cada archivo» (Configuración → Descargas), así los modelos se bajan solos (`references/foto-a-3d.md`).
 6. Escribir `config.json` (formato en `references/configuracion.md` de la skill `impresion-3d`) con el procedimiento de escritura y crear `historial.csv` con encabezado. Si ya existe, completar solo lo que falte.
 
 ## 5. Pieza de prueba

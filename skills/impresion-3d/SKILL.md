@@ -31,7 +31,9 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
   - `revisar_gcode.py`: revisión de seguridad del G-code; con `--json` y `--config`, también el costo real de la pieza.
   - `impresora.py`: impresoras del usuario y sus datos (`detectar` las que tiene en Orca, `validar`, `desde-gcode` para leer lo que usa Orca y `comparar`). Ver `references/impresoras.md`.
   - `costos.py`: costo real de una pieza (material, luz, desgaste, fallas, tu tiempo, embalaje) y precio por canal con el margen sobre el precio; `luz` saca el precio del kWh de la boleta, `consumo` guarda el consumo de una impresora (el promedio oficial o de una prueba publicada, o estimado por el tamaño de la cama: se busca, no se pregunta), `estado` dice qué falta configurar, `pieza --margenes` da opciones de margen. Ver `references/costos.md`.
-  - `producto_tienda.py`: ficha de producto y precio (lo usa `/publicar`).
+  - `producto_tienda.py`: ficha de producto, precio y vista previa (lo usa `/publicar`).
+  - `textos_ia.py`: pedido para que Gemini escriba el texto de venta y revisión de lo que devuelve, o de lo que escribe Claude (`references/textos-con-gemini.md`).
+  - `vista_publicacion.py`: la vista previa de la publicación como página de la tienda, para el archivo y para la página al costado del chat.
   - `render_producto.py`: fotos de producto con Blender (`pip install --break-system-packages bpy pillow`, unos 400 MB): cuadradas, sin texto, fondo blanco puro para Mercado Libre y otra con sombra (lo usa `/publicar`).
   - `catalogo.py`: el panel del taller: índice de ideas y piezas (`taller-3d/catalogo.json`) y página `panel.html` con el paso en que está cada una, a quién le toca lo que sigue, vistas, datos y archivos; con `--modo claude`, la página para el panel al costado del chat en claude.ai (skill `panel`); `carpeta` da el nombre de la carpeta de una pieza y de su G-code, con la impresora.
   - `proyecto_3mf.py`: proyecto de Orca (`.3mf`) de una pieza, a partir del STL y del G-code laminado: el modelo con los perfiles y la cama real, para abrirlo con doble clic.
@@ -118,6 +120,7 @@ Los archivos del plugin no cambian solos. Lo que se aprende del Orca del usuario
 - `references/cad.md`: reglas de diseño para imprimir y uso de `cad.py`.
 - `references/modelado.md`: con qué modelar (código, Blender o un modelo que ya existe), Blender por código, piezas mixtas y cómo revisar y mostrar una pieza decorativa.
 - `references/foto-a-3d.md`: pieza desde una foto (o una imagen aprobada) con Hunyuan 3D en el Chrome del usuario, dejarla imprimible y combinarla con una parte diseñada.
+- `references/textos-con-gemini.md`: el texto de venta de `/publicar` escrito por el Gemini gratis del usuario (o por Claude) y su revisión.
 - `references/impresoras.md`: elegir la impresora, investigarla y configurarla; formato de sus datos.
 - `references/plugins-orca.md`: plugins de Orca 2.5 (qué son, riesgos, cómo buscarlos y los que sirven).
 - `references/configuracion.md`: formato de `config.json`.

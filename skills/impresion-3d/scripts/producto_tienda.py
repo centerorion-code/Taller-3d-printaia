@@ -8,7 +8,12 @@ embalaje, más el margen sobre el precio y las comisiones del canal),
 redacta la descripción con medidas, material y cuidados, y genera:
   - producto.json: datos para crear el producto por la API REST de WooCommerce (siempre como borrador);
   - producto_woocommerce.csv: para el importador de productos de WooCommerce (Publicado = -1, borrador);
-  - ficha.md: el texto para revisar o copiar a mano.
+  - ficha.md: el texto para revisar o copiar a mano;
+  - publicacion.json y vista-previa.html: la vista previa de cómo se vería en la tienda (vista_publicacion.py).
+
+Con --textos (textos_ia.py revisar), el título para Mercado Libre, la descripción corta y los párrafos de venta los
+escribió Gemini o Claude; los datos de la lista (medidas, material, cuidados) salen siempre de los informes.
+Con --fotos-reales, las fotos de la pieza impresa van primero; si solo hay renderizadas, la descripción lo aclara.
 
 Uso:
   python3 producto_tienda.py --nombre "Soporte en L reforzado" --material PETG --color Negro \\
@@ -106,9 +111,35 @@ def calcular_precio(gramos: float | None, segundos: float | None, material: str 
     }
 
 
+IMAGENES = (".jpg", ".jpeg", ".png", ".webp")
+AVISO_ILUSTRATIVAS = ("Las imágenes son ilustrativas: la pieza real puede variar levemente en color y terminación.")
+
+
+def fotos_de(salida: Path, reales: list[str] | None = None) -> tuple[list[str], int]:
+    """Las fotos de la publicación, relativas a la carpeta producto/: primero las reales de la pieza impresa (las
+    pasa el usuario, por ejemplo ../foto.jpg) y después las de producto renderizadas que hay en la carpeta."""
+    reales = [r for r in reales or [] if isinstance(r, str) and r.lower().endswith(IMAGENES)]
+    renders = sorted(p.name for p in Path(salida).glob("producto-*") if p.suffix.lower() in IMAGENES)
+    if (Path(salida) / "foto_producto.png").exists():
+        renders.append("foto_producto.png")
+    return reales + [r for r in renders if r not in reales], len(reales)
+
+
+def leer_textos(ruta: Path | None) -> dict | None:
+    """textos.json de textos_ia.py revisar: título, descripción corta, descripción y palabras clave."""
+    if not ruta:
+        return None
+    textos = comun.cargar_json(ruta)
+    if not isinstance(textos, dict) or not textos.get("revisado") or not textos.get("descripcion_corta"):
+        raise SystemExit(f"{ruta} no es un textos.json revisado: pasalo antes por textos_ia.py revisar.")
+    return textos
+
+
 def armar(args, config: dict) -> dict:
     gcode = comun.cargar_json(args.informe_gcode) if args.informe_gcode else {}
     stl = comun.cargar_json(args.informe_stl) if args.informe_stl else {}
+    textos = leer_textos(getattr(args, "textos", None))
+    fotos, reales = fotos_de(args.salida, getattr(args, "fotos_reales", None))
     material = comun.normalizar_material(args.material) or gcode.get("material")
     est = gcode.get("estimaciones", {})
     gramos, segundos = est.get("gramos"), est.get("segundos")
@@ -129,19 +160,33 @@ def armar(args, config: dict) -> dict:
     if tienda.get("demora_dias"):
         puntos.append(f"Se fabrica a pedido: demora aproximada de {tienda['demora_dias']} días hábiles.")
     puntos.append("Se puede hacer a medida o en otro color: consultanos.")
+    if fotos and not reales:
+        puntos.append(AVISO_ILUSTRATIVAS)
 
-    corta = f"{args.nombre} impreso en 3D en {material or 'plástico'}" + (f" {args.color.lower()}" if args.color else "")
-    corta += f". {args.uso.rstrip('.')}." if args.uso else "."
+    # El texto de venta (si lo escribió Gemini o Claude y pasó textos_ia.py revisar) va antes de los datos, que
+    # salen siempre de los informes.
+    if textos:
+        corta = textos["descripcion_corta"]
+        parrafos = [p.strip() for p in str(textos.get("descripcion") or "").split("\n\n") if p.strip()]
+    else:
+        corta = f"{args.nombre} impreso en 3D en {material or 'plástico'}" + (f" {args.color.lower()}" if args.color else "")
+        corta += f". {args.uso.rstrip('.')}." if args.uso else "."
+        parrafos = [f"{args.uso.rstrip('.')}."] if args.uso else []
     descripcion_html = (
-        (f"<p>{html.escape(args.uso.rstrip('.'))}.</p>\n" if args.uso else "")
+        "".join(f"<p>{html.escape(p)}</p>\n" for p in parrafos)
         + "<ul>\n" + "".join(f"<li>{html.escape(p)}</li>\n" for p in puntos) + "</ul>\n"
         + f"<p><small>{html.escape(AVISO_3D)}</small></p>\n"
     )
+    titulo_ml = (textos or {}).get("titulo") or comun.una_linea(
+        f"{args.nombre} impreso en 3D" + (f" {material}" if material else ""), 60)
     peso_kg = ((gramos or 0) + (tienda.get("peso_embalaje_g") or 0)) / 1000 if gramos else None
     sku = args.sku or f"P3D-{date.today():%Y%m%d}-{_slug(args.nombre)}"
     etiquetas = [e.strip() for e in (args.etiquetas or "").split(",") if e.strip()]
     if material and material not in etiquetas:
         etiquetas.append(material)
+    for clave in (textos or {}).get("palabras_clave") or []:
+        if len(etiquetas) < 10 and comun.plano(clave) not in {comun.plano(x) for x in etiquetas}:
+            etiquetas.append(clave)
 
     producto = {
         "name": args.nombre,
@@ -160,7 +205,11 @@ def armar(args, config: dict) -> dict:
         "images": [],
     }
     return {"producto": producto, "precio": precio, "puntos": puntos, "material": material, "sku": sku,
-            "precio_fijo": args.precio is not None}
+            "precio_fijo": args.precio is not None, "parrafos": parrafos, "titulo_ml": titulo_ml,
+            "textos": textos, "fotos": fotos, "fotos_reales": reales, "medidas_mm": medidas, "gramos": gramos,
+            "color": args.color, "categoria": args.categoria, "carpeta": getattr(args, "carpeta", None),
+            "tienda": {"url": tienda.get("url"), "plataforma": tienda.get("plataforma"),
+                       "demora_dias": tienda.get("demora_dias")}}
 
 
 def escribir(resultado: dict, salida: Path) -> list[Path]:
@@ -187,16 +236,20 @@ def escribir(resultado: dict, salida: Path) -> list[Path]:
     archivos.append(ruta)
 
     pr = resultado["precio"]
+    titulo_ml = resultado.get("titulo_ml") or p["name"]
     lineas = [
         f"# {p['name']}",
         "",
         f"**Estado:** borrador (revisar antes de publicar) · **SKU:** {p['sku']}",
         f"**Precio:** {p.get('regular_price') or 'a definir'} {pr['moneda']}",
+        f"**Título para Mercado Libre:** {titulo_ml} ({len(titulo_ml)}/60 caracteres)",
+        f"**Texto:** {autor_del_texto(resultado.get('textos'))}",
         "",
         f"**Descripción corta:** {p['short_description']}",
         "",
         "**Descripción:**",
         "",
+        *[x for par in resultado.get("parrafos") or [] for x in (par, "")],
         *[f"- {x}" for x in resultado["puntos"]],
         "",
         f"_{AVISO_3D}_",
@@ -229,7 +282,29 @@ def escribir(resultado: dict, salida: Path) -> list[Path]:
     ruta = salida / "ficha.md"
     ruta.write_text("\n".join(lineas) + "\n", encoding="utf-8")
     archivos.append(ruta)
+
+    # Lo que necesita la vista previa (vista_publicacion.py): la página como en la tienda y lo que hay que revisar.
+    publicacion = {"version": 1, "producto": p, "precio": pr, "puntos": resultado["puntos"],
+                   "aviso_3d": AVISO_3D, **{k: resultado.get(k) for k in (
+                       "parrafos", "titulo_ml", "textos", "fotos", "fotos_reales", "medidas_mm", "gramos", "color",
+                       "categoria", "carpeta", "tienda", "material")}}
+    ruta = salida / "publicacion.json"
+    ruta.write_text(json.dumps(publicacion, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    archivos.append(ruta)
+    import vista_publicacion
+    ruta = salida / "vista-previa.html"
+    ruta.write_text(vista_publicacion.generar(publicacion), encoding="utf-8")
+    archivos.append(ruta)
     return archivos
+
+
+def autor_del_texto(textos: dict | None) -> str:
+    if not textos:
+        return "armado con la plantilla (uso, medidas, material y cuidados)"
+    quien = {"gemini": "Gemini (gratis), revisado por Claude contra los datos de la pieza",
+             "claude": "Claude, revisado contra los datos de la pieza"}.get(textos.get("autor"), "revisado por Claude")
+    cambios = [c for c in textos.get("cambios") or [] if isinstance(c, str) and c.strip()]
+    return f"escrito por {quien}" + (f"; Claude corrigió: {'; '.join(cambios)}" if cambios else "")
 
 
 SINONIMOS = {
@@ -319,6 +394,10 @@ def main(argv=None) -> None:
     ap.add_argument("--canal", help="canal del precio sugerido (tienda, mercadolibre…); si no, el de la plataforma")
     ap.add_argument("--sku")
     ap.add_argument("--plantilla", type=Path, help="CSV exportado de otra plataforma para completar")
+    ap.add_argument("--textos", type=Path, help="textos.json revisado (textos_ia.py revisar): título y descripción")
+    ap.add_argument("--fotos-reales", nargs="*", default=[],
+                    help="fotos de la pieza impresa, relativas a --salida (por ejemplo ../foto.jpg): van primero")
+    ap.add_argument("--carpeta", help="carpeta de la pieza, relativa a la carpeta de trabajo (para los pedidos)")
     ap.add_argument("--salida", type=Path, default=Path("."))
     a = ap.parse_args(argv)
     config = comun.cargar_json(a.config) if a.config and a.config.exists() else {}

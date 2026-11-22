@@ -40,6 +40,7 @@ No vienen con el plugin ni los paga el taller: Claude los usa en tu Chrome, con 
 |---|---|
 | Hunyuan 3D (Tencent), https://3d.hunyuan.tencent.com | generar el modelo 3D de una pieza desde una o varias fotos (`references/foto-a-3d.md`) |
 | Gemini o Flow (Google), con Nano Banana | generar una imagen para aprobar antes del 3D, o las vistas que faltan de un objeto |
+| Gemini (Google), plan gratis | escribir el texto de venta de una publicación, que Claude revisa antes de usar (`references/textos-con-gemini.md`) |
 
 ## Marcas
 

@@ -1,5 +1,12 @@
 # Cambios
 
+## 0.1.26 (2026-11-22)
+
+- **Vista previa de la publicación:** antes de cargar el producto, `/publicar` muestra cómo se vería la página en tu tienda (galería de fotos, título, precio, descripción y ficha técnica) y, abajo, lo que conviene revisar: si las fotos son ilustrativas, el título para Mercado Libre con sus caracteres, si la primera foto tiene fondo blanco, el precio y la ganancia en cada canal y quién escribió el texto. Se abre al costado del chat (siempre la misma página) y queda como `vista-previa.html` en la carpeta `producto/` de la pieza. Se aprueba con su botón o en el chat, también desde el celular; recién ahí se carga el borrador.
+- **El texto de venta lo puede escribir tu Gemini gratis:** con `generadores_ia.textos = "gemini"`, Claude abre Gemini en tu navegador, con tu cuenta de Google, le pasa los datos de la pieza y las reglas, y usa su respuesta después de revisarla (`references/textos-con-gemini.md`). Si Gemini no está disponible, escribe Claude con las mismas reglas. Las medidas, el material, el peso y los cuidados no los escribe ninguna IA: salen de los informes de la pieza.
+- **`textos_ia.py`:** arma el pedido para Gemini en una sola línea y revisa la respuesta: largo del título (60 caracteres para Mercado Libre), afirmaciones que no se pueden sostener (alimentos, lavavajillas, uso médico, chicos, certificaciones, garantía, irrompible), contactos y enlaces, promociones, menciones de la IA, exclamaciones, emojis y números que no están en los datos.
+- **`producto_tienda.py`:** `--textos`, `--fotos-reales` y `--carpeta`; deja también `publicacion.json` y `vista-previa.html`, y si solo hay fotos renderizadas, la descripción aclara que son ilustrativas. Nuevo `vista_publicacion.py` para la página de claude.ai.
+
 ## 0.1.25 (2026-11-22)
 
 - **La impresora se elige al arrancar cada pieza, entre todas las de tu Orca:** antes, la pregunta solo aparecía si había dos o más impresoras preparadas en el taller; con una sola preparada, Claude seguía con esa aunque tuvieras otra en Orca. Ahora cuenta las impresoras de Orca (también las que todavía no están preparadas en esta carpeta) y pregunta en cuál siempre que haya más de una y no la hayas dicho. Si elegís una sin preparar, Claude la prepara antes, la primera vez.

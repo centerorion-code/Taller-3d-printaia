@@ -518,6 +518,163 @@ class TestProducto(unittest.TestCase):
         self.assertTrue(any("recargo" in s for s in p["supuestos"]))
 
 
+class TestPublicacion(unittest.TestCase):
+    """El texto de venta (Gemini o Claude, revisado contra los datos) y la vista previa de la publicación."""
+
+    DATOS = {"nombre": "Soporte para router", "uso": "Colgar el router con dos tornillos de 4 mm", "material": "PETG",
+             "color": "negro", "categoria": None, "medidas_mm": [60.0, 30.0, 40.0], "peso_g": 25, "notas": None}
+    BIEN = {"titulo": "Soporte de pared para router impreso en 3D PETG negro",
+            "descripcion_corta": "Soporte de pared para que el router quede firme y ordenado.",
+            "descripcion": "Dejá el router a la vista. Se fija con dos tornillos de 4 mm.\n\nMide 6 cm de ancho y pesa 25 g.",
+            "palabras_clave": ["soporte router", "PETG", "Soporte router"]}
+
+    def test_pedido_y_revision_del_texto(self):
+        import textos_ia
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / "stl.json").write_text(json.dumps({"medidas_mm": [60, 30, 40]}), encoding="utf-8")
+            (d / "gcode.json").write_text(json.dumps({"material": "PETG", "estimaciones": {"gramos": 25.4}}),
+                                          encoding="utf-8")
+            datos = textos_ia.datos_de("Soporte para router", "Colgar el router", "petg", "negro",
+                                       informe_stl=d / "stl.json", informe_gcode=d / "gcode.json")
+        self.assertEqual((datos["material"], datos["medidas_mm"], datos["peso_g"]), ("PETG", [60.0, 30.0, 40.0], 25))
+        pedido = textos_ia.armar_prompt(datos)
+        self.assertNotIn("\n", pedido)                       # en el chat de Gemini, un Enter lo mandaría
+        for parte in ("60 × 30 × 40 mm", "PETG", "hasta 60 caracteres", "\"palabras_clave\"", "no inventes"):
+            self.assertIn(parte, pedido)
+        # La respuesta con texto alrededor y entre ```
+        respuesta = "Acá va:\n```json\n" + json.dumps(self.BIEN, ensure_ascii=False) + "\n```\n¿Algo más?"
+        self.assertEqual(textos_ia.extraer_json(respuesta)["titulo"], self.BIEN["titulo"])
+        self.assertEqual(textos_ia.extraer_json("{\"titulo\": \"x\", \"a\": {\"b\": 1}}")["a"], {"b": 1})
+        with self.assertRaises(ValueError):
+            textos_ia.extraer_json("No puedo ayudarte con eso.")
+        self.assertEqual(textos_ia.revisar(self.BIEN, self.DATOS), [])   # 6 cm = 60 mm; 4 mm lo dijo el usuario
+        self.assertEqual(textos_ia.limpiar(self.BIEN)["palabras_clave"], ["soporte router", "PETG"])
+        mal = {"titulo": "SOPORTE para router IRROMPIBLE ¡Oferta! con envío gratis a todo el país ya mismo",
+               "descripcion_corta": "Apto para alimentos y lavavajillas.",
+               "descripcion": "Mide 25 cm y pesa 80 g. Escribinos al 3815551234 o a www.printaia.com.ar. Lo escribió Gemini.",
+               "palabras_clave": ["regalo para chicos"]}
+        problemas = " | ".join(textos_ia.revisar(mal, self.DATOS))
+        for parte in ("caracteres", "alimentos", "lavavajillas", "duración absoluta", "contacto", "menciona la IA",
+                      "promociones", "exclamación", "mayúsculas: SOPORTE, IRROMPIBLE", "«25 cm»", "«80 g»", "chicos"):
+            self.assertIn(parte, problemas)
+        self.assertEqual(textos_ia.revisar({"titulo": "x"}, self.DATOS), ["falta «descripcion_corta»",
+                                                                          "falta «descripcion»"])
+        self.assertIn("medida que no está en los datos", " ".join(textos_ia.revisar(
+            {**self.BIEN, "descripcion": "Mide 10 x 5 x 2 cm."}, self.DATOS)))
+
+    def test_texto_por_linea_de_comandos(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            datos, bien, mal = d / "datos.json", d / "bien.txt", d / "mal.txt"
+            r = subprocess.run([sys.executable, str(SCRIPTS / "textos_ia.py"), "prompt", "--nombre", "Soporte",
+                                "--medidas", "60x30x40", "--peso", "25", "--material", "PETG", "--datos", str(datos),
+                                "--uso", "Colgar el router con dos tornillos de 4 mm"],
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(r.stdout.count("\n"), 1)
+            bien.write_text(json.dumps(self.BIEN, ensure_ascii=False), encoding="utf-8")
+            mal.write_text(json.dumps({**self.BIEN, "descripcion": "Apto microondas."}, ensure_ascii=False),
+                           encoding="utf-8")
+
+            def revisar(respuesta, salida, *extra):
+                return subprocess.run([sys.executable, str(SCRIPTS / "textos_ia.py"), "revisar", "--datos", str(datos),
+                                       "--respuesta", str(respuesta), "--json", str(salida), *extra],
+                                      capture_output=True, text=True)
+            ok = revisar(bien, d / "textos.json", "--cambio", "acorté el título")
+            self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
+            textos = json.loads((d / "textos.json").read_text(encoding="utf-8"))
+            self.assertEqual((textos["autor"], textos["revisado"], textos["cambios"]),
+                             ("gemini", True, ["acorté el título"]))
+            no = revisar(mal, d / "no.json")
+            self.assertEqual(no.returncode, 1)
+            self.assertIn("microondas", no.stdout)
+            self.assertFalse((d / "no.json").exists())
+
+    def test_ficha_y_vista_previa(self):
+        import vista_publicacion
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            producto = d / "producto"
+            producto.mkdir()
+            for nombre in ("producto-1-principal.jpg", "producto-2-tienda.jpg"):
+                (producto / nombre).write_bytes(b"\xff\xd8\xff")
+            (d / "stl.json").write_text(json.dumps({"medidas_mm": [60, 30, 40]}), encoding="utf-8")
+            (d / "gcode.json").write_text(json.dumps({"material": "PETG", "estimaciones": {"gramos": 25.4,
+                                                                                           "segundos": 5400}}),
+                                          encoding="utf-8")
+            tienda = {**TestCostos.CONFIG["tienda"], "url": "https://mitienda.com"}
+            (d / "config.json").write_text(json.dumps({**TestCostos.CONFIG, "tienda": tienda}), encoding="utf-8")
+            (d / "textos.json").write_text(json.dumps({**self.BIEN, "autor": "gemini", "revisado": True,
+                                                       "cambios": []}, ensure_ascii=False), encoding="utf-8")
+
+            def armar(*extra):
+                r = subprocess.run([sys.executable, str(SCRIPTS / "producto_tienda.py"), "--nombre", "Soporte <b>router</b>",
+                                    "--material", "PETG", "--color", "Negro", "--uso", "Colgar el router",
+                                    "--informe-gcode", str(d / "gcode.json"), "--informe-stl", str(d / "stl.json"),
+                                    "--config", str(d / "config.json"), "--margen", "40", "--salida", str(producto),
+                                    "--carpeta", "impresiones/2026-11-21_soporte_ender", *extra],
+                                   capture_output=True, text=True)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                return json.loads((producto / "publicacion.json").read_text(encoding="utf-8"))
+            pub = armar("--textos", str(d / "textos.json"))
+            pagina = (producto / "vista-previa.html").read_text(encoding="utf-8")
+            ficha = (producto / "ficha.md").read_text(encoding="utf-8")
+            woo = json.loads((producto / "producto.json").read_text(encoding="utf-8"))
+            # Sin el texto revisado, el script no lo usa
+            (d / "crudo.json").write_text(json.dumps(self.BIEN), encoding="utf-8")
+            crudo = subprocess.run([sys.executable, str(SCRIPTS / "producto_tienda.py"), "--nombre", "X",
+                                    "--salida", str(d / "otro"), "--textos", str(d / "crudo.json")],
+                                   capture_output=True, text=True)
+            sin_textos = armar("--fotos-reales", "../foto.jpg")
+        self.assertNotEqual(crudo.returncode, 0)
+        self.assertIn("textos_ia.py revisar", crudo.stderr)
+        # El texto de Gemini va antes de los datos, que salen de los informes; las palabras clave, a las etiquetas
+        self.assertEqual(woo["short_description"], self.BIEN["descripcion_corta"])
+        self.assertTrue(woo["description"].startswith("<p>Dejá el router a la vista."))
+        self.assertIn("<li>Medidas: 60 × 30 × 40 mm.</li>", woo["description"])
+        self.assertIn("Las imágenes son ilustrativas", woo["description"])
+        self.assertEqual([t["name"] for t in woo["tags"]], ["PETG", "soporte router"])
+        self.assertIn(f"**Título para Mercado Libre:** {self.BIEN['titulo']} (53/60 caracteres)", ficha)
+        self.assertIn("escrito por Gemini (gratis), revisado por Claude", ficha)
+        self.assertEqual(pub["fotos"], ["producto-1-principal.jpg", "producto-2-tienda.jpg"])
+        # La vista previa: como la página de la tienda, y abajo lo que hay que revisar
+        self.assertIn("así se vería en <strong>mitienda.com</strong>", pagina)
+        self.assertIn("Soporte &lt;b&gt;router&lt;/b&gt;", pagina)
+        self.assertNotIn("<b>router</b>", pagina)
+        self.assertIn('<img id="principal" src="producto-1-principal.jpg"', pagina)
+        self.assertIn("Imágenes ilustrativas", pagina)
+        self.assertIn("Content-Security-Policy", pagina)
+        for parte in ("(53/60 caracteres)", "fondo blanco, como pide Mercado Libre", "Mercado Libre: $ ",
+                      "lo escribió Gemini (gratis) y Claude lo revisó", "Se carga como borrador",
+                      "aprobé la publicación de «Soporte &lt;b&gt;router&lt;/b&gt;» (impresiones/2026-11-21_soporte_ender)"):
+            self.assertIn(parte, pagina)
+        # Con fotos reales van primero, y sin texto de la IA sale el de la plantilla
+        self.assertEqual(sin_textos["fotos"][0], "../foto.jpg")
+        self.assertNotIn("Las imágenes son ilustrativas", " ".join(sin_textos["puntos"]))
+        self.assertEqual(sin_textos["parrafos"], ["Colgar el router."])
+        claude = vista_publicacion.generar(sin_textos, modo="claude")
+        self.assertNotIn("Content-Security-Policy", claude)
+        self.assertIn('src="fotos/foto.jpg"', claude)
+        self.assertIn("sendToClaude", claude)
+        self.assertIn("1 foto real de la pieza", claude)
+        self.assertIn("tiene que tener fondo blanco puro", claude)
+        self.assertIn("plantilla", claude)
+        # Sin precio, lo dice; las fotos con rutas raras no entran
+        sin_precio = {**sin_textos, "producto": {**sin_textos["producto"], "regular_price": ""},
+                      "fotos": ["javascript:alert(1)", "/etc/x.jpg", "ok.jpg"],
+                      "precio": {**sin_textos["precio"], "faltan_datos": ["el precio del filamento"]}}
+        pagina = vista_publicacion.generar(sin_precio)
+        self.assertIn("Precio a definir", pagina)
+        self.assertIn("faltan el precio del filamento", pagina)
+        self.assertNotIn("javascript:", pagina)
+        self.assertNotIn("/etc/x.jpg", pagina)
+        self.assertEqual(vista_publicacion.plata(1452.2), "$ 1.452,20")
+        self.assertEqual(vista_publicacion.plata(3500), "$ 3.500")
+        with self.assertRaises(ValueError):
+            vista_publicacion.generar(sin_textos, modo="otro")
+
+
 class TestCostos(unittest.TestCase):
     CONFIG = {
         "impresora_por_defecto": "hi",
