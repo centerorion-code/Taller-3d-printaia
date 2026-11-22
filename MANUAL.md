@@ -200,7 +200,7 @@ Los comandos llevan el nombre del plugin adelante (`/taller-3d:...`): si escrib�
 
 **¿Por qué la carpeta y el G-code dicen el nombre de la impresora?** Porque un G-code sirve solo para la impresora para la que se laminó: así no se confunde, ni en la PC ni en la pantalla de la impresora.
 
-**¿Claude me puede abrir Orca?** Si tiene terminal en tu PC, te pregunta si querés que te lo abra con la pieza. Si no, abrí el `.3mf` con doble clic. Imprimir es siempre tuyo: Claude no usa la pestaña Dispositivo ni los botones Imprimir o Enviar.
+**¿Claude me puede abrir Orca?** Sí, en Linux, si corrés de nuevo el instalador del taller y aceptás el paso "Abrir Orca desde Claude y desde el panel" (después reiniciá la app de Claude). Así Claude te abre Orca con la pieza, y el botón "Abrila en Orca" del panel la abre directo (la primera vez la app te pide permiso). Si no está, tocá el enlace o abrí el `.3mf` con doble clic. Imprimir es siempre tuyo: Claude no usa la pestaña Dispositivo ni los botones Imprimir o Enviar.
 
 **¿Gasta mi plan de Claude?** Sí: diseñar y ajustar consume uso de tu plan. Un pedido claro y con medidas ahorra vueltas.
 

@@ -56,7 +56,7 @@ Por ahora el taller se instala desde este repositorio de GitHub. Se hace en **Cl
 
 - **En el espacio de Claude:** los scripts de Python de `skills/impresion-3d/scripts/` diseñan las piezas (`cad.py`), revisan el STL y el G-code, validan los perfiles de Orca, calculan costos y precios, comparan tu Orca con lo que conoce el taller y arman el panel. Para el CAD y las imágenes instala `manifold3d`, `numpy`, `matplotlib` y `Pillow` con pip, ahí mismo; para las fotos de producto, el módulo de Blender (`bpy`, unos 400 MB), solo cuando hace falta.
 - **En tu PC, los bloqueos automáticos** (`hooks/guardia.py`, en Cowork y Claude Code): corren con Python antes de que Claude escriba un archivo o use la terminal, leen solo ese archivo o ese comando y bloquean si no pasan la revisión. No mandan nada a ningún lado.
-- **Qué toca en tu PC:** solo las carpetas que conectás (la de trabajo y las de perfiles de usuario de Orca), con respaldo antes de cambiar algo. Lamina con tu OrcaSlicer a través de orca-mcp, que se instala aparte; no viene en el plugin. Blender (por su MCP) es opcional.
+- **Qué toca en tu PC:** solo las carpetas que conectás (la de trabajo y las de perfiles de usuario de Orca), con respaldo antes de cambiar algo. Lamina con tu OrcaSlicer a través de orca-mcp, que se instala aparte; no viene en el plugin. Blender (por su MCP) es opcional. En Linux, el instalador puede agregar `taller3d-orca`, un programa chico del propio taller que solo abre la ventana de Orca con el proyecto de una pieza de tu carpeta, para que Claude y los botones del panel te la muestren.
 - **Qué baja el instalador**, solo si lo corrés vos: OrcaSlicer 2.5.1 desde el GitHub de OrcaSlicer y uv 0.13.9 desde el GitHub de Astral (solo Windows), los dos con huella SHA-256 fija; orca-mcp 0.1.0 y sus dependencias desde PyPI; en Linux, si aceptás, paquetes del sistema con apt (fuse3, bibliotecas de Orca, pipx, xvfb). Agrega orca-mcp a la configuración de la app de Claude, con respaldo, y en Windows mueve la carpeta de datos de Orca fuera de AppData.
 - **Qué manda a internet:** nada por su cuenta y sin telemetría. Lo único que sale es la publicación de un producto en **tu** tienda (WooCommerce, Tiendanube, Shopify o Mercado Libre), cuando lo pedís y siempre como borrador, por la conexión o el navegador que uses vos, y, si lo aceptás, el panel al costado del chat, como página privada en tu cuenta de claude.ai. Claude también busca en la web cuando revisa si hay versiones o plugins nuevos de Orca, o la comisión de tu canal de venta.
 
@@ -74,7 +74,7 @@ Ubuntu 24.04, OrcaSlicer 2.5.1, orca-mcp 0.1.0, Creality Ender-3 V3 Plus. El ins
 
 ## Versión
 
-0.1.16. Cambios en [CHANGELOG.md](CHANGELOG.md).
+0.1.17. Cambios en [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 

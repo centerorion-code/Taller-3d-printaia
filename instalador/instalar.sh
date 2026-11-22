@@ -30,7 +30,7 @@
 #     --sin-app         no tocar la configuración de la app de Claude
 set -euo pipefail
 
-VERSION_PLUGIN="0.1.16"
+VERSION_PLUGIN="0.1.17"
 ORCA_VERSION="2.5.1"
 ORCA_ARCHIVO="OrcaSlicer_Linux_AppImage_Ubuntu2404_V${ORCA_VERSION}.AppImage"
 ORCA_URL="https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v${ORCA_VERSION}/${ORCA_ARCHIVO}"
@@ -548,6 +548,31 @@ if [ "$ORCA_TIPO" = flatpak ]; then
   fi
 fi
 
+# --- 4b. Abrir Orca desde Claude y desde el panel ------------------------------------------------
+# abrir_orca.py: servidor MCP chico (solo Python, sin dependencias) con una herramienta, abrir_en_orca, que abre en
+# la ventana de Orca un .3mf de la carpeta de trabajo. No lamina, no imprime, no escribe archivos.
+paso "Abrir Orca desde Claude y desde el panel"
+SERVIDOR_ORCA=""
+ORCA_VENTANA="$ORCA_PARA_MCP"
+if [ -z "$ORCA_VENTANA" ] && [ "$APP_TIENE_MCP" -eq 1 ]; then          # el mismo Orca que ya usa tu orca-mcp
+  ORCA_VENTANA="$(python3 -c 'import json,sys; s=(json.load(open(sys.argv[1])).get("mcpServers") or {}).get("orca-mcp") or {}; print((s.get("env") or {}).get("ORCASLICER_PATH", ""))' "$CONFIG_APP" 2>/dev/null || true)"
+fi
+if [ ! -f "$AQUI/abrir_orca.py" ]; then
+  info "No está abrir_orca.py al lado del instalador: salteo este paso."
+elif [ -z "$ORCA_VENTANA" ] || [ ! -x "$ORCA_VENTANA" ]; then
+  info "No encontré el programa de Orca para abrir su ventana: salteo este paso."
+else
+  info "Deja que Claude y los botones del panel te abran Orca con el proyecto .3mf de una pieza."
+  info "Solo abre la ventana (no lamina, no imprime, no manda nada a la impresora) y solo proyectos de"
+  info "$CARPETA_TRABAJO. Lo hace abrir_orca.py, un programa chico de Python que arranca la app de Claude."
+  if preguntar_si "¿Lo instalo?"; then
+    SERVIDOR_ORCA="$HOME/.local/share/taller-3d/abrir_orca.py"
+    hacer mkdir -p "$(dirname "$SERVIDOR_ORCA")"
+    hacer install -m 0644 "$AQUI/abrir_orca.py" "$SERVIDOR_ORCA"
+    grep -qxF "$(printf 'archivo\t%s' "$SERVIDOR_ORCA")" "$MANIFIESTO" 2>/dev/null || anotar archivo "$SERVIDOR_ORCA"
+  fi
+fi
+
 # --- 5. App de Claude ----------------------------------------------------------------------------
 paso "Conexión con la app de Claude"
 TEMPORAL_MCP=""
@@ -557,7 +582,8 @@ if [ "${ORCA_TIPO:-}" = "flatpak" ]; then
   hacer mkdir -p "$TEMPORAL_MCP"
 fi
 ENTRADA="$(ORCA_MCP_BIN="$ORCA_MCP_BIN" ORCA_PARA_MCP="$ORCA_PARA_MCP" DATOS_ORCA="${DATOS_ORCA:-}" \
-  TEMPORAL_MCP="$TEMPORAL_MCP" python3 -c '
+  TEMPORAL_MCP="$TEMPORAL_MCP" SERVIDOR_ORCA="$SERVIDOR_ORCA" ORCA_VENTANA="$ORCA_VENTANA" \
+  CARPETA_TRABAJO="$CARPETA_TRABAJO" PYTHON="$(command -v python3)" python3 -c '
 import json, os
 e = {"command": os.environ["ORCA_MCP_BIN"]}
 env = {}
@@ -569,18 +595,24 @@ if os.environ.get("TEMPORAL_MCP"):
     env["TMPDIR"] = os.environ["TEMPORAL_MCP"]
 if env:
     e["env"] = env
-print(json.dumps({"mcpServers": {"orca-mcp": e}}, indent=2))')"
-info "Esta es la entrada para la app de Claude (Configuración → Desarrollador → Editar configuración):"
+servidores = {"orca-mcp": e}
+if os.environ.get("SERVIDOR_ORCA"):
+    servidores["taller3d-orca"] = {
+        "command": os.environ["PYTHON"], "args": ["-I", os.environ["SERVIDOR_ORCA"]],
+        "env": {"TALLER3D_CARPETA": os.environ["CARPETA_TRABAJO"],
+                "TALLER3D_ORCA": json.dumps([os.environ["ORCA_VENTANA"]], ensure_ascii=False)}}
+print(json.dumps({"mcpServers": servidores}, indent=2, ensure_ascii=False))')"
+info "Estas son las entradas para la app de Claude (Configuración → Desarrollador → Editar configuración):"
 echo "$ENTRADA"
 if [ "$SIN_APP" -eq 0 ] && [ -d "$HOME/.config/Claude" ]; then
-  if [ "$APP_TIENE_MCP" -eq 1 ]; then
+  if [ "$APP_TIENE_MCP" -eq 1 ] && [ -z "$SERVIDOR_ORCA" ]; then
     info "La app ya tiene un orca-mcp configurado: no lo cambio."
-  elif preguntar "¿La agrego yo a $CONFIG_APP? (hago una copia de respaldo antes)"; then
+  elif preguntar "¿Las agrego yo a $CONFIG_APP? (hago una copia de respaldo antes; un orca-mcp que ya tengas no lo toco)"; then
     if pgrep -u "$(id -u)" -f '(^|/)(claude-desktop|Claude)( |$)' >/dev/null 2>&1; then
       read -r -p "   Cerrá la app de Claude (también desde la bandeja) y apretá Enter: " _
     fi
     [ -f "$CONFIG_APP" ] && cp "$CONFIG_APP" "$CONFIG_APP.respaldo-$(date +%Y%m%d-%H%M%S)"
-    if ENTRADA="$ENTRADA" python3 - "$CONFIG_APP" <<'EOF_PY'
+    if AGREGADAS="$(ENTRADA="$ENTRADA" python3 - "$CONFIG_APP" <<'EOF_PY'
 import json, os, sys
 ruta = sys.argv[1]
 try:
@@ -593,15 +625,24 @@ if not isinstance(actual, dict):
     sys.exit("La configuración de la app no tiene el formato esperado: agregá la entrada a mano.")
 if not isinstance(actual.get("mcpServers"), dict):
     actual["mcpServers"] = {}
-actual["mcpServers"].update(nuevo["mcpServers"])
+agregadas = []
+for nombre, entrada in nuevo["mcpServers"].items():
+    if nombre == "orca-mcp" and nombre in actual["mcpServers"]:
+        continue                                   # el orca-mcp que ya tenías no se toca
+    actual["mcpServers"][nombre] = entrada
+    agregadas.append(nombre)
 with open(ruta, "w", encoding="utf-8") as f:
     json.dump(actual, f, ensure_ascii=False, indent=2)
+print("\n".join(agregadas))
 EOF_PY
-    then
-      anotar mcp-app "$CONFIG_APP"
+)"; then
+      if grep -qx orca-mcp <<<"$AGREGADAS"; then anotar mcp-app "$CONFIG_APP"; fi
+      if grep -qx taller3d-orca <<<"$AGREGADAS" && ! grep -qxF "$(printf 'mcp-app-orca\t%s' "$CONFIG_APP")" "$MANIFIESTO" 2>/dev/null; then
+        anotar mcp-app-orca "$CONFIG_APP"
+      fi
       info "Listo. Abrí la app de Claude para que tome el cambio."
     else
-      info "No pude agregarla: copiá la entrada de arriba a mano (tu configuración quedó como estaba)."
+      info "No pude agregarlas: copiá las entradas de arriba a mano (tu configuración quedó como estaba)."
     fi
   fi
 fi

@@ -304,6 +304,22 @@ def _en_una_linea(texto, largo: int = 80) -> str:
     return limpio if len(limpio) <= largo else limpio[:largo - 1].rstrip() + "…"
 
 
+ABRIR_EN_ORCA = "Abrila en Orca"
+# El servidor MCP local que abre Orca (instalador/abrir_orca.py), como lo nombra la página del panel en la app.
+SERVIDOR_ORCA = "host:taller3d-orca"
+RE_PROYECTO = re.compile(r"^(?:impresiones|disenos)/\d{4}-\d{2}-\d{2}_[^/\\]+/[^/\\]+\.3mf$")
+
+
+def proyecto_de(p: dict) -> str | None:
+    """El proyecto de Orca (.3mf) de la pieza, relativo a la carpeta de trabajo: el que abre "Abrila en Orca"."""
+    for archivo in p.get("archivos") or []:
+        ruta = f"{p.get('carpeta')}/{archivo}"
+        if (isinstance(archivo, str) and not archivo.lower().endswith(".gcode.3mf") and RE_PROYECTO.match(ruta)
+                and ".." not in ruta.split("/") and not re.search(r"[\x00-\x1f\x7f]", ruta)):
+            return ruta
+    return None
+
+
 def acciones(p: dict) -> list[tuple[str, str]]:
     """Los botones de la tarjeta: (etiqueta, pedido a Claude). El pedido nombra la pieza y su carpeta.
 
@@ -319,7 +335,7 @@ def acciones(p: dict) -> list[tuple[str, str]]:
     if "laminada" not in h:
         return [("Dejala lista para imprimir", f"Desde el panel: dejá {cual} lista para imprimir en mi impresora.")]
     if "impresa" not in h:
-        return [("Abrila en Orca", f"Desde el panel: abrí {cual} en Orca para que la vea."),
+        return [(ABRIR_EN_ORCA, f"Desde el panel: abrí {cual} en Orca para que la vea."),
                 ("Ya la imprimí", f"Desde el panel: ya imprimí {cual}. Marcala como impresa y preguntame cómo salió.")]
     if "en_tienda" not in h:
         return [("Publicala", f"Desde el panel: armá la publicación de {cual} para la tienda.")]
@@ -529,9 +545,37 @@ GUION = """
                 avisar(el,'No se envió: '+(motivos[c]||'algo falló ('+(c||'error')+')')+'. Si querés, pegalo en el chat: '+texto);});
     }).catch(function(){copiar(el,texto);}).then(function(){el.disabled=false;});
   }
+  // "Abrila en Orca": si la app de Claude deja que la página use el servidor local taller3d-orca de la PC, Orca se
+  // abre sin pasar por el chat; si no (navegador, celular, sin el servidor), el pedido va a Claude como los demás.
+  var SERVIDOR_ORCA='host:taller3d-orca',orca=null;     // = SERVIDOR_ORCA de catalogo.py
+  function abrirEnOrca(el,ruta,texto){
+    if(!orca){pedir(el,texto);return;}
+    el.disabled=true;avisar(el,'Abriendo Orca en tu PC…');
+    orca.callTool(SERVIDOR_ORCA,'abrir_en_orca',{ruta:ruta},{cache:false}).then(function(r){
+      var p=r&&r.payload;avisar(el,(p&&p.mensaje)||'Listo: se abre Orca con la pieza.');el.disabled=false;
+    },function(err){
+      var c=err&&err.code,p=err&&err.result&&err.result.structuredContent;el.disabled=false;
+      if(c==='tool_error'){avisar(el,'No la abrí: '+((p&&p.mensaje)||'Orca no la pudo abrir.'));}
+      else if(c==='cancelled'){avisar(el,'No la abrí: no lo confirmaste en la app de Claude.');}
+      else if(c==='server_unavailable'||c==='upstream_error'||c==='rate_limited'){
+        avisar(el,'No sé si se abrió: la app no contestó. Si no aparece Orca, tocá de nuevo.');}
+      else{orca=null;pedir(el,texto);}          // nunca llegó a la PC: se lo pido a Claude
+    });
+  }
   document.querySelectorAll('[data-pedido]').forEach(function(b){
-    b.addEventListener('click',function(){pedir(b,b.getAttribute('data-pedido'));});
+    b.addEventListener('click',function(){
+      var ruta=b.getAttribute('data-orca');
+      if(ruta){abrirEnOrca(b,ruta,b.getAttribute('data-pedido'));}else{pedir(b,b.getAttribute('data-pedido'));}
+    });
   });
+  if(window.claude&&typeof window.claude.use==='function'&&document.querySelector('[data-orca]')){
+    window.claude.use('mcp').then(function(m){
+      if(!m){return;}
+      return m.listTools(SERVIDOR_ORCA).then(function(r){   // fuera de la app de escritorio no aparece
+        if(((r&&r.servers)||[]).some(function(s){return s.server===SERVIDOR_ORCA;})){orca=m;}
+      });
+    }).catch(function(){});
+  }
   document.querySelectorAll('[data-comentar]').forEach(function(b){b.addEventListener('click',function(){
     if(com){com.openComposer({element:lugar(b)}).catch(function(){});}
   });});
@@ -612,8 +656,12 @@ def _tarjeta(p: dict, modo: str = "archivo", imagenes: dict | None = None) -> st
     tienda = url_segura(p.get("url_tienda")) if isinstance(p.get("url_tienda"), str) else None
     if tienda:                                           # se revisa también acá: el índice se puede tocar a mano
         enlaces += f'<a href="{e(tienda)}" rel="noopener noreferrer">en la tienda</a>'
-    botones = "".join(f'<button type="button" data-pedido="{e(pedido)}">{e(etiqueta)}</button>'
-                      for etiqueta, pedido in acciones(p))
+    # En claude.ai, "Abrila en Orca" lleva su .3mf (relativo a la carpeta de trabajo, sin rutas de la PC): la página
+    # le pide a la app de Claude que lo abra con el servidor local taller3d-orca; si no puede, se lo pide a Claude.
+    proyecto = proyecto_de(p) if modo == "claude" else None
+    botones = "".join(f'<button type="button" data-pedido="{e(pedido)}"'
+                      + (f' data-orca="{e(proyecto)}"' if proyecto and etiqueta == ABRIR_EN_ORCA else "")
+                      + f'>{e(etiqueta)}</button>' for etiqueta, pedido in acciones(p))
     botones += '<button type="button" class="solo-claude" data-comentar>Otra cosa…</button>'
     fecha = p.get("fecha") or ""
     texto = " ".join(str(x) for x in (nombre, p.get("material"), p.get("color"), p.get("impresora"), p.get("nota"),

@@ -21,6 +21,7 @@ Con `get_device_info` y las herramientas de Orca, armar una tabla corta de estad
 | Configuración | existe `<trabajo>/taller-3d/config.json` y tiene `aceptacion` e `impresoras` |
 | Impresoras | `list_profiles` (machine): cuáles hay en Orca; en `config.json`, cuáles están preparadas (su `datos` es un JSON en `taller-3d/impresoras/` que pasa `impresora.py validar`). Si `datos` es un id viejo (`ender-3-v3-plus`), prepararla de nuevo con `/impresoras` |
 | Windows: datos de Orca | si la plataforma es Windows, la carpeta de perfiles conectada **no** tiene que estar bajo `AppData` (ver sección 2) |
+| Abrir Orca desde Claude y el panel (opcional, Linux) | `localMcpServers`: `taller3d-orca` `announced`. Si falta, decir que corriendo de nuevo el instalador (paso "Abrir Orca desde Claude y desde el panel") Claude y los botones del panel le abren Orca con la pieza |
 | Blender (opcional) | `localMcpServers` |
 
 Si todo está bien, decirlo y ofrecer la pieza de prueba (paso 5). Si algo falta, seguir solo con lo que corresponda.
@@ -33,7 +34,7 @@ Dejar el instalador del sistema en la PC y explicar en 5 líneas qué hace: ante
 
 1. Pedir acceso a una carpeta conocida (por ejemplo, Descargas) si no hay ninguna conectada.
 2. Copiar a `/mnt/user-data/outputs/taller-3d/instalador/` y commitear juntos a `<carpeta>/taller-3d-instalador/`, más `DISCLAIMER.md` e `INSTALACION.md`:
-   - **Linux:** `instalar.sh` y `desinstalar.sh`. Indicar: abrir una terminal ahí, correr `bash instalar.sh --prueba`, leer, y después `bash instalar.sh`.
+   - **Linux:** `instalar.sh`, `desinstalar.sh` y `abrir_orca.py` (el programa que deja a Claude y al panel abrir la ventana de Orca: va al lado de `instalar.sh`). Indicar: abrir una terminal ahí, correr `bash instalar.sh --prueba`, leer, y después `bash instalar.sh`. Si ya estaba instalado, saltea lo que hay y suma lo nuevo.
    - **Windows:** `instalar.ps1`, `desinstalar.ps1`, `instalar-windows.bat` y `desinstalar-windows.bat`. Indicar: doble clic en `instalar-windows.bat` (si Windows muestra un aviso, "Más información" → "Ejecutar de todos modos"); para ver antes qué haría, abrir PowerShell en la carpeta y correr `.\instalar-windows.bat -Prueba`. Avisar que el instalador de Windows no se probó en una PC real todavía.
    - **macOS:** guiar con la sección C de `INSTALACION.md` (sin instalador; decirlo).
 3. Al terminar, que cierre y abra la app de Claude y vuelva a escribir `/taller-3d:instalar` (en la app los comandos llevan el prefijo del plugin).

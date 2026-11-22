@@ -721,6 +721,25 @@ class TestPanelEnClaude(unittest.TestCase):
         self.assertIn("Te paso mi boleta de luz para el precio del kWh", con_taller)
         self.assertNotIn('class="taller"', archivo)
 
+    def test_abrila_en_orca_desde_la_pagina(self):
+        """En claude.ai, "Abrila en Orca" lleva el .3mf relativo a la carpeta de trabajo para el servidor local
+        taller3d-orca; en panel.html no (ahí los botones copian el pedido)."""
+        import catalogo as cat
+        c = {"version": 1, "piezas": []}
+        lista = cat.agregar(c, "impresiones/2026-11-21_soporte_creality-hi", nombre="Soporte",
+                            archivos=["soporte_creality-hi.gcode", "soporte_creality-hi.3mf", "vista.png"])
+        sin = cat.agregar(c, "impresiones/2026-11-20_tapa_creality-hi", nombre="Tapa", archivos=["tapa_creality-hi.gcode"])
+        self.assertEqual(cat.proyecto_de(lista), "impresiones/2026-11-21_soporte_creality-hi/soporte_creality-hi.3mf")
+        self.assertIsNone(cat.proyecto_de(sin))
+        self.assertIsNone(cat.proyecto_de({"carpeta": "impresiones/2026-11-21_x", "archivos": ["../../fuera.3mf"]}))
+        self.assertIsNone(cat.proyecto_de({"carpeta": "../afuera", "archivos": ["x.3mf"]}))
+        self.assertIsNone(cat.proyecto_de({"carpeta": "impresiones/2026-11-21_x", "archivos": ["x.gcode.3mf"]}))
+        claude = cat.generar_html(c, modo="claude")
+        self.assertEqual(claude.count("data-orca="), 1)
+        self.assertIn('data-orca="impresiones/2026-11-21_soporte_creality-hi/soporte_creality-hi.3mf"', claude)
+        self.assertIn(f"'{cat.SERVIDOR_ORCA}'", claude)
+        self.assertNotIn("data-orca=", cat.generar_html(c))
+
 
 class TestFotosDeProducto(unittest.TestCase):
     def test_componer_sin_blender(self):

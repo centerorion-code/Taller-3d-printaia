@@ -34,7 +34,7 @@ Más adelante el taller va a estar también en el directorio de plugins de Anthr
 
 1. Sumá el plugin a Claude (sección anterior), si todavía no lo hiciste.
 2. Conseguí el instalador: en Claude escribí `/taller-3d:instalar` y te lo deja en una carpeta de tu PC. También lo podés bajar de GitHub: en la página del repositorio, **Code → Download ZIP**; descomprimilo y usá la carpeta `instalador/`.
-3. Abrí una terminal en esa carpeta y corré primero el modo prueba, que muestra todo lo que haría sin cambiar nada:
+3. Abrí una terminal en esa carpeta y corré primero el modo prueba, que muestra todo lo que haría sin cambiar nada (si ya lo tenías instalado, correrlo de nuevo saltea lo que ya está y suma lo nuevo, como abrir Orca desde el panel):
    ```bash
    bash instalar.sh --prueba
    ```

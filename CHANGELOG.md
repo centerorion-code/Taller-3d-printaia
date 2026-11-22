@@ -1,5 +1,16 @@
 # Cambios
 
+## 0.1.17 (2026-11-21)
+
+- **"Abrila en Orca" abre Orca de verdad** (Linux). El instalador puede agregar `taller3d-orca` (`instalador/abrir_orca.py`), un programa chico del taller que la app de Claude arranca como servidor MCP local. Hace una sola cosa: abrir en la ventana de Orca el proyecto `.3mf` de una pieza de tu carpeta de trabajo.
+  - **Desde Claude:** cuando pedís ver la pieza, o tocás el botón del panel y el pedido llega al chat, Claude la abre con ese programa.
+  - **Directo desde el panel al costado:** si la app de escritorio deja que la página use el programa, el botón abre Orca sin pasar por el chat. La primera vez la app te pide permiso. Si no puede, el pedido va a Claude como antes.
+  - **Seguridad:**
+    - solo abre `.3mf` de tu carpeta, sin scripts, con el Orca que el instalador configuró;
+    - no lamina, no imprime y no escribe nada;
+    - rechaza rutas de afuera, enlaces y nombres de archivo armados para colar comandos.
+  - **Para tenerlo:** corré de nuevo el instalador en Linux (saltea lo que ya está) y reiniciá la app de Claude. En Windows todavía no está: el botón le pasa el pedido a Claude, que te da el enlace al `.3mf`.
+
 ## 0.1.16 (2026-11-21)
 
 Correcciones de una revisión independiente de la 0.1.15.

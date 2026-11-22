@@ -75,7 +75,7 @@ if [ "$PRUEBA" -eq 1 ]; then echo "Modo prueba: no cambié nada."; exit 0; fi
 read -r -p "¿Lo quito? Va todo a la papelera. Escribí QUITAR para confirmar: " r
 [ "$r" = "QUITAR" ] || { echo "No cambié nada."; exit 0; }
 
-if grep -q $'^mcp-app\t' "$MANIFIESTO" && app_de_claude_abierta; then
+if grep -qE $'^mcp-app(-orca)?\t' "$MANIFIESTO" && app_de_claude_abierta; then
   read -r -p "Cerrá la app de Claude (también desde la bandeja) y apretá Enter para seguir: " _
 fi
 
@@ -97,23 +97,25 @@ while IFS=$'\t' read -r tipo valor <&3; do
       if command -v flatpak >/dev/null && flatpak override --user --nofilesystem="$carpeta" "$id"; then
         echo "Quitado el permiso de $id para $carpeta"
       fi ;;
-    mcp-app)
+    mcp-app|mcp-app-orca)
+      # mcp-app: la entrada orca-mcp; mcp-app-orca: la de taller3d-orca (abrir Orca desde Claude y el panel)
+      if [ "$tipo" = mcp-app ]; then entrada=orca-mcp; else entrada=taller3d-orca; fi
       if ! ruta_segura "$valor"; then echo "No toco '$valor': está fuera de tu carpeta personal."
       elif [ -f "$valor" ]; then
         cp -- "$valor" "$valor.respaldo-$(date +%Y%m%d-%H%M%S)"
-        if python3 - "$valor" <<'EOF_PY'
+        if python3 - "$valor" "$entrada" <<'EOF_PY'
 import json, sys
-ruta = sys.argv[1]
+ruta, entrada = sys.argv[1], sys.argv[2]
 with open(ruta, encoding="utf-8") as f:
     datos = json.load(f)
 servidores = datos.get("mcpServers") if isinstance(datos, dict) else None
 if isinstance(servidores, dict):
-    servidores.pop("orca-mcp", None)
+    servidores.pop(entrada, None)
 with open(ruta, "w", encoding="utf-8") as f:
     json.dump(datos, f, ensure_ascii=False, indent=2)
 EOF_PY
-        then echo "Quitado orca-mcp de la app de Claude (respaldo al lado). Abrí la app de nuevo."
-        else echo "No pude editar $valor: sacá a mano la entrada \"orca-mcp\" (hay un respaldo al lado)."; fi
+        then echo "Quitado $entrada de la app de Claude (respaldo al lado). Abrí la app de nuevo."
+        else echo "No pude editar $valor: sacá a mano la entrada \"$entrada\" (hay un respaldo al lado)."; fi
       fi ;;
     carpeta)
       if [ "$TODO" -eq 1 ] && [ -d "$valor" ]; then

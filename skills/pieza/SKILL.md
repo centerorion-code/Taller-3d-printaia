@@ -105,12 +105,14 @@ Revisar:
 - Cómo imprimir: pasar `<archivo>.gcode` por USB o por la app de la impresora y arrancar desde la impresora. **No arrancarla nunca desde acá.**
 - Para verla o tocarla en Orca: tocar el enlace del `<archivo>.3mf` o abrirlo con doble clic; se abre con la impresora, el filamento, el proceso y la cama elegidos. Si Orca ya estaba abierto desde antes de que se crearan los perfiles AUTO, cerrarlo primero: si no, los muestra como cambios sobre el perfil de sistema (con los mismos valores).
 
-**Abrir Orca con la pieza** (opcional): solo si hay `device_bash` en la PC y después de preguntar "¿Te abro Orca con la pieza?". Si dice que sí, lanzarlo en segundo plano con el proyecto, con `orca.ejecutable` de `config.json`:
+**Abrir Orca con la pieza** (opcional): preguntar "¿Te abro Orca con la pieza?" (si el usuario ya lo pidió, por ejemplo con el botón del panel, no preguntar). Si dice que sí:
+- **Con `taller3d-orca`** (`get_device_info` lo muestra `announced`): llamar `abrir_en_orca` con la ruta del `.3mf` relativa a la carpeta de trabajo (`<carpeta>/<archivo>.3mf`). Contesta si la abrió o por qué no (y no abre dos veces la misma en pocos segundos).
+- **Si no está, con `device_bash`**, lanzarlo en segundo plano con el proyecto, con `orca.ejecutable` de `config.json`:
 - Linux, solo con sesión gráfica (`[ -n "$DISPLAY$WAYLAND_DISPLAY" ]`): `nohup "<ejecutable>" "<ruta del .3mf>" >/dev/null 2>&1 &` (Flatpak: `nohup flatpak run com.orcaslicer.OrcaSlicer "<ruta del .3mf>" >/dev/null 2>&1 &`).
 - Windows (PowerShell): `Start-Process -FilePath "<ejecutable>" -ArgumentList '"<ruta del .3mf>"'`.
 - macOS: `open -a OrcaSlicer "<ruta del .3mf>"`.
 
-Si no se puede (sin sesión gráfica, sin ejecutable o sin `device_bash`), decir en una línea: "Tocá el enlace o abrí `<archivo>.3mf` con doble clic", con el enlace `computer://` al archivo. Abrir la ventana está bien; imprimir es del usuario (skill `impresion-3d`, regla 1): nunca usar la pestaña Dispositivo (Device) de Orca ni sus botones Imprimir o Enviar, tampoco con el control del escritorio.
+Si no se puede (sin `taller3d-orca`, sin sesión gráfica, sin ejecutable o sin `device_bash`), decir en una línea: "Tocá el enlace o abrí `<archivo>.3mf` con doble clic", con el enlace `computer://` al archivo, y una vez por conversación que corriendo de nuevo el instalador del taller (Linux) Claude y el panel pueden abrir Orca solos. Abrir la ventana está bien; imprimir es del usuario (skill `impresion-3d`, regla 1): nunca usar la pestaña Dispositivo (Device) de Orca ni sus botones Imprimir o Enviar, tampoco con el control del escritorio.
 
 Registrar la entrega en `historial.csv` y actualizar el panel (skill `panel`, "Agregar o actualizar una pieza"; con `--de-idea` si salió de una idea anotada) con `--impresora "<nombre de la impresora>"`, `informe_gcode.json`, `informe_stl.json` y los archivos de la carpeta (`<archivo>.gcode`, `<archivo>.3mf`, `pieza.stl`, `pieza.py`, `vista.png`, `informe.md`).
 
