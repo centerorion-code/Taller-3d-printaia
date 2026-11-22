@@ -25,7 +25,7 @@ Uso:
       --nombre "Soporte para router" [--tipo impresion|diseno] [--material PETG] [--color negro] \\
       [--informe-gcode informe_gcode.json] [--informe-stl informe_stl.json] [--producto publicacion.json] \\
       [--archivos pieza.stl pieza.py vista.png informe.md] [--imagen vista.png] \\
-      [--estado disenada|laminada|impresa|en_tienda] [--nota "..."] [--url-tienda https://...] [--id-tienda 123] [--moneda ARS]
+      [--estado disenada|laminada|impresa|en_tienda] [--nota "..."] [--url-tienda https://...] [--id-tienda 123] [--estado-publicacion borrador] [--moneda ARS]
 
   # Anotar una idea para más adelante (y quitarla si el usuario la descarta)
   python3 catalogo.py idea --catalogo catalogo.json --nombre "Soporte para la tele" [--nota "..."] [--impresora X]
@@ -167,12 +167,54 @@ def datos_de_informes(gcode: dict, stl: dict, producto: dict) -> dict:
             d["revision"] = gcode["estado"]
         d["estado"] = "laminada"
     if isinstance(producto.get("producto"), dict):       # publicacion.json (0.1.30) trae el producto adentro
+        d["publicacion"] = publicacion_de(producto)
         producto = producto["producto"]
-    if producto:
+        if producto.get("regular_price"):
+            d["precio"] = {"valor": producto["regular_price"]}
+            if d["publicacion"]["precio"].get("moneda"):
+                d["precio"]["moneda"] = d["publicacion"]["precio"]["moneda"]
+        # Armar la publicación no es tenerla en la tienda: eso lo dice su estado (borrador o publicada).
+    elif producto:                                       # producto.json de antes de la 0.1.30
         if producto.get("regular_price"):
             d["precio"] = {"valor": producto["regular_price"]}
         d["estado"] = "en_tienda"
     return d
+
+
+# Dónde está la publicación de una pieza: armada acá (vista previa), cargada como borrador o ya publicada.
+ESTADOS_PUBLICACION = {"vista_previa": "Vista previa, sin cargar en la tienda", "borrador": "Borrador en la tienda",
+                       "publicada": "Publicada"}
+VISTA_PUBLICACION = "producto/vista-previa.html"
+
+
+def publicacion_de(pub: dict) -> dict:
+    """Lo que el panel muestra de una publicación, sacado de publicacion.json (producto_tienda.py)."""
+    producto = pub.get("producto") or {}
+    pr = pub.get("precio") or {}
+    canal = (pr.get("canales") or {}).get(pr.get("canal")) or {}
+    fotos = [f for f in pub.get("fotos") or [] if isinstance(f, str)]
+    d = {"titulo": str(producto.get("name") or ""), "vista": VISTA_PUBLICACION, "fotos": len(fotos),
+         "fotos_reales": int(pub.get("fotos_reales") or 0),
+         "precio": {"valor": producto.get("regular_price") or None, "moneda": pr.get("moneda"),
+                    "con_iva": bool(pr.get("con_iva"))}}
+    if fotos:                                            # relativa a la carpeta de la pieza (las reales van con ../)
+        primera = fotos[0]
+        d["foto"] = primera[3:] if primera.startswith("../") else f"producto/{primera}"
+    if "error" not in canal and canal.get("ganancia") is not None:
+        d["ganancia"] = {"valor": canal["ganancia"], "margen_pct": canal.get("margen_real_pct")}
+    if producto.get("sku"):
+        d["sku"] = str(producto["sku"])
+    return d
+
+
+def estado_publicacion(pieza: dict) -> str | None:
+    """vista_previa, borrador o publicada; None si la pieza no tiene publicación armada."""
+    pub = pieza.get("publicacion")
+    if not isinstance(pub, dict):
+        return None
+    if pub.get("estado") in ("borrador", "publicada"):
+        return pub["estado"]
+    return "borrador" if pieza.get("id_tienda") else "vista_previa"      # con número en la tienda, ya está cargada
 
 
 def agregar(catalogo: dict, carpeta: str, de_idea: str | None = None, **campos) -> dict:
@@ -382,14 +424,18 @@ def desde_listado(catalogo: dict, listado) -> list[str]:
         estado = "disenada"
         if any(a.lower().endswith((".gcode", ".gco", ".gcode.3mf")) for a in archivos):
             estado = "laminada"
-        if any(a.lower().startswith("producto/") for a in archivos):
+        en_producto = {a.lower() for a in archivos if a.lower().startswith("producto/")}
+        armada = bool(en_producto & {"producto/publicacion.json", VISTA_PUBLICACION})
+        if en_producto and not armada:                    # producto.json de antes de la 0.1.30
             estado = "en_tienda"
         impresa = any(es_foto_impresa(a) for a in archivos)   # una foto de la pieza impresa
         if carpeta in existentes:
-            agregar(catalogo, carpeta, archivos=archivos, impresa=impresa or None)
+            pieza = agregar(catalogo, carpeta, archivos=archivos, impresa=impresa or None)
         else:
-            agregar(catalogo, carpeta, archivos=archivos, estado=estado, impresa=impresa or None)
+            pieza = agregar(catalogo, carpeta, archivos=archivos, estado=estado, impresa=impresa or None)
             nuevas.append(carpeta)
+        if armada and not isinstance(pieza.get("publicacion"), dict):
+            pieza["publicacion"] = {"vista": VISTA_PUBLICACION} if VISTA_PUBLICACION in en_producto else {}
     return nuevas
 
 
@@ -497,6 +543,12 @@ footer{max-width:1200px;margin:0 auto;padding:0 24px 32px;color:var(--suave);fon
 .acciones button:first-child,form.idea button{background:var(--tinta);color:#fff}
 .acciones button:disabled,form.idea button:disabled,.desde-foto button:disabled{opacity:.55;cursor:progress}
 .acciones .solo-claude{display:none}
+.acciones a.boton{display:inline-flex;align-items:center;min-height:40px;padding:6px 12px;border:1.5px solid var(--tinta);border-radius:999px;background:#fff;color:var(--tinta);font-size:14px;text-decoration:none}
+.acciones a.boton:first-child{background:var(--tinta);color:#fff}
+.estado-publi{margin:0;font-size:14px;font-weight:600}
+.estado-publi::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;border:1.5px solid var(--tinta);background:#fff}
+.estado-publi.borrador::before{background:var(--acento)}
+.estado-publi.publicada::before{background:var(--tinta)}
 body.con-claude .acciones .solo-claude{display:inline-block}
 .aviso{margin:0;font-size:13px;color:var(--suave)}
 .aviso:empty{display:none}
@@ -730,6 +782,65 @@ def _tarjeta(p: dict, modo: str = "archivo", imagenes: dict | None = None) -> st
 </article>"""
 
 
+def _publicacion(p: dict, modo: str = "archivo", imagenes: dict | None = None) -> str:
+    """La tarjeta de una publicación: foto, título, precio, ganancia, dónde está y los botones para verla,
+    cargarla o cambiarla. Los pedidos van como los de las piezas: el verbo es la orden, el nombre y la carpeta, datos."""
+    e = html.escape
+    pub = p.get("publicacion") if isinstance(p.get("publicacion"), dict) else {}
+    carpeta = str(p["carpeta"])
+    nombre = str(p.get("nombre") or carpeta)
+    titulo = str(pub.get("titulo") or nombre)
+    estado = estado_publicacion(p) or "vista_previa"
+    if modo == "claude":
+        src = _imagen_publicada((imagenes or {}).get(carpeta))
+    else:
+        foto = pub.get("foto") if isinstance(pub.get("foto"), str) and ".." not in pub["foto"].split("/") else None
+        foto = foto or imagen_de(p)
+        src = _href(carpeta, foto) if foto else None
+    img = (f'<img src="{e(src)}" alt="{e("Foto de " + titulo)}" loading="lazy">' if src
+           else '<span class="sin">Sin foto</span>')
+    precio = pub.get("precio") if isinstance(pub.get("precio"), dict) else (p.get("precio") or {})
+    filas = []
+    if _plata(precio):
+        filas.append(("Precio", _plata(precio) + (" con IVA" if precio.get("con_iva") else "")))
+    ganancia = pub.get("ganancia") if isinstance(pub.get("ganancia"), dict) else None
+    if ganancia and _plata({"valor": ganancia.get("valor"), "moneda": precio.get("moneda")}):
+        margen = ganancia.get("margen_pct")
+        filas.append(("Ganancia", _plata({"valor": ganancia["valor"], "moneda": precio.get("moneda")})
+                      + (f" ({_numero(margen)} %)" if margen is not None else "")))
+    if pub.get("fotos"):
+        reales = int(pub.get("fotos_reales") or 0)
+        filas.append(("Fotos", f'{pub["fotos"]} ' + ("ilustrativas" if not reales else
+                                                     "reales" if reales >= pub["fotos"] else f"({reales} reales)")))
+    filas.append(("Pieza", nombre))
+    dl = "".join(f"<dt>{e(k)}</dt><dd>{e(str(v))}</dd>" for k, v in filas)
+    cual = f"«{_en_una_linea(nombre) or _en_una_linea(carpeta, 160)}» ({_en_una_linea(carpeta, 160)})"
+    botones = []
+    vista = pub.get("vista") if pub.get("vista") == VISTA_PUBLICACION else None
+    if modo == "claude":
+        botones.append(f'<button type="button" data-pedido="{e("Desde el panel: mostrame cómo queda la publicación de " + cual + ".")}">Ver cómo queda</button>')
+    elif vista:
+        botones.append(f'<a class="boton" href="{e(_href(carpeta, vista))}">Ver cómo queda</a>')
+    if estado == "vista_previa":
+        botones.append(f'<button type="button" data-pedido="{e("Desde el panel: cargá como borrador en la tienda la publicación de " + cual + ".")}">Cargala como borrador</button>')
+    botones.append(f'<button type="button" data-pedido="{e("Desde el panel: quiero cambiar la publicación de " + cual + ". Preguntame qué.")}">Cambiar precio o texto</button>')
+    tienda = url_segura(p.get("url_tienda")) if isinstance(p.get("url_tienda"), str) else None
+    if tienda:
+        botones.append(f'<a class="boton" href="{e(tienda)}" rel="noopener noreferrer">Abrir en la tienda</a>')
+    texto = " ".join(str(x) for x in (titulo, nombre, carpeta, "publicación") if x).lower()
+    return f"""<article class="publi" data-tipo="publicacion" data-grupo="publicacion" data-texto="{e(texto)}">
+<div class="imagen{'' if src else ' vacia'}">{img}</div>
+<div class="cuerpo">
+<h3>{e(titulo)}</h3>
+<p class="estado-publi {e(estado)}">{e(ESTADOS_PUBLICACION[estado])}</p>
+<div class="acciones">{''.join(botones)}</div>
+<p class="aviso" role="status" aria-live="polite"></p>
+<dl>{dl}</dl>
+<div class="ubicacion">{e(carpeta)}/producto</div>
+</div>
+</article>"""
+
+
 def _taller(estado: list[dict] | None) -> str:
     """La caja "Tu taller": qué está listo para calcular costos y precios, y lo que falta, con su botón."""
     if not estado:
@@ -805,6 +916,9 @@ def generar_html(catalogo: dict, titulo: str = "Panel del taller", modo: str = "
     secciones = []
     if por_hacer:
         secciones.append(("hacer", "Para hacer", [_tarjeta(p, modo, imagenes) for p in por_hacer]))
+    publicaciones = [p for p in piezas if estado_publicacion(p)]
+    if publicaciones:                                    # cómo queda cada producto en la tienda, y dónde está
+        secciones.append(("publicaciones", "Publicaciones", [_publicacion(p, modo, imagenes) for p in publicaciones]))
     for pieza in terminadas:
         clave = (pieza.get("fecha") or "")[:7]
         if not secciones or secciones[-1][0] != clave:
@@ -823,7 +937,7 @@ def generar_html(catalogo: dict, titulo: str = "Panel del taller", modo: str = "
     cuenta = {g: sum(1 for p in piezas if grupo_de(p) == g) for g in GRUPOS}
     contadores = "".join(f"<li><strong>{cuenta[g]}</strong>{e(t.lower())}</li>" for g, t in GRUPOS.items())
     actualizado = (catalogo.get("actualizado") or _ahora())[:16].replace("T", " ")
-    filtros = [("todo", "Todo")] + list(GRUPOS.items())
+    filtros = [("todo", "Todo")] + list(GRUPOS.items()) + ([("publicacion", "Publicaciones")] if publicaciones else [])
     botones = "".join(f'<button type="button" data-filtro="{f}" aria-pressed="{"true" if f == "todo" else "false"}">'
                       f'{e(t)}</button>' for f, t in filtros)
     # En claude.ai manda la política del sitio; una propia bloquearía el puente con Claude.
@@ -969,6 +1083,8 @@ def main(argv=None) -> None:
     a.add_argument("--nota")
     a.add_argument("--url-tienda")
     a.add_argument("--id-tienda", help="número del producto en la tienda, para actualizarlo en vez de crear otro")
+    a.add_argument("--estado-publicacion", choices=sorted(ESTADOS_PUBLICACION),
+                   help="dónde está la publicación: vista_previa (armada), borrador (cargada) o publicada")
     a.add_argument("--moneda", help="moneda del precio, si no sale del costo")
 
     i = sub.add_parser("idea", help="anota una idea para más adelante")
@@ -1025,6 +1141,21 @@ def main(argv=None) -> None:
     if args.accion == "agregar":
         extra = datos_de_informes(_leer_json(args.informe_gcode), _leer_json(args.informe_stl),
                                   _leer_json(args.producto))
+        # La publicación: lo nuevo de publicacion.json pisa lo anterior, pero su estado se conserva si no se dice otro.
+        anterior = next((p for p in catalogo["piezas"] if p.get("carpeta") == normalizar_carpeta(args.carpeta)), {})
+        vieja = anterior.get("publicacion") if isinstance(anterior.get("publicacion"), dict) else None
+        if "publicacion" in extra or args.estado_publicacion and (vieja is not None or args.id_tienda):
+            pub = {**(vieja or {}), **extra.get("publicacion", {})}
+            estado_pub = (args.estado_publicacion or (vieja or {}).get("estado")
+                          or ("borrador" if args.id_tienda or anterior.get("id_tienda") else "vista_previa"))
+            if estado_pub == "vista_previa" and (args.id_tienda or anterior.get("id_tienda")):
+                estado_pub = "borrador"
+            pub["estado"] = estado_pub
+            extra["publicacion"] = pub
+            if estado_pub in ("borrador", "publicada"):
+                extra["estado"] = "en_tienda"
+        if args.id_tienda:
+            extra.setdefault("estado", "en_tienda")
         if args.estado:
             extra["estado"] = args.estado
         if args.moneda and extra.get("precio"):

@@ -667,6 +667,30 @@ class TestPublicacion(unittest.TestCase):
                                   "--url-tienda", "https://mitienda.com/?p=123"], capture_output=True, text=True)
             self.assertEqual(cat.returncode, 0, cat.stderr)
             pieza = json.loads((d / "catalogo.json").read_text(encoding="utf-8"))["piezas"][0]
+
+            # El sector «Publicaciones» del panel (0.1.31): armada es "vista previa"; con número, borrador
+            def catalogar(nombre, *extra):
+                r = subprocess.run([sys.executable, str(SCRIPTS / "catalogo.py"), "agregar", "--catalogo",
+                                    str(d / nombre), "--carpeta", "impresiones/2026-11-21_soporte_ender", *extra],
+                                   capture_output=True, text=True)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                return json.loads((d / nombre).read_text(encoding="utf-8"))["piezas"][0]
+            armada = catalogar("c2.json", "--producto", str(producto / "publicacion.json"),
+                               "--archivos", "soporte_ender.gcode", "producto/producto-1-principal.jpg")
+            import catalogo
+            c2 = catalogo.cargar(d / "c2.json")
+            panel_pc = catalogo.generar_html(c2)
+            panel_claude = catalogo.generar_html(c2, modo="claude", imagenes={})
+            sin_publi = catalogo.generar_html({"piezas": [{"carpeta": "impresiones/2026-11-21_x", "estado": "laminada"}]})
+            publicada = catalogar("c2.json", "--estado-publicacion", "publicada",
+                                  "--url-tienda", "https://mitienda.com/producto/soporte")
+            rearmada = catalogar("c2.json", "--producto", str(producto / "publicacion.json"))
+            c3 = {"piezas": []}
+            catalogo.desde_listado(c3, ["impresiones/2026-11-21_a_ender/pieza.stl",
+                                        "impresiones/2026-11-21_a_ender/producto/publicacion.json",
+                                        "impresiones/2026-11-21_a_ender/producto/vista-previa.html",
+                                        "impresiones/2026-11-20_b_ender/producto/producto.json"])
+            del_listado = {p["carpeta"]: p for p in c3["piezas"]}
             # Sin el texto revisado, el script no lo usa
             (d / "crudo.json").write_text(json.dumps(self.BIEN), encoding="utf-8")
             crudo = subprocess.run([sys.executable, str(SCRIPTS / "producto_tienda.py"), "--nombre", "X",
@@ -683,6 +707,30 @@ class TestPublicacion(unittest.TestCase):
         self.assertEqual(pieza["id_tienda"], "123")
         self.assertEqual(pieza["estado"], "en_tienda")
         self.assertEqual(pieza["precio"]["valor"], woo["regular_price"])
+        self.assertEqual(armada["publicacion"]["estado"], "vista_previa")
+        self.assertNotEqual(armada["estado"], "en_tienda")              # armar la publicación no es tenerla en la tienda
+        self.assertEqual(armada["publicacion"]["titulo"], "Soporte <b>router</b>")
+        self.assertEqual(armada["publicacion"]["foto"], "producto/producto-1-principal.jpg")
+        self.assertEqual(armada["publicacion"]["fotos"], len(FOTOS_POR_DEFECTO))
+        self.assertGreater(armada["publicacion"]["ganancia"]["valor"], 0)
+        self.assertEqual(pieza["publicacion"]["estado"], "borrador")    # con --id-tienda
+        for pagina_panel in (panel_pc, panel_claude):
+            self.assertIn('data-seccion="publicaciones"', pagina_panel)
+            self.assertIn('data-filtro="publicacion"', pagina_panel)
+            self.assertIn("Vista previa, sin cargar en la tienda", pagina_panel)
+            self.assertIn("Soporte &lt;b&gt;router&lt;/b&gt;", pagina_panel)
+            self.assertNotIn("<b>router</b>", pagina_panel)
+            self.assertIn("Cargala como borrador", pagina_panel)
+        self.assertIn('href="impresiones/2026-11-21_soporte_ender/producto/vista-previa.html"', panel_pc)
+        self.assertIn("mostrame cómo queda la publicación de «Soporte", panel_claude)
+        self.assertNotIn("vista-previa.html", panel_claude)             # en claude.ai no hay archivos de la PC
+        self.assertNotIn("publicaciones", sin_publi)
+        self.assertEqual(publicada["publicacion"]["estado"], "publicada")
+        self.assertEqual(publicada["estado"], "en_tienda")
+        self.assertEqual(rearmada["publicacion"]["estado"], "publicada")  # rearmarla no le cambia el estado
+        self.assertEqual(del_listado["impresiones/2026-11-21_a_ender"]["publicacion"], {"vista": "producto/vista-previa.html"})
+        self.assertNotEqual(del_listado["impresiones/2026-11-21_a_ender"]["estado"], "en_tienda")
+        self.assertEqual(del_listado["impresiones/2026-11-20_b_ender"]["estado"], "en_tienda")
         self.assertNotEqual(crudo.returncode, 0)
         self.assertIn("textos_ia.py revisar", crudo.stderr)
         # El texto de Gemini va antes de los datos, que salen de los informes; las palabras clave, a las etiquetas

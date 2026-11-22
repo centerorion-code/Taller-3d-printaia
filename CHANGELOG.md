@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.1.31 (2026-11-22)
+
+- **Sector «Publicaciones» en el panel:** cada pieza con la publicación armada tiene su tarjeta con la foto, el título, el precio, lo que ganás y dónde está: vista previa sin cargar, borrador en la tienda o publicada. «Ver cómo queda» abre la página del producto como se vería en la tienda (en `panel.html`, el archivo de la pieza; al costado del chat, se lo pide a Claude), y hay botones para cargarla como borrador y para cambiar el precio o el texto. También hay un filtro «Publicaciones».
+- **Armar la publicación ya no marca la pieza como «En la tienda»:** ese paso se marca cuando se carga como borrador o cuando contás que la publicaste (`catalogo.py agregar --estado-publicacion`).
+- `/taller-3d:publicar` anota la publicación en el panel apenas arma la vista previa.
+
 ## 0.1.30 (2026-11-22)
 
 - **Publicar, más simple:** el primer paso de `/taller-3d:publicar` es un solo comando (`producto_tienda.py --opciones`) que dice qué falta configurar, cuánto cuesta la pieza y las tres opciones de margen. La carpeta `producto/` queda con tres archivos (`publicacion.json`, `ficha.md` y `vista-previa.html`) en vez de cinco: `producto.json` repetía lo que ya está en `publicacion.json`, y el CSV de WooCommerce sale solo si hace falta (`--csv`).

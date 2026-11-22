@@ -66,6 +66,7 @@ El título (sirve también para Mercado Libre), la descripción corta y dos pár
      ```
      Es siempre la misma página. La primera vez, `publish_files` (título "Vista previa de la publicación", ícono `store`) y después `declare_capabilities` con `{"comments": {}}`; guardar `"vista_previa_claude": {"slug": "…", "url": "…"}` en `config.json`. Las siguientes, `list_files`, `get_artifact` y `publish_files` con `mode: "replace"`. Engancharla a la conversación con `watch`.
    - **En la PC:** escribir `vista-previa.html` y las fotos en `<carpeta>/producto/` (el resto, después de aprobar) y dar el enlace `computer://`. Se abre con doble clic.
+   - **Anotarla en el panel** (skill `panel`): `catalogo.py agregar --carpeta <carpeta de la pieza> --producto <carpeta>/producto/publicacion.json`, con `producto/vista-previa.html` y la foto principal en `--archivos`. Queda en el sector "Publicaciones" como vista previa, aunque todavía no se cargue en la tienda. Rehacer el panel.
    - **Esperar la aprobación:** el botón "Aprobar y cargar como borrador" de la página o un "sí" en el chat. Los pedidos de la página se atienden como los del panel (`references/panel-al-costado.md` de la skill `impresion-3d`, "Los pedidos desde el panel"). Con "Cambiar algo…" o un pedido en el chat: cambiar, volver a armar la ficha y la vista previa, y republicarla. Puede aprobar desde la app de Claude en el celular.
 
 ## 5. Cargar según la plataforma (`tienda.plataforma`)
@@ -89,6 +90,6 @@ Los datos del producto están en `publicacion.json`, clave `producto`: nombre, S
 
 1. Dejar en `<carpeta de la pieza>/producto/`: `publicacion.json`, `ficha.md`, `vista-previa.html` y `textos.json` (y `producto_woocommerce.csv` o `plantilla_completa.csv` si se usaron), más las fotos.
 2. Decir dónde quedó el borrador (enlace al producto en el administrador si se creó, y en WooCommerce también su vista previa real, la de "Vista previa" del borrador; y el enlace `computer://` a la carpeta `producto/` de la pieza) y qué falta revisar antes de publicarlo: si quedó sin fotos, decirlo primero.
-3. Actualizar el panel (skill `panel`) con `--producto <carpeta>/producto/publicacion.json`, la foto principal en `--archivos` y, si se cargó en la tienda, `--id-tienda <número del producto>` (para actualizarlo la próxima vez en vez de crear otro) y el enlace público en `--url-tienda`.
+3. Actualizar el panel (skill `panel`): si se cargó en la tienda, `catalogo.py agregar … --id-tienda <número del producto>` (queda como borrador en "Publicaciones", y la próxima vez se actualiza ese producto en vez de crear otro) y el enlace en `--url-tienda`; si no se cargó, queda como vista previa. Cuando el usuario cuente que la publicó, `--estado-publicacion publicada`.
 4. Registrar en `historial.csv`.
 5. Terminar con una línea "Te toca: …" (revisar el borrador y publicarlo, o imprimir la pieza y sacarle fotos).

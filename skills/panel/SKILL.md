@@ -64,7 +64,7 @@ Lo hacen solos `/pieza`, `/diseno` y `/publicar` al guardar. También a pedido (
 ```bash
 python3 -I catalogo.py agregar --catalogo catalogo.json --carpeta impresiones/AAAA-MM-DD_nombre_impresora \
   --nombre "<nombre legible>" --impresora "<nombre de la impresora>" [--material PETG] [--color negro] \
-  [--informe-gcode informe_gcode.json] [--informe-stl informe_stl.json] [--producto producto/publicacion.json] [--id-tienda 123] \
+  [--informe-gcode informe_gcode.json] [--informe-stl informe_stl.json] [--producto producto/publicacion.json] [--id-tienda 123] [--estado-publicacion vista_previa|borrador|publicada] \
   [--archivos pieza.stl pieza.py vista.png informe.md nombre_impresora.gcode nombre_impresora.3mf] \
   [--estado disenada|laminada|impresa|en_tienda] [--de-idea ideas/AAAA-MM-DD_nombre] [--nota "..."] [--url-tienda https://...]
 ```
@@ -81,6 +81,19 @@ Para "¿qué piezas hice?", "¿qué tengo pendiente?" o "¿dónde está el sopor
 python3 -I catalogo.py resumen --catalogo catalogo.json [--buscar "router"]
 ```
 Dar la carpeta de la pieza y lo que sigue, y ofrecer el paso que corresponda (`/pieza` para hacerla, reimprimirla o cambiar medidas; `/publicar` para venderla).
+
+## Publicaciones
+
+Las piezas con la publicación armada (`/publicar`) salen además en el sector **"Publicaciones"** del panel (y en el filtro del mismo nombre): foto, título, precio, ganancia y dónde está cada una: vista previa sin cargar en la tienda, borrador en la tienda o publicada. El estado se guarda con `agregar`:
+- `--producto <carpeta>/producto/publicacion.json`: la registra; si no se dice otra cosa queda como vista previa (o conserva el estado que tenía). Armar la publicación no marca el paso "En la tienda" de la pieza.
+- `--id-tienda <número>` o `--estado-publicacion borrador`: se cargó en la tienda como borrador.
+- `--estado-publicacion publicada`: el usuario contó que la publicó.
+
+Los botones de cada publicación:
+- **"Ver cómo queda":** en `panel.html` abre `producto/vista-previa.html` de la pieza. Al costado llega «mostrame cómo queda la publicación de …»: traer su `producto/publicacion.json` y sus fotos, rearmar con eso la vista previa al costado (skill `publicar`, sección 4, paso 5; es siempre la misma página y muestra una publicación por vez) y decirlo. Sin páginas de claude.ai, dar el enlace `computer://` a su `vista-previa.html`.
+- **"Cargala como borrador"** (solo en vista previa): skill `publicar`, sección 5; el botón es la aprobación. Si no hay tienda ni conector, decirlo y ofrecer el archivo para importar o la ficha.
+- **"Cambiar precio o texto":** preguntar qué cambia y rehacer la ficha con la skill `publicar` (otro margen o precio, u otro texto), sin repetir lo que no cambia. Si ya está cargada, se actualiza el mismo producto (`id_tienda`).
+- **"Abrir en la tienda":** si tiene `--url-tienda`.
 
 ## El panel al costado del chat (claude.ai)
 
