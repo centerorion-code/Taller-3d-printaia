@@ -40,6 +40,9 @@ apoyar(s); centrar(s, impresora=datos)  # o centrar(s, x, y); medidas(s)
 exportar_stl(s, "pieza.stl")                # valida, limpia y apoya en Z=0
 importar_stl("figura.stl")                  # un STL cerrado (de Blender o bajado), para unir o restar
 hueco_para(pieza, profundidad, holgura_mm=0.3)  # hueco para que otra pieza entre de arriba (una máscara en su base)
+deformar(s, funcion, malla=0.6)             # mueve los puntos de la malla: funcion(N×3) → N×3 (abollar, doblar, torcer)
+desgastar(s, [marca_golpe(p, n, d, largo, ancho, hondo), marca_tajo(p, n, d, largo), marca_rayon(p, n, d, largo, fuerza),
+              marca_picadura(p, n)], espesor=3)   # daño y desgaste naturales (references/modelado.md)
 holgura("presion"|"justo"|"deslizante"|"giratorio", "PETG")
 TORNILLOS["M4"]["pasante"]                  # medidas de tornillos y tuercas
 ```

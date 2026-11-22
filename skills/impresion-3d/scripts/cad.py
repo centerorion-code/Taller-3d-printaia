@@ -34,6 +34,7 @@ __all__ = [
     "hexagono", "agujero", "agujero_tornillo", "alojamiento_tuerca", "agujero_inserto",
     "chaflan_inferior", "unir", "restar", "intersectar", "mover", "rotar", "espejar", "escalar",
     "apoyar", "centrar", "medidas", "exportar_stl", "importar_stl", "hueco_para", "holgura", "TORNILLOS", "HOLGURAS",
+    "deformar", "desgastar", "marca_golpe", "marca_tajo", "marca_rayon", "marca_picadura",
 ]
 
 EPS = 0.01  # sobrante para que las restas no dejen caras coincidentes
@@ -318,6 +319,128 @@ def hueco_para(pieza: Manifold, profundidad: float, holgura_mm: float = 0.3) -> 
 
 
 # --- Exportar ----------------------------------------------------------------------------
+
+# ------------------------------------------------------------------ desgaste y daño: se deforma, no se corta
+# Un golpe de verdad hunde el material con bordes suaves y le levanta un labio alrededor; un tajo de filo deja un
+# surco con el material corrido a un costado y astillados chicos; un rayón tiembla, cambia de hondo y se corta.
+# Restar esferas o cajas deja bordes perfectos, que se ven falsos. Por eso acá se mueven los puntos de la malla.
+
+def deformar(solido: Manifold, funcion, malla: float = 0.6, tolerancia: float = 0.02) -> Manifold:
+    """Afina la malla (triángulos de `malla` mm), mueve sus puntos con `funcion` (recibe un arreglo N×3 y devuelve
+    otro igual) y vuelve a simplificarla. Para dar forma orgánica a algo hecho con medidas: abollar, doblar un borde,
+    torcer. Los agujeros y encastres que tienen que quedar exactos se cortan después de deformar."""
+    if malla <= 0:
+        raise ValueError("El tamaño de malla tiene que ser mayor que cero.")
+    fino = solido.refine_to_length(float(malla))
+    movido = fino.warp_batch(lambda v: np.asarray(funcion(np.array(v, dtype=float)), dtype=float))
+    return movido.simplify(float(tolerancia))
+
+
+def _ruido(x, fases):
+    return 0.6 * np.sin(x + fases[0]) + 0.3 * np.sin(2.7 * x + fases[1]) + 0.15 * np.sin(6.1 * x + fases[2])
+
+
+def _marca(punto, normal, direccion, alcance, perfil) -> dict:
+    n = np.asarray(normal, dtype=float)
+    n = n / np.linalg.norm(n)
+    d = np.asarray(direccion, dtype=float)
+    d = d - n * float(d @ n)
+    if np.linalg.norm(d) < 1e-9:
+        raise ValueError("La dirección de la marca no puede ser la misma que la normal.")
+    d = d / np.linalg.norm(d)
+    return {"p": np.asarray(punto, dtype=float), "n": n, "d": d, "c": np.cross(n, d), "alcance": float(alcance),
+            "perfil": perfil}
+
+
+def _azar(azar):
+    return azar if azar is not None else np.random.default_rng(0)
+
+
+def marca_golpe(punto, normal, direccion, largo: float, ancho: float, hondo: float, azar=None) -> dict:
+    """Una abolladura: hundimiento suave de radios `largo` × `ancho` (a lo largo de `direccion`) y `hondo` mm, con
+    forma algo irregular y un labio apenas levantado alrededor. `normal` apunta hacia afuera de la pieza."""
+    fases = _azar(azar).uniform(0, 2 * math.pi, 3)
+
+    def perfil(s, t):
+        r = np.sqrt((s / largo) ** 2 + (t / ancho) ** 2) / (1 + 0.18 * _ruido(np.arctan2(t / ancho, s / largo) * 2, fases))
+        return hondo * np.exp(-1.3 * r ** 2.4) - 0.10 * hondo * np.exp(-((r - 1.35) / 0.28) ** 2)
+    return _marca(punto, normal, direccion, 2.2 * max(largo, ancho), perfil)
+
+
+def marca_tajo(punto, normal, direccion, largo: float, hondo: float = 1.3, ancho: float = 0.9, azar=None) -> dict:
+    """Un tajo de filo: surco en V que entra de golpe y sale de a poco, con el material corrido a un costado,
+    astillados chicos al azar en los bordes y la superficie que cede un poco alrededor."""
+    azar = _azar(azar)
+    fases, fases2 = azar.uniform(0, 2 * math.pi, 3), azar.uniform(0, 2 * math.pi, 3)
+    astillas = [(azar.uniform(-0.45, 0.45) * largo, azar.choice([-1, 1]), azar.uniform(0.7, 1.9), azar.uniform(0.35, 0.8))
+                for _ in range(int(azar.integers(5, 10)))]
+    lado = azar.choice([-1, 1])
+
+    def perfil(s, t):
+        u = s / largo + 0.5
+        entra = np.clip(u / 0.12, 0, 1) * np.clip((1 - u) / 0.45, 0, 1) ** 0.8
+        w = ancho * (1 + 0.3 * _ruido(s * 0.55, fases))
+        tt = t - 0.5 * _ruido(s * 0.16, fases2)
+        total = (hondo * np.clip(1 - np.abs(tt) / w, 0, None) ** 1.2
+                 - 0.38 * hondo * np.exp(-((tt - lado * 1.5 * w) / (0.6 * w)) ** 2)
+                 - 0.12 * hondo * np.exp(-((tt + lado * 1.6 * w) / (0.6 * w)) ** 2)
+                 + 0.45 * hondo * np.exp(-(tt / (4.5 * w)) ** 2))
+        for s0, lado_a, tam, fuerza in astillas:
+            total = total + fuerza * hondo * np.exp(-((s - s0) / tam) ** 2 - ((tt - lado_a * 1.15 * w) / (0.75 * tam)) ** 2)
+        return entra * total
+    return _marca(punto, normal, direccion, 0.62 * largo, perfil)
+
+
+def marca_rayon(punto, normal, direccion, largo: float, fuerza: float = 1.0, azar=None) -> dict:
+    """Un rayón: surco fino de bordes suaves que tiembla, se curva un poco, entra fuerte y se va perdiendo, y por
+    momentos casi no marca. `fuerza` de 0,4 (apenas) a 1,3 (hondo: medio milímetro largo)."""
+    azar = _azar(azar)
+    fases, fases2 = azar.uniform(0, 2 * math.pi, 3), azar.uniform(0, 2 * math.pi, 3)
+    temblor, curva = azar.uniform(0.3, 1.0) * fuerza, azar.uniform(-0.05, 0.05) * largo
+    entrada = azar.uniform(0.05, 0.18)
+    hondo, w = 0.5 * fuerza, 0.45 + 0.32 * fuerza
+    picos = [(azar.uniform(-0.4, 0.4) * largo, azar.uniform(0.6, 1.4), azar.uniform(0.5, 1.1))
+             for _ in range(int(azar.integers(1, 4)))]
+
+    def perfil(s, t):
+        u = s / largo + 0.5
+        entra = np.clip(u / entrada, 0, 1) * np.clip(1 - u, 0, 1) ** 0.65 * (u > 0)
+        tt = t - temblor * _ruido(u * 9, fases) - curva * np.sin(math.pi * np.clip(u, 0, 1))
+        marca = 0.5 + 0.5 * np.clip(_ruido(u * 23, fases2) + 0.55, 0, 1)
+        total = hondo * entra * marca * (np.exp(-(tt / w) ** 2) - 0.2 * np.exp(-((np.abs(tt) - 1.8 * w) / (0.6 * w)) ** 2))
+        for s0, tam, fuerza_p in picos:
+            total = total + hondo * fuerza_p * entra * np.exp(-((s - s0) / tam) ** 2 - (tt / (0.8 * tam)) ** 2)
+        return total
+    return _marca(punto, normal, direccion, 0.6 * largo, perfil)
+
+
+def marca_picadura(punto, normal, radio: float = 1.8, hondo: float = 0.4) -> dict:
+    """Una marca chica de uso: un hoyito suave."""
+    n = np.asarray(normal, dtype=float)
+    otra = np.cross(n, (0, 0, 1)) if abs(n[2]) < 0.9 * np.linalg.norm(n) else np.cross(n, (1, 0, 0))
+    return _marca(punto, normal, otra, 3 * radio, lambda s, t: hondo * np.exp(-(s ** 2 + t ** 2) / radio ** 2))
+
+
+def desgastar(solido: Manifold, marcas: list[dict], malla: float = 0.6, espesor: float = 3.0, curvatura: float = 80.0,
+              donde=None, tolerancia: float = 0.02) -> Manifold:
+    """Aplica marcas (marca_golpe, marca_tajo, marca_rayon, marca_picadura) a un sólido, hundiendo el material hacia
+    adentro en cada una. Mueve por igual todo lo que está hasta `espesor` mm por debajo de la superficie, así una
+    chapa abollada conserva su espesor (la abolladura se ve también del otro lado). `curvatura` es el radio de la
+    superficie más cerrada donde hay marcas. `donde(v)`, opcional, devuelve qué puntos se pueden mover: sirve para
+    dejar intactos los encastres y los agujeros (o cortarlos después de desgastar)."""
+    def funcion(v):
+        mueve = np.zeros_like(v)
+        libre = np.ones(len(v), dtype=bool) if donde is None else np.asarray(donde(v), dtype=bool)
+        for m in marcas:
+            rel = v - m["p"]
+            s, t, alto = rel @ m["d"], rel @ m["c"], rel @ m["n"]
+            r2 = s ** 2 + t ** 2
+            cerca = libre & (r2 < m["alcance"] ** 2) & (alto < 8) & (alto > -(espesor + 2.5 + r2 / (1.4 * curvatura)))
+            if cerca.any():
+                mueve[cerca] -= np.outer(m["perfil"](s[cerca], t[cerca]), m["n"])
+        return v + mueve
+    return deformar(solido, funcion, malla, tolerancia)
+
 
 def exportar_stl(solido: Manifold, ruta, nombre: str = "taller-3d", apoyar_en_cama: bool = True) -> dict:
     """Guarda un STL binario. Verifica que el sólido sea válido y no esté vacío."""

@@ -518,6 +518,42 @@ class TestProducto(unittest.TestCase):
         self.assertTrue(any("recargo" in s for s in p["supuestos"]))
 
 
+class TestDesgaste(unittest.TestCase):
+    """0.1.33: el daño se hace deformando la malla."""
+
+    def test_golpe_tajo_y_rayon_sobre_una_chapa(self):
+        import cad
+        import numpy as np
+        chapa = cad.mover(cad.caja(80, 60, 3, centrada=True), z=-3)            # la cara de arriba en Z = 0
+        azar = np.random.default_rng(7)
+        arriba = (0, 0, 1)
+        marcas = [cad.marca_golpe((-20, 0, 0), arriba, (1, 0, 0), 12, 8, 3.0, azar),
+                  cad.marca_tajo((18, 10, 0), arriba, (1, 0.4, 0), 30, 1.4, 1.0, azar),
+                  cad.marca_rayon((15, -15, 0), arriba, (1, -0.2, 0), 40, 1.2, azar),
+                  cad.marca_picadura((-30, 22, 0), arriba)]
+        gastada = cad.desgastar(chapa, marcas, malla=0.8, espesor=3)
+        quieta = cad.desgastar(chapa, marcas, malla=0.8, espesor=3, donde=lambda v: v[:, 0] > 1000)
+        v = np.asarray(gastada.to_mesh().vert_properties)[:, :3]
+        zona = v[np.hypot(v[:, 0] + 20, v[:, 1]) < 3]
+        with tempfile.TemporaryDirectory() as d:
+            info = cad.exportar_stl(gastada, Path(d) / "gastada.stl", apoyar_en_cama=False)
+        self.assertFalse(gastada.is_empty())
+        self.assertEqual(gastada.genus(), 0)                              # no perfora ni deja partes sueltas
+        self.assertEqual(len(gastada.decompose()), 1)
+        self.assertAlmostEqual(gastada.volume(), chapa.volume(), delta=chapa.volume() * 0.03)   # hunde, no saca
+        self.assertLess(zona[:, 2].min(), -5.0)                           # el golpe hunde también la cara de abajo
+        self.assertGreater(zona[:, 2].max(), -3.5)                        # y la de arriba baja unos 3 mm
+        self.assertLess(zona[:, 2].max(), -2.0)
+        self.assertGreater(v[:, 2].max(), 0.05)                           # hay labio levantado
+        self.assertLess(v[:, 2].max(), 1.5)
+        self.assertGreater(info["triangulos"], 2000)                      # la malla quedó fina donde hay daño
+        self.assertAlmostEqual(quieta.volume(), chapa.volume(), delta=1e-3)
+        with self.assertRaises(ValueError):
+            cad.marca_golpe((0, 0, 0), arriba, arriba, 10, 5, 2)
+        with self.assertRaises(ValueError):
+            cad.deformar(chapa, lambda p: p, malla=0)
+
+
 class TestStlDelUsuario(unittest.TestCase):
     """0.1.32: un STL que trae el usuario sigue el mismo circuito."""
 

@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.1.33 (2026-11-22)
+
+- **Daño y desgaste que se ven naturales:** para utilería y réplicas, los golpes, tajos y rayones ya no se hacen restando formas (dejaban cortes perfectos): se deforma la malla. `cad.py` suma `desgastar` con `marca_golpe` (hundimiento de bordes suaves con labio), `marca_tajo` (surco con el material corrido a un costado y astillados), `marca_rayon` (tiembla, cambia de hondo y se corta) y `marca_picadura`, y `deformar` para cualquier otra deformación. Una pared abollada conserva su espesor.
+- **Piezas grandes en partes:** la guía de modelado explica cómo partir una pieza que apoya mal y unirla con tachas impresas (cuello con juego, agujeros iguales, tacha de media bola que se imprime parada), con un STL armado para verla.
+- Las dos cosas salieron de diseñar un morrión español con golpes de batalla.
+
 ## 0.1.32 (2026-11-22)
 
 - **Pieza desde un STL que ya tenés:** adjuntás el `.stl` en el chat (o decís en qué carpeta está) y sigue el mismo circuito que una pieza diseñada: revisión, configuración, G-code, proyecto de Orca, costo y publicación. En el panel hay un botón **Pieza desde un STL**. Claude no le cambia la forma; guarda tu archivo como `original.stl` y lamina `pieza.stl`, ya orientado.

@@ -112,6 +112,37 @@ escribir_stl(a_malla(texto, voxel=0.2), "texto.stl")
 
 Después, en `pieza.py`: `importar_stl("figura.stl")` e `importar_stl("texto.stl")`, ubicarlas con `mover` (el texto queda centrado en Z = 0: subirlo para que asome sobre la base) y `unir` con la base. Revisar dónde quedó cada parte: un texto metido entero adentro de la base no se ve, y la revisión del STL no lo nota.
 
+## Desgaste y daño que se vean naturales
+
+Para una pieza que tiene que verse usada o golpeada (utilería, una réplica, algo "envejecido"): **el daño se hace deformando la malla, no restando formas.** Una esfera, una caja o una cadena de esferas restadas dejan bordes perfectos y parejos, y se ven falsos (probado con un morrión el 22/11: al usuario le parecieron «cortes perfectos»). Lo que pasa de verdad:
+
+- **Un golpe** hunde el material con bordes suaves, forma irregular y un labio apenas levantado alrededor.
+- **Un tajo de filo** deja un surco en V que entra de golpe y sale de a poco, con el material corrido a un costado y astillados chicos en los bordes; la superficie cede un poco alrededor.
+- **Un rayón** tiembla, cambia de profundidad, por momentos casi no marca, y suele venir con otros más finos casi paralelos.
+- **Un borde golpeado** queda doblado, no cortado.
+
+Con `cad.py`:
+
+```python
+azar = np.random.default_rng(1543)            # con la misma semilla el daño sale siempre igual
+marcas = [marca_golpe(p, n, d, largo=30, ancho=9, hondo=4, azar=azar),     # p: punto de la superficie; n: normal hacia
+          marca_tajo(p, n, d, largo=44, hondo=1.5, ancho=1.0, azar=azar),   # afuera; d: dirección de la marca
+          marca_rayon(p2, n2, d2, largo=70, fuerza=1.1, azar=azar),
+          marca_picadura(p3, n3)]
+pieza = desgastar(pieza, marcas, malla=0.6, espesor=3, donde=lambda v: v[:, 2] > 25)
+```
+
+- `desgastar` afina la malla, mueve los puntos y la simplifica. Mueve por igual la cara de afuera y la de adentro (hasta `espesor` mm), así una pared abollada no se afina ni se perfora.
+- **Los agujeros, roscas y encastres se cortan después** de desgastar, o se protegen con `donde`: tienen que quedar exactos. No poner marcas sobre ellos ni contra una pared que nace de la superficie (una marca que la cruce la deforma también).
+- Repartir sin simetría, con tamaños distintos, y agrupar: un tajo en el medio de un golpe largo, dos o tres rayones juntos. Pocas marcas fuertes y varias leves se ven mejor que muchas iguales.
+- Lo que no se imprime no vale la pena: con boquilla de 0,4, un rayón de menos de 0,4 mm de hondo casi no se nota. Decírselo al usuario.
+- Para otras deformaciones (doblar un borde, hundir una zona), `deformar(solido, funcion)` con una función propia.
+- Mirar siempre el resultado de cerca en una foto renderizada (abajo) antes de mostrarlo: es lo único que dice si se ve natural.
+
+## Piezas grandes en partes, unidas con tachas impresas
+
+Si una pieza grande apoya mal en la cama o lleva soportes por todos lados, ofrecer partirla donde la unión quede tapada o tenga sentido (la banda de un casco, una moldura) y unirla con **tachas impresas**: un cuello de una parte entra en la otra con 0,3 mm de juego por lado, las dos llevan los mismos agujeros, y la tacha es una media bola con un cono debajo (45°, entra en un avellanado de la parte de afuera) y un perno de 4 mm (agujero de 4,3). Así se imprime parada sobre el perno, sin soportes, y se fija a presión con una gota de pegamento. Entregar un STL por parte, las tachas en una placa (con dos de repuesto) y un `armado.stl` con todo en su lugar, solo para verlo y para la foto. El encastre se prueba imprimiendo primero una tacha y, si se puede, un tramo corto de la unión.
+
 ## Revisar y mostrar
 
 1. `revisar_stl.py`: además de la malla y las medidas, mira las partes separadas. Una parte suelta en el aire es RECHAZO (pasa con bolas que no se llegaron a fundir); una que toca la pieza sin estar unida es advertencia: unirla. También avisa si la pieza es una cáscara fina (lo típico de los modelos de IA): engrosarla con `engrosar_stl.py`.

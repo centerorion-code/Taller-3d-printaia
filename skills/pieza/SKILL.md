@@ -45,6 +45,8 @@ Con las respuestas, decidir y anotar: material (si va al sol o al calor, nunca P
 
 Nombre de la carpeta y de los archivos: `python3 -I catalogo.py carpeta --nombre "<nombre de la pieza>" --impresora "<nombre de la impresora en config.json>"` devuelve `carpeta` (`impresiones/AAAA-MM-DD_nombre_impresora`) y `archivo` (`nombre_impresora`, para el G-code y el proyecto de Orca). La impresora va en el nombre porque un G-code solo sirve para la impresora para la que se laminó. Crear `/mnt/user-data/outputs/taller-3d/<carpeta>/`. Si después cambia de impresora (por ejemplo, porque no entra), sacar el nombre de nuevo con la otra antes de escribir en la PC.
 
+**Daño y desgaste** (utilería, réplicas): deformando la malla con `desgastar` de `cad.py`, nunca restando formas; y una pieza grande que apoya mal se puede partir y unir con tachas impresas (`references/modelado.md`).
+
 **Con qué modelar** (`references/modelado.md`): se decide antes de modelar, por cómo se describe la pieza y no por comodidad. Nunca aproximar con formas simples algo que se define por su aspecto.
 
 - **Se describe con medidas** (funcional o geométrica): escribir `pieza.py` con `cad.py` según la plantilla de `references/cad.md` (parámetros arriba, medidas del usuario, holguras de `holgura()` o de `aprendizajes.md` si hay calibración propia). Correrlo para generar `pieza.stl`.

@@ -27,6 +27,8 @@ Si a mitad de `/diseno` pide imprimirla, seguir con `/pieza` desde la configurac
 
 ## 2. Modelo
 
+**Si tiene que verse usada o golpeada,** el daño se hace deformando la malla (`desgastar` de `cad.py`), nunca restando formas: `references/modelado.md`, «Desgaste y daño que se vean naturales». Si es grande y apoya mal, ofrecer partirla y unirla con tachas impresas (misma guía).
+
 **Con qué modelar** (`references/modelado.md`), antes de empezar y por cómo se describe la pieza: con medidas, `pieza.py` con `cad.py` (abajo); por cómo se ve (figura, forma suave, logo, texto), Blender por código (`modelo.py`, con las medidas que importan arriba) o un modelo que ya exista; si es mixta, cada parte con su herramienta, unidas en `pieza.py` con `importar_stl` y `unir`; para copiar algo de una foto (o algo que Blender por código no hace bien), generarlo por IA desde la foto o desde una imagen aprobada (`references/foto-a-3d.md`). Nunca aproximar con formas simples algo que se define por su aspecto.
 
 1. Carpeta: `python3 -I catalogo.py carpeta --tipo diseno --nombre "<nombre>"` → `/mnt/user-data/outputs/taller-3d/<carpeta>/` (`disenos/AAAA-MM-DD_nombre`). Si se diseña para una impresora puntual (la nombró o se revisó contra la suya), sumar `--impresora "<nombre>"`: queda al final del nombre.
