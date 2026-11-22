@@ -1,6 +1,6 @@
 # Aviso de uso y descargo de responsabilidad
 
-taller-3d, versión 0.1.21.
+taller-3d, versión 0.1.22.
 
 1. Este plugin se ofrece "tal cual", sin garantías de ningún tipo, incluidas las de funcionamiento, ausencia de errores o idoneidad para un fin determinado.
 2. Quien lo descarga, instala o usa lo hace bajo su exclusiva cuenta y riesgo. En la máxima medida que permita la ley aplicable, los autores no responden por daños a impresoras u otros equipos, incendios, lesiones, pérdida de datos, material desperdiciado ni ningún otro perjuicio directo o indirecto.

@@ -939,6 +939,16 @@ class TestPanelEnClaude(unittest.TestCase):
         # La foto de producto de Blender va antes que la vista, pero la foto real va primero
         self.assertEqual(cat.imagen_de(lista), "producto/producto-1-principal.jpg")
         self.assertEqual(cat.imagen_de(impresa), "foto.jpg")
+        # La foto de referencia de una pieza generada desde una foto no la marca como impresa; la vista va primero
+        generada = cat.agregar(c, "disenos/2026-11-22_mascara", nombre="Máscara",
+                               archivos=["referencia.jpg", "foto-sin-soga.jpg", "hunyuan/foto.jpg", "vista-con-base.jpg",
+                                         "mascara.stl"])
+        self.assertNotIn("impresa", cat.hechos(generada))
+        self.assertEqual(cat.imagen_de(generada), "vista-con-base.jpg")
+        self.assertTrue(all(cat.es_foto_impresa(a) for a in ("foto.jpg", "Foto-2.PNG", "foto-10.webp")))
+        self.assertFalse(any(cat.es_foto_impresa(a) for a in ("foto-sin-soga.jpg", "hunyuan/foto.jpg", "fotos.jpg",
+                                                              "producto/foto.jpg", "foto.stl")))
+        c["piezas"].remove(generada)
         archivo = cat.generar_html(c)
         self.assertIn("Content-Security-Policy", archivo)
         self.assertIn("data-pedido=", archivo)

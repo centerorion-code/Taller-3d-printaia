@@ -1,5 +1,9 @@
 # Cambios
 
+## 0.1.22 (2026-11-22)
+
+- **El panel ya no da por impresa una pieza por una foto cualquiera:** solo cuenta `foto.jpg` (o `foto-2.jpg`, …) en la carpeta de la pieza, que es la foto de la pieza impresa. La foto de referencia de una pieza generada desde una foto se guarda como `referencia.jpg` y no la cambia de paso. Si no hay foto real ni foto de producto, la tarjeta muestra la primera vista (`vista…`).
+
 ## 0.1.21 (2026-11-22)
 
 - **Pieza desde una foto** (`references/foto-a-3d.md`): para copiar algo que existe (una máscara, una figura, una escultura), el modelo 3D lo genera Hunyuan 3D de Tencent con tu cuenta, desde tu Chrome. Claude sube la foto, espera, baja el STL de tu carpeta de descargas (solo ese archivo) y lo deja imprimible. Probado de punta a punta con una máscara de piedra.

@@ -252,6 +252,16 @@ def quitar_idea(catalogo: dict, carpeta: str) -> bool:
     return True
 
 
+# La foto de la pieza impresa: foto.jpg (o foto-2.jpg…) en la carpeta de la pieza. Otras fotos (la de referencia
+# de una pieza generada desde una foto, por ejemplo) no la marcan como impresa.
+RE_FOTO_IMPRESA = re.compile(r"^foto(?:-\d+)?\.(?:jpe?g|png|webp)$")
+
+
+def es_foto_impresa(archivo) -> bool:
+    a = str(archivo).replace("\\", "/").lower()
+    return "/" not in a and bool(RE_FOTO_IMPRESA.match(a))
+
+
 def hechos(p: dict) -> set[str]:
     """Pasos del recorrido que ya se cumplieron."""
     if p.get("tipo") == "idea" or p.get("estado") == "idea":
@@ -259,7 +269,7 @@ def hechos(p: dict) -> set[str]:
     estado = p.get("estado") or "disenada"
     archivos = [str(a).lower() for a in p.get("archivos") or []]
     h = {"idea", "disenada"}
-    foto = any(a.rsplit("/", 1)[-1].startswith("foto") and not a.startswith("producto/") for a in archivos)
+    foto = any(es_foto_impresa(a) for a in archivos)
     if p.get("impresa") or estado == "impresa" or foto:
         h |= {"laminada", "impresa"}
     if estado in ("laminada", "impresa", "en_tienda") or any(a.endswith(G_CODE) for a in archivos):
@@ -369,8 +379,7 @@ def desde_listado(catalogo: dict, listado) -> list[str]:
             estado = "laminada"
         if any(a.lower().startswith("producto/") for a in archivos):
             estado = "en_tienda"
-        impresa = any(a.rsplit("/", 1)[-1].lower().startswith("foto") and not a.lower().startswith("producto/")
-                      for a in archivos)                   # una foto de la pieza impresa
+        impresa = any(es_foto_impresa(a) for a in archivos)   # una foto de la pieza impresa
         if carpeta in existentes:
             agregar(catalogo, carpeta, archivos=archivos, impresa=impresa or None)
         else:
@@ -385,9 +394,10 @@ def imagen_de(pieza: dict) -> str | None:
         return pieza["imagen"]
     archivos = pieza.get("archivos") or []
     imagenes = [a for a in archivos if a.lower().endswith(IMAGENES)]
-    for criterio in (lambda a: a.rsplit("/", 1)[-1].lower().startswith("foto") and "producto" not in a.lower(),
+    for criterio in (es_foto_impresa,
                      lambda a: a.lower().endswith("producto-1-principal.jpg"),
                      lambda a: a.lower() == "vista.png",
+                     lambda a: "/" not in a and a.lower().startswith("vista"),
                      lambda a: a.lower().endswith("foto_producto.png")):
         elegida = next((a for a in imagenes if criterio(a)), None)
         if elegida:

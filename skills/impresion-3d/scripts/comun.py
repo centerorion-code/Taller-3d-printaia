@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-VERSION_PLUGIN = "0.1.21"
+VERSION_PLUGIN = "0.1.22"
 VERSION_ORCA = "2.5.1"
 
 SCRIPTS = Path(__file__).resolve().parent
