@@ -84,5 +84,5 @@ Hacen falta dos: la **carpeta de trabajo** (diseños, impresiones con sus vistas
 1. Generar con `cad.py` un cubo de calibración de 20 × 20 × 20 mm con chaflán inferior.
 2. Laminar con los perfiles de la impresora elegida: `AUTO proceso` y `AUTO filamento` creado con `--cama` de la configuración (como en `/pieza`).
 3. Traer el G-code y correr `revisar_gcode.py --impresora <json> --cama-primera-capa <temperatura>`: tiene que salir APROBADO, con las temperaturas y la cama correctas.
-4. Mostrar tiempo, gramos y costo (si hay precios) y dejar todo en `impresiones/AAAA-MM-DD_cubo-prueba/`.
+4. Mostrar tiempo, gramos y costo (si hay precios) y dejar todo en la carpeta de `catalogo.py carpeta --nombre "Cubo de prueba" --impresora "<impresora>"`, con el G-code con nombre y el proyecto `.3mf` como en `/pieza` (sección 5). Decir que abra el `.3mf` con doble clic para ver la pieza en Orca con todo elegido.
 5. Cerrar con: qué quedó listo, qué falta (si algo), los comandos disponibles, que en la app llevan el prefijo del plugin (`/taller-3d:pieza`, `/taller-3d:diseno`, `/taller-3d:calibrar`, `/taller-3d:impresoras`, `/taller-3d:publicar`, `/taller-3d:catalogo`, `/taller-3d:restaurar`, `/taller-3d:ayuda`), y que también puede pedir todo con sus palabras, y cómo pedir una pieza con un ejemplo de `MANUAL.md`. Ofrecer dejar el manual en la carpeta de trabajo.

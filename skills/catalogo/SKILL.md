@@ -32,13 +32,14 @@ El catálogo son dos archivos de la carpeta de trabajo:
 
 Lo hacen solos `/pieza`, `/diseno` y `/publicar` al guardar. También a pedido ("marcá el llavero como impreso", "agregale una nota"):
 ```bash
-python3 -I catalogo.py agregar --catalogo catalogo.json --carpeta impresiones/AAAA-MM-DD_nombre \
-  --nombre "<nombre legible>" [--material PETG] [--color negro] \
+python3 -I catalogo.py agregar --catalogo catalogo.json --carpeta impresiones/AAAA-MM-DD_nombre_impresora \
+  --nombre "<nombre legible>" --impresora "<nombre de la impresora>" [--material PETG] [--color negro] \
   [--informe-gcode informe_gcode.json] [--informe-stl informe_stl.json] [--producto producto/producto.json] \
-  [--archivos pieza.stl pieza.py vista.png informe.md <carpeta del G-code>/plate_1.gcode] \
+  [--archivos pieza.stl pieza.py vista.png informe.md nombre_impresora.gcode nombre_impresora.3mf] \
   [--estado disenada|laminada|impresa|en_tienda] [--nota "..."] [--url-tienda https://...]
 ```
 - `--carpeta` es relativa a la carpeta de trabajo; `--archivos`, relativos a la carpeta de la pieza.
+- Las carpetas nuevas llevan la impresora al final (`impresiones/AAAA-MM-DD_nombre_impresora`, de `catalogo.py carpeta`). El nombre de la pieza se saca sin la impresora, que queda aparte en la tarjeta; las carpetas de antes de la 0.1.12 no la tienen.
 - El estado sale solo de los informes (con G-code: lista para imprimir; con producto: en la tienda como borrador). "Impresa" lo marca el usuario, o Claude cuando el usuario cuenta que la imprimió.
 - Si el usuario manda una foto de la pieza impresa, guardarla como `foto.jpg` (o `foto-2.jpg`, ...) en la carpeta de la pieza y sumarla a `--archivos`: la página muestra la foto real antes que la vista.
 - Después de `agregar`, rehacer la página (`html`) y escribir los dos archivos (paso 5 de arriba).

@@ -36,7 +36,7 @@ Con las respuestas, decidir y anotar: material (si va al sol o al calor, nunca P
 
 ## 2. Modelo
 
-Crear la carpeta de la pieza en el contenedor: `/mnt/user-data/outputs/taller-3d/impresiones/AAAA-MM-DD_nombre/`.
+Nombre de la carpeta y de los archivos: `python3 -I catalogo.py carpeta --nombre "<nombre de la pieza>" --impresora "<nombre de la impresora en config.json>"` devuelve `carpeta` (`impresiones/AAAA-MM-DD_nombre_impresora`) y `archivo` (`nombre_impresora`, para el G-code y el proyecto de Orca). La impresora va en el nombre porque un G-code solo sirve para la impresora para la que se laminó. Crear `/mnt/user-data/outputs/taller-3d/<carpeta>/`. Si después cambia de impresora (por ejemplo, porque no entra), sacar el nombre de nuevo con la otra antes de escribir en la PC.
 
 - **Pieza funcional o geométrica:** escribir `pieza.py` con `cad.py` según la plantilla de `references/cad.md` (parámetros arriba, medidas del usuario, holguras de `holgura()` o de `aprendizajes.md` si hay calibración propia). Correrlo para generar `pieza.stl`.
 - **Forma orgánica, decorativa o con texto:** Blender (MCP) o un modelo que traiga el usuario. Si trae un STL, traerlo con `device_stage_files`.
@@ -71,8 +71,8 @@ Revisar:
 
 ## 4. Laminar y revisar (bucle)
 
-1. Escribir `pieza.stl` (y `pieza.py`, `vista.png`) en `<trabajo>/impresiones/AAAA-MM-DD_nombre/` con `device_commit_files`.
-2. `slice_model` con la ruta del STL en la PC, `machine_profile` = `perfil_maquina`, `process_profile` = el AUTO proceso, `filament_profile` = el AUTO filamento, `output_dir` = la carpeta de la pieza en la PC.
+1. Escribir `pieza.stl` (y `pieza.py`, `vista.png`) en `<trabajo>/<carpeta>/` con `device_commit_files`.
+2. `slice_model` con la ruta del STL en la PC, `machine_profile` = `perfil_maquina`, `process_profile` = el AUTO proceso, `filament_profile` = el AUTO filamento, `output_dir` = `<trabajo>/<carpeta>/laminado` (Orca deja ahí una subcarpeta por vuelta con `plate_1.gcode`: son borradores).
 3. `get_slice_estimates` (tiempo, gramos) y, si hay voladizos o zonas críticas, `analyze_gcode_layers` en ese rango de Z.
 4. Traer el G-code con `device_stage_files` y correr:
    ```bash
@@ -85,17 +85,32 @@ Revisar:
 
 ## 5. Entregar
 
-En la carpeta de la pieza en la PC dejar: `pieza.py` (si se modeló), `pieza.stl`, `vista.png`, el G-code, `config_usada.json`, `informe_gcode.json` e `informe.md`.
+1. **G-code con nombre:** copiar el G-code aprobado (el que se trajo para revisarlo) a `/mnt/user-data/outputs/taller-3d/<carpeta>/<archivo>.gcode` y escribirlo en `<trabajo>/<carpeta>/` con `device_commit_files` (`stagedPath`). Es el que se imprime: el nombre dice para qué impresora es, también en la pantalla de la impresora.
+2. **Proyecto de Orca**, para ver o tocar la pieza en la ventana de Orca:
+   ```bash
+   python3 -I proyecto_3mf.py --stl pieza.stl --gcode <G-code aprobado> --cama "<cama de la impresora en config.json>" \
+     --nombre "<nombre de la pieza>" --salida /mnt/user-data/outputs/taller-3d/<carpeta>/<archivo>.3mf --json informe_3mf.json
+   ```
+   Lleva el modelo en el centro de la cama, los nombres y valores de los perfiles con que se laminó (la copia de la máquina, el AUTO proceso y el AUTO filamento) y la cama real (por línea de comandos Orca usa Cool Plate). Escribirlo con `device_commit_files` (`stagedPath`). Si el script avisa algo, contarlo en una línea; si no lo puede armar (sale 2), entregar sin proyecto y decir que abra `pieza.stl` en Orca y elija los perfiles AUTO.
+3. Dejar también en la carpeta: `pieza.py` (si se modeló), `pieza.stl`, `vista.png`, `config_usada.json`, `informe_gcode.json` e `informe.md`. En `laminado/` quedan las vueltas de Orca: se pueden borrar.
 
 `informe.md` y la respuesta al usuario (breve):
-- Ruta del G-code.
+- El G-code a imprimir (`<archivo>.gcode`) y su carpeta.
 - Tiempo, gramos y costo (si hay precios en la configuración; si faltan, ofrecer cargarlos).
 - 3 a 6 decisiones clave con el porqué (material, orientación, paredes/relleno, costura, soportes, cama).
 - Resultado de la revisión de seguridad (APROBADO o advertencias explicadas).
 - Qué mirar durante la impresión (primera capa, voladizos en tal altura) y el recordatorio de no dejarla sin supervisión.
-- Cómo imprimir: pasar el G-code por USB o por la app de la impresora y arrancar desde la impresora. También puede abrir `pieza.stl` en Orca y elegir los perfiles `AUTO`: quedan configurados igual. **No arrancarla nunca desde acá.**
+- Cómo imprimir: pasar `<archivo>.gcode` por USB o por la app de la impresora y arrancar desde la impresora. **No arrancarla nunca desde acá.**
+- Para verla o tocarla en Orca: abrir `<archivo>.3mf` con doble clic; se abre con la impresora, el filamento, el proceso y la cama elegidos. Si Orca ya estaba abierto desde antes de que se crearan los perfiles AUTO, cerrarlo primero: si no, los muestra como cambios sobre el perfil de sistema (con los mismos valores).
 
-Registrar la entrega en `historial.csv` y actualizar el catálogo (skill `catalogo`, "Agregar o actualizar una pieza") con `informe_gcode.json`, `informe_stl.json` y los archivos de la carpeta.
+**Abrir Orca con la pieza** (opcional): solo si hay `device_bash` en la PC y después de preguntar "¿Te abro Orca con la pieza?". Si dice que sí, lanzarlo en segundo plano con el proyecto, con `orca.ejecutable` de `config.json`:
+- Linux, solo con sesión gráfica (`[ -n "$DISPLAY$WAYLAND_DISPLAY" ]`): `nohup "<ejecutable>" "<ruta del .3mf>" >/dev/null 2>&1 &` (Flatpak: `nohup flatpak run com.orcaslicer.OrcaSlicer "<ruta del .3mf>" >/dev/null 2>&1 &`).
+- Windows (PowerShell): `Start-Process -FilePath "<ejecutable>" -ArgumentList '"<ruta del .3mf>"'`.
+- macOS: `open -a OrcaSlicer "<ruta del .3mf>"`.
+
+Si no se puede (sin sesión gráfica, sin ejecutable o sin `device_bash`), decir en una línea: "Abrí `<archivo>.3mf` con doble clic". Abrir la ventana está bien; imprimir es del usuario (skill `impresion-3d`, regla 1): nunca usar la pestaña Dispositivo (Device) de Orca ni sus botones Imprimir o Enviar, tampoco con el control del escritorio.
+
+Registrar la entrega en `historial.csv` y actualizar el catálogo (skill `catalogo`, "Agregar o actualizar una pieza") con `--impresora "<nombre de la impresora>"`, `informe_gcode.json`, `informe_stl.json` y los archivos de la carpeta (`<archivo>.gcode`, `<archivo>.3mf`, `pieza.stl`, `pieza.py`, `vista.png`, `informe.md`).
 
 ### En paralelo: la publicación
 

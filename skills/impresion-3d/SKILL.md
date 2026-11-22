@@ -9,7 +9,7 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
 
 ## 1. Reglas de seguridad (siempre, sin excepción)
 
-1. **Nunca arrancar una impresión.** No usar herramientas que inicien, pausen o controlen impresoras aunque estén disponibles, ni mandar archivos a una impresora por red. Entregar el G-code; la persona lo imprime.
+1. **Nunca arrancar una impresión.** No usar herramientas que inicien, pausen o controlen impresoras aunque estén disponibles, ni mandar archivos a una impresora por red. Entregar el G-code; la persona lo imprime. Abrir la ventana de Orca con el proyecto de una pieza está bien (`/pieza`: solo con terminal en la PC y preguntando antes), pero nunca usar su pestaña Dispositivo (Device) ni sus botones Imprimir o Enviar, tampoco con el control del escritorio.
 2. **Revisar todo G-code antes de entregarlo** con `revisar_gcode.py`. Si sale RECHAZADO, no entregarlo. Si sale CON ADVERTENCIAS, explicar cada una; si toca temperaturas o el área de la cama, pedir confirmación.
 3. **No pasar límites.** Crear y modificar perfiles solo con `perfil_orca.py`, que valida claves, valores y temperaturas contra la impresora y el material. No escribir JSON de perfiles a mano. Los perfiles que escribe Claude no llevan scripts de posprocesado ni plugins (Orca los ejecuta al laminar).
 4. **Escribir solo en dos lugares de la PC:** la carpeta de perfiles de usuario de Orca y la carpeta de trabajo del taller. Nunca tocar los perfiles de sistema de Orca. Pedir acceso solo a esas carpetas (y, si el usuario lo elige, una vez a su carpeta de documentos para crear adentro la de trabajo: `/instalar`, sección 3).
@@ -30,7 +30,8 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
   - `revisar_gcode.py`: revisión de seguridad del G-code; con `--json` y precios, también calcula el costo.
   - `impresora.py`: impresoras del usuario y sus datos (`detectar` las que tiene en Orca, `validar`, `desde-gcode` para leer lo que usa Orca y `comparar`). Ver `references/impresoras.md`.
   - `producto_tienda.py`: ficha de producto y precio (lo usa `/publicar`).
-  - `catalogo.py`: índice de las piezas (`taller-3d/catalogo.json`) y página `catalogo.html` con vistas, datos y archivos (skill `catalogo`).
+  - `catalogo.py`: índice de las piezas (`taller-3d/catalogo.json`) y página `catalogo.html` con vistas, datos y archivos (skill `catalogo`); `carpeta` da el nombre de la carpeta de una pieza y de su G-code, con la impresora.
+  - `proyecto_3mf.py`: proyecto de Orca (`.3mf`) de una pieza, a partir del STL y del G-code laminado: el modelo con los perfiles y la cama real, para abrirlo con doble clic.
   - `novedades_orca.py`: compara el Orca del usuario con lo que conoce el taller (parámetros nuevos o que ya no están, claves viejas en perfiles, perfiles TEST o AUTO que sobran) y dice cuándo toca revisar en la web (sección 7).
   - Dependencias de CAD y vistas: `pip install --break-system-packages -q manifold3d numpy matplotlib`.
   - Otras skills llegan a estos scripts por `<raíz del plugin>/skills/impresion-3d/scripts/`. La raíz es la carpeta que contiene `skills/`. Si no se sabe: `find / -path '*skills/impresion-3d/scripts/comun.py' -not -path '/proc/*' 2>/dev/null | head -1`.
@@ -46,8 +47,8 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
 - La configuración vive en la PC: `<carpeta de trabajo>/taller-3d/config.json` (formato en `references/configuracion.md`; ejemplo en `datos/config-ejemplo.json`). Tiene las impresoras del usuario, los nombres de sus perfiles, sus costos, su tienda y la aceptación del aviso.
 - Para encontrarla: `get_device_info` → buscar en cada carpeta conectada `taller-3d/config.json` con `device_list_dir`. Traerla con `device_stage_files` y leerla. Si no hay ninguna, usar `/instalar`.
 - Carpeta de trabajo:
-  - `impresiones/AAAA-MM-DD_nombre/`: modelo editable (`pieza.py`), `pieza.stl`, `vista.png`, G-code, `config_usada.json`, `informe.md`.
-  - `disenos/AAAA-MM-DD_nombre/`: pedidos de solo diseño (`/diseno`): `pieza.py`, STL, vista y `parametros.md`.
+  - `impresiones/AAAA-MM-DD_nombre_impresora/`: modelo editable (`pieza.py`), `pieza.stl`, `vista.png`, `nombre_impresora.gcode` (el que se imprime), `nombre_impresora.3mf` (proyecto de Orca), `config_usada.json`, `informe.md` y `laminado/` (las vueltas de Orca). La impresora va en el nombre porque un G-code solo sirve para la impresora para la que se laminó (`catalogo.py carpeta`).
+  - `disenos/AAAA-MM-DD_nombre/`: pedidos de solo diseño (`/diseno`): `pieza.py`, STL, vista y `parametros.md`. Si se diseñó para una impresora puntual, también lleva su nombre al final.
   - `respaldos/AAAA-MM-DD_HHMMSS/`: copias previas de lo que se cambió.
   - `calibraciones/<filamento>.md`: resultados de calibración.
   - `taller-3d/`: `config.json`, `impresoras/<id>.json` (datos de cada impresora preparada), `historial.csv`, `aprendizajes.md`, `novedades-orca.json` (lo que se aprendió del Orca del usuario; sección 7), `catalogo.json` (índice de piezas).
@@ -85,7 +86,8 @@ jq -rs 'map(.parametros)|add|to_entries[]|select((.value.label//"")+(.value.tool
 
 - `orca-mcp` 0.1.0 con Orca 2.5.1: `parameter_sweep` y los `*_overrides` fallan, y un JSON fuera de la carpeta de usuario no se carga. Para variar parámetros, escribir un perfil de usuario (`AUTO ...`) y laminar llamándolo por nombre.
 - `inherits` tiene que ser un perfil **de sistema**. Por eso un perfil derivado repite todas las anulaciones del perfil de usuario base (`perfil_orca.py crear --base`).
-- Orca abierto no ve perfiles nuevos hasta reiniciarlo.
+- Orca abierto no ve perfiles nuevos hasta reiniciarlo. El proyecto `.3mf` de una pieza trae los valores igual, pero si Orca no conoce los AUTO los muestra como cambios sobre el perfil de sistema.
+- Al abrir un proyecto, Orca 2.5.1 toma del proyecto solo las claves que cada perfil cambia respecto del de sistema (`different_settings_to_system`) y el resto lo lee del perfil de sistema. Por eso las claves que Orca recalcula al laminar (`enable_prime_tower`, `has_scarf_joint_seam`) no marcan el perfil como modificado. El proyecto de una pieza vieja sí puede mostrar cambios (↺) sobre los AUTO actuales: son los ajustes de esa pieza, porque los AUTO se rehacen en cada una.
 - Blender sin la ventana abierta: usar `execute_blender_code_for_cli` con un `.blend` existente; en ese modo `bpy.ops` falla, así que armar la geometría con `bmesh` y escribir el STL a mano. Para piezas funcionales preferir `cad.py`.
 
 ## 7. Mantenerse al día con Orca

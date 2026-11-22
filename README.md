@@ -31,7 +31,7 @@ Además, la skill `impresion-3d` responde cualquier duda de configuración: cono
 - Si una pieza no entra en la impresora elegida, te dice en cuál de tus otras impresoras entra.
 - Si un plugin de Orca resuelve lo que pedís (un llavero, un cartel, un florero), te lo sugiere con sus riesgos. No instala nada.
 - Después de cada laminado compara tu Orca con lo que conoce (parámetros nuevos o que ya no están) y una vez por mes revisa si salió una versión nueva o hay plugins útiles. Lo anota en tu carpeta de trabajo.
-- Cada pieza queda en su carpeta: modelo editable (`pieza.py`), STL, vista previa, G-code, configuración usada e informe.
+- Cada pieza queda en su carpeta, con el nombre de la impresora para la que se laminó: modelo editable (`pieza.py`), STL, vista previa, G-code, proyecto de Orca (`.3mf`, se abre con doble clic con los perfiles y la cama ya elegidos), configuración usada e informe.
 - Tus datos (impresoras, nombres de perfiles, precios, tienda) viven en `taller-3d/config.json` dentro de tu carpeta de trabajo, no en el plugin. Los datos de cada impresora, en `taller-3d/impresoras/`.
 - Antes de cambiar algo, hace un respaldo y lo anota en el historial.
 - Con el uso, `aprendizajes.md` guarda qué funcionó con tus materiales e impresoras.
@@ -61,7 +61,7 @@ Por ahora el taller se instala desde este repositorio de GitHub. Se hace en **Cl
 
 ## Componentes
 
-- `skills/impresion-3d/`: conocimiento, reglas de seguridad, scripts (`cad.py`, `revisar_stl.py`, `vista_previa.py`, `perfil_orca.py`, `revisar_gcode.py`, `impresora.py`, `producto_tienda.py`, `novedades_orca.py`, `catalogo.py`), datos de materiales, catálogo de parámetros de Orca, guía de plugins de Orca y pruebas (`scripts/tests/`).
+- `skills/impresion-3d/`: conocimiento, reglas de seguridad, scripts (`cad.py`, `revisar_stl.py`, `vista_previa.py`, `perfil_orca.py`, `revisar_gcode.py`, `impresora.py`, `producto_tienda.py`, `novedades_orca.py`, `catalogo.py`, `proyecto_3mf.py`), datos de materiales, catálogo de parámetros de Orca, guía de plugins de Orca y pruebas (`scripts/tests/`).
 - `skills/pieza`, `diseno`, `calibrar`, `impresoras`, `publicar`, `catalogo`, `instalar`, `restaurar`, `ayuda`: flujos de trabajo.
 - `MANUAL.md`: manual de uso.
 - `hooks/`: bloqueos automáticos de seguridad.

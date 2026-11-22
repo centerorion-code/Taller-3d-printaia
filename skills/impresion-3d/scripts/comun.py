@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-VERSION_PLUGIN = "0.1.11"
+VERSION_PLUGIN = "0.1.12"
 VERSION_ORCA = "2.5.1"
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -39,6 +39,14 @@ def cargar_json(ruta: Path | str):
 # Boquilla al final del nombre de un perfil de máquina: "0.4 nozzle", "(0.4 nozzle)", "HF0.4 nozzle", "0.4mm nozzle".
 RE_BOQUILLA = re.compile(r"\s*[(\[]?\s*(?:hf\s*)?\d+(?:[.,]\d+)?\s*(?:mm)?\s*nozzle\s*(?:hf)?\s*[)\]]?\s*$", re.I)
 RE_NUMERO_BOQUILLA = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:mm)?\s*nozzle", re.I)
+
+
+def slug(texto, vacio: str = "pieza") -> str:
+    """Nombre para carpetas y archivos: minúsculas, sin acentos, palabras unidas con guiones."""
+    import unicodedata
+    t = unicodedata.normalize("NFKD", str(texto or "")).encode("ascii", "ignore").decode()
+    t = re.sub(r"[^a-z0-9]+", "-", t.lower()).strip("-")
+    return t[:60].strip("-") or vacio
 
 
 def plano(texto) -> str:

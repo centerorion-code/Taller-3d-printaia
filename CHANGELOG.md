@@ -1,5 +1,12 @@
 # Cambios
 
+## 0.1.12 (2026-11-21)
+
+- **Proyecto de Orca de cada pieza.** Junto con el G-code queda un `.3mf`: con doble clic, Orca abre la pieza en el centro de la cama con la impresora, el filamento y el proceso AUTO elegidos, y con tu tipo de cama real (por línea de comandos Orca usa Cool Plate). Lo arma `proyecto_3mf.py` con el STL y la configuración completa que Orca escribe en el G-code, porque orca-mcp no exporta proyectos. Se probó en la ventana de Orca 2.5.1: abre con los tres perfiles sin cambios, y Orca por línea de comandos lo lamina con la misma configuración. Si Orca estaba abierto desde antes de crear los AUTO, hay que cerrarlo: si no, los muestra como cambios sobre el perfil de sistema.
+- **La impresora va en el nombre** de la carpeta de la pieza y del G-code (`impresiones/2026-11-21_soporte-router_ender-3-v3-plus/soporte-router_ender-3-v3-plus.gcode`), porque un G-code solo sirve para la impresora para la que se laminó. Las vueltas de prueba de Orca quedan aparte, en `laminado/`. `catalogo.py carpeta` arma los nombres, y el catálogo muestra la impresora de cada pieza.
+- **Abrir Orca con la pieza:** si Claude tiene terminal en la PC, pregunta antes y lo abre con el proyecto. Imprimir sigue siendo tuyo: nunca usa la pestaña Dispositivo ni los botones Imprimir o Enviar.
+- El bloqueo de la terminal ya no frena direcciones web como `https://github.com/OrcaSlicer/OrcaSlicer` (las tomaba por la carpeta de datos de Orca). `file://` sigue contando como ruta.
+
 ## 0.1.11 (2026-11-21)
 
 Correcciones de la prueba con la Creality Hi en una PC real.

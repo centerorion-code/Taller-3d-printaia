@@ -26,7 +26,7 @@ Crear y modificar siempre con `perfil_orca.py` (valida y escribe el `.info`). Es
 
 ## Laminar con perfiles por nombre (orca-mcp)
 
-`slice_model(model_path, machine_profile, process_profile, filament_profile, output_dir)` con los nombres de usuario (por ejemplo `Mi <modelo> 0.4 nozzle`, `AUTO proceso @<modelo>`, el filamento del usuario). `output_dir` dentro de la carpeta de trabajo (ruta absoluta).
+`slice_model(model_path, machine_profile, process_profile, filament_profile, output_dir)` con los nombres de usuario (por ejemplo `Mi <modelo> 0.4 nozzle`, `AUTO proceso @<modelo>`, el filamento del usuario). `output_dir` dentro de la carpeta de la pieza, en `laminado/` (ruta absoluta): orca-mcp deja ahí una subcarpeta con fecha por cada vuelta.
 
 ## Tipo de cama
 

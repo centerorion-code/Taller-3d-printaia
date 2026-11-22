@@ -86,7 +86,7 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
 4. **Configuración.** Elige los ajustes según el uso: paredes, relleno, velocidades, temperaturas, soportes y orientación. Los guarda en dos perfiles de trabajo llamados "AUTO". **Tus perfiles no se tocan.**
 5. **Laminado.** Lamina en tu Orca y mira el resultado: tiempo, gramos, voladizos y temperaturas. Si algo no cierra, ajusta y vuelve a laminar, hasta tres veces antes de consultarte.
 6. **Revisión de seguridad.** Revisa el G-code: temperaturas, que no salga de la cama, que no tenga comandos que cambien la configuración de la impresora y que apague todo al terminar. **Si no pasa, no se entrega.**
-7. **Entrega.** Deja todo en una carpeta y te resume tiempo, gramos, costo (si cargaste precios), las decisiones con el porqué y qué mirar durante la impresión. También podés abrir `pieza.stl` en Orca y elegir los perfiles AUTO: quedan configurados igual.
+7. **Entrega.** Deja todo en una carpeta con el nombre de la pieza y de la impresora, y te resume tiempo, gramos, costo (si cargaste precios), las decisiones con el porqué y qué mirar durante la impresión. **Para verla o tocarla en Orca, abrí el proyecto (`.3mf`) con doble clic:** se abre con tu impresora, el filamento, el proceso AUTO y tu tipo de cama ya elegidos. Si Claude tiene terminal en tu PC, te pregunta si querés que te abra Orca con la pieza.
    **En paralelo, la publicación:** si tenés tienda configurada, Claude te ofrece armar el producto en ese momento, con el precio calculado con el tiempo y los gramos reales y una imagen ilustrativa (dice "Imagen ilustrativa"). Lo aprobás vos, también desde la app de Claude en el celular, y queda como borrador.
 8. **Imprimís vos.** Pasás el G-code a la impresora (por USB o con la app de la marca) y la arrancás desde ahí. **Claude nunca arranca una impresión.** Mirá la primera capa completa y no dejes la impresora sola.
 9. **Contale cómo salió.** Mandale una foto, aunque haya salido bien. Si algo falló, lo diagnostica y lo corrige. Lo que funcionó queda anotado y mejora las próximas piezas.
@@ -107,13 +107,15 @@ En tu carpeta de trabajo, la que elegiste al instalar (si apretaste Enter, `Docu
 
 ```
 catalogo.html           todas tus piezas en una página: abrila con doble clic
-impresiones/2026-11-21_soporte-router/
+impresiones/2026-11-21_soporte-router_ender-3-v3-plus/
+    soporte-router_ender-3-v3-plus.gcode   lo que se imprime (solo en esa impresora)
+    soporte-router_ender-3-v3-plus.3mf     el proyecto de Orca: abrilo con doble clic
     pieza.py            modelo editable (las medidas están arriba de todo)
     pieza.stl           el modelo
     vista.png           la vista previa
-    pieza-.../plate_1.gcode   lo que se imprime
     informe.md          tiempo, gramos, costo, decisiones y qué mirar
     config_usada.json   configuración usada y por qué
+    laminado/           las vueltas de prueba de Orca (se pueden borrar)
 disenos/2026-11-21_organizador/
     pieza.py, pieza.stl, vista.png, parametros.md   pedidos de solo diseño
 respaldos/              copias de lo que se cambió
@@ -161,7 +163,13 @@ Los comandos llevan el nombre del plugin adelante (`/taller-3d:...`): si escrib�
 
 **¿Puedo aprobar desde el celular?** Sí: la conversación es la misma en la PC y en la app de Claude del celular.
 
-**¿Tengo que tener Orca abierto?** No. Si lo tenés abierto, reinicialo para ver los perfiles nuevos.
+**¿Tengo que tener Orca abierto?** No. Si lo tenés abierto, cerralo y volvé a abrirlo para ver los perfiles nuevos; después abrí el proyecto `.3mf` de la pieza.
+
+**Abrí el proyecto de una pieza vieja y Orca marca cambios (↺) en los perfiles AUTO. ¿Está mal?** No: los AUTO se rehacen en cada pieza, y el proyecto trae los ajustes con que se hizo esa. Si la volvés a laminar desde ahí, sale igual que la primera vez.
+
+**¿Por qué la carpeta y el G-code dicen el nombre de la impresora?** Porque un G-code sirve solo para la impresora para la que se laminó: así no se confunde, ni en la PC ni en la pantalla de la impresora.
+
+**¿Claude me puede abrir Orca?** Si tiene terminal en tu PC, te pregunta si querés que te lo abra con la pieza. Si no, abrí el `.3mf` con doble clic. Imprimir es siempre tuyo: Claude no usa la pestaña Dispositivo ni los botones Imprimir o Enviar.
 
 **¿Gasta mi plan de Claude?** Sí: diseñar y ajustar consume uso de tu plan. Un pedido claro y con medidas ahorra vueltas.
 

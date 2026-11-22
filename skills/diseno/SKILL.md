@@ -26,7 +26,7 @@ Si a mitad de `/diseno` pide imprimirla, seguir con `/pieza` desde la configurac
 
 ## 2. Modelo paramétrico
 
-1. Carpeta: `/mnt/user-data/outputs/taller-3d/disenos/AAAA-MM-DD_nombre/`.
+1. Carpeta: `python3 -I catalogo.py carpeta --tipo diseno --nombre "<nombre>"` → `/mnt/user-data/outputs/taller-3d/<carpeta>/` (`disenos/AAAA-MM-DD_nombre`). Si se diseña para una impresora puntual (la nombró o se revisó contra la suya), sumar `--impresora "<nombre>"`: queda al final del nombre.
 2. `pieza.py` con `cad.py` según `references/cad.md`: **todos los parámetros arriba**, con nombre claro y un comentario con unidad y rango razonable; el modelo se calcula a partir de ellos, sin números sueltos en el cuerpo. Holguras con `holgura()` o de `aprendizajes.md`.
 3. Correrlo para generar `pieza.stl`.
 4. Revisar: `revisar_stl.py pieza.stl --impresora ninguna --esperado <AxBxC> [--material <m>] --json informe_stl.json` (malla cerrada, medidas, apoyo y voladizos). Si el usuario dijo en qué impresora la va a imprimir y está preparada en el taller, usar sus datos (`--impresora <json>`) para revisar también que entre en la cama, y con `--otras <carpeta taller-3d/impresoras>` el informe dice en cuál de sus otras impresoras entra si en esa no. RECHAZADO → corregir.
@@ -38,7 +38,7 @@ Si a mitad de `/diseno` pide imprimirla, seguir con `/pieza` desde la configurac
 - Archivos: `pieza.py` (editable), `pieza.stl` (uno por variante), `vista.png` y `parametros.md`.
 - `parametros.md`: tabla de parámetros (nombre, valor, unidad, qué cambia), cómo regenerar (`python3 pieza.py`, con `cad.py` al lado) y que para cambiar algo alcanza con pedirlo ("hacelo 5 mm más alto").
 - Recomendaciones de impresión en 3 a 5 líneas: orientación, material sugerido, si lleva soportes. Sin laminar.
-- Mandar los archivos con `SendUserFile`. Si la PC está conectada y hay carpeta de trabajo, dejarlos también en `<trabajo>/disenos/AAAA-MM-DD_nombre/` con el procedimiento de escritura, registrar en `historial.csv` y actualizar el catálogo (skill `catalogo`) con `informe_stl.json` y los archivos.
+- Mandar los archivos con `SendUserFile`. Si la PC está conectada y hay carpeta de trabajo, dejarlos también en `<trabajo>/<carpeta>/` con el procedimiento de escritura, registrar en `historial.csv` y actualizar el catálogo (skill `catalogo`) con `informe_stl.json` y los archivos.
 - Ofrecer el paso siguiente: dejarla lista para imprimir (`/pieza`) o armar la publicación (`/publicar`, con imagen ilustrativa hasta tener la foto real).
 
 ## Reglas

@@ -2,7 +2,7 @@
 
 ## Principios
 
-1. **Nunca arranca una impresión.** El plugin no usa herramientas de control de impresoras y entrega el G-code para que la persona lo imprima. Un bloqueo automático impide además mandar comandos de impresión por red (Moonraker, OctoPrint) desde la terminal.
+1. **Nunca arranca una impresión.** El plugin no usa herramientas de control de impresoras y entrega el G-code para que la persona lo imprima. Un bloqueo automático impide además mandar comandos de impresión por red (Moonraker, OctoPrint) desde la terminal. Puede abrir la ventana de Orca con el proyecto de una pieza solo si tiene terminal en la PC y después de preguntar; nunca usa la pestaña Dispositivo ni los botones Imprimir o Enviar.
 2. **Revisión de seguridad de cada G-code** (`revisar_gcode.py`) antes de entregarlo:
    - temperaturas de boquilla y cama contra el máximo de la impresora y el rango del material;
    - movimientos fuera del área de impresión y Z negativa;
@@ -23,7 +23,7 @@
 
 `hooks/guardia.py` corre:
 
-- **Antes de escribir en la PC** (`device_commit_files`, y `Write`/`Edit`/`MultiEdit` en Claude Code): revisa los G-code (`.gcode`, `.gco`, `.g`, `.gc`), los proyectos `.3mf` y `.gcode.3mf` (G-code de adentro, scripts y temperaturas de sus ajustes) y los perfiles de usuario de Orca. Rechaza el G-code binario (`.bgcode`), que no puede leer. Estos archivos tienen que ir con `stagedPath`: con `fileUuid` no los puede leer, así que no los deja pasar.
+- **Antes de escribir en la PC** (`device_commit_files`, y `Write`/`Edit`/`MultiEdit` en Claude Code): revisa los G-code (`.gcode`, `.gco`, `.g`, `.gc`), los proyectos `.3mf` y `.gcode.3mf` (G-code de adentro, scripts y temperaturas de sus ajustes; el proyecto que arma `proyecto_3mf.py` sale sin scripts de posprocesado ni plugins) y los perfiles de usuario de Orca. Rechaza el G-code binario (`.bgcode`), que no puede leer. Estos archivos tienen que ir con `stagedPath`: con `fileUuid` no los puede leer, así que no los deja pasar.
 - **Antes de un comando de terminal** (Bash y `device_bash`): bloquea arrancar impresiones por red, subir modelos, G-code o perfiles a internet, escribir, mover o borrar en la carpeta de datos de Orca, y leer, copiar o empaquetar `OrcaSlicer.conf` o la carpeta de datos de Orca entera: solo deja pasar los dos comandos fijos que sacan la lista de impresoras y la elegida.
 - **Antes de traer archivos de la PC** (`device_stage_files`) **y de leerlos** (`Read` y `Grep` en Claude Code): no deja traer ni leer `OrcaSlicer.conf`, sus copias (como el `.bak` que Orca hace en Windows) ni nada de la carpeta de datos de Orca fuera de los perfiles (`user/` y `system/`).
 - **Después de laminar:** recuerda revisar el G-code antes de entregarlo.

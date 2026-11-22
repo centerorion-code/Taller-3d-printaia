@@ -512,13 +512,16 @@ def toca_conf_de_orca(comando: str) -> bool:
                 for ruta in (x.strip() for x in _RE_CORTE.split(variante)):
                     if not ruta or (n == 0 and "/" not in ruta.strip("/")):
                         continue                          # el nombre del programa (orcaslicer --help)
+                    # Una dirección web (git clone https://github.com/OrcaSlicer/OrcaSlicer) no es la carpeta de
+                    # datos; file:// sí puede serlo, así que esa sigue como ruta.
+                    web = bool(re.match(r"[a-z][a-z0-9+.-]*://", ruta)) and not ruta.startswith("file://")
                     con_carpeta = "/" in ruta or ruta.startswith("~")
                     carpeta, _, final = ruta.rstrip("/").rpartition("/")
                     if not mira and _es_nombre_conf(final, False) and (con_carpeta or en_raiz):
                         return True                       # OrcaSlicer.conf o una copia, con su carpeta
                     if not mira and _comodin_de_conf(final) and (_puede_ser_raiz(carpeta) if carpeta else en_raiz):
                         return True                       # un comodín sobre la carpeta de datos de Orca
-                    if _es_raiz_orca(ruta) and (con_carpeta or programa in EMPAQUETAN):
+                    if not web and _es_raiz_orca(ruta) and (con_carpeta or programa in EMPAQUETAN):
                         if not (mira and len(tramos) == 1 and not _RE_RECURSIVO.search(tramo)):
                             return True                   # la carpeta entera: copiarla, empaquetarla, recorrerla
         if programa in _CD and len(palabras) > 1:

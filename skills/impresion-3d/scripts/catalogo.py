@@ -8,9 +8,18 @@ arma `catalogo.html`, una página que se abre con el navegador desde la carpeta 
 la vista de cada pieza, sus datos y enlaces a sus archivos, ordenadas por mes, con buscador y
 filtros. Las imágenes se cargan desde la carpeta de cada pieza: no hace falta traerlas.
 
+Las carpetas de las piezas llevan la impresora para la que se hicieron:
+impresiones/AAAA-MM-DD_nombre_impresora/ (los diseños sin impresora, disenos/AAAA-MM-DD_nombre/).
+
 Uso:
+  # Nombre de la carpeta de una pieza nueva y de su G-code y proyecto (.gcode y .3mf)
+  python3 catalogo.py carpeta --nombre "Soporte para router" --impresora "Ender-3 V3 Plus" [--tipo diseno]
+  #   → {"carpeta": "impresiones/2026-11-21_soporte-para-router_ender-3-v3-plus",
+  #      "archivo": "soporte-para-router_ender-3-v3-plus"}
+
   # Agregar o actualizar una pieza (cada vez que se guarda, se lamina, se imprime o se publica)
-  python3 catalogo.py agregar --catalogo catalogo.json --carpeta impresiones/2026-11-21_soporte-router \\
+  python3 catalogo.py agregar --catalogo catalogo.json \\
+      --carpeta impresiones/2026-11-21_soporte-para-router_ender-3-v3-plus --impresora "Ender-3 V3 Plus" \\
       --nombre "Soporte para router" [--tipo impresion|diseno] [--material PETG] [--color negro] \\
       [--informe-gcode informe_gcode.json] [--informe-stl informe_stl.json] [--producto producto.json] \\
       [--archivos pieza.stl pieza.py vista.png informe.md] [--imagen vista.png] \\
@@ -81,10 +90,30 @@ def normalizar_carpeta(carpeta: str) -> str:
     return "/".join(partes)
 
 
-def nombre_desde_carpeta(carpeta: str) -> str:
+def carpeta_de_pieza(tipo: str, nombre: str, impresora: str | None = None, fecha: str | None = None) -> str:
+    """impresiones/AAAA-MM-DD_nombre_impresora (o disenos/...): la impresora va al final, después de un '_'."""
+    base = f"{fecha or time.strftime('%Y-%m-%d')}_{comun.slug(nombre)}"
+    if impresora:
+        base += f"_{comun.slug(impresora, 'impresora')}"
+    return f"{'disenos' if tipo == 'diseno' else 'impresiones'}/{base}"
+
+
+def archivo_de_pieza(nombre: str, impresora: str | None = None) -> str:
+    """Nombre del G-code y del proyecto de Orca: nombre_impresora (sin extensión)."""
+    return comun.slug(nombre) + (f"_{comun.slug(impresora, 'impresora')}" if impresora else "")
+
+
+def partes_de_carpeta(carpeta: str) -> tuple[str | None, str, str | None]:
+    """(fecha, nombre, impresora) de una carpeta de pieza. Los nombres usan guiones; la impresora va
+    después del segundo '_' (desde la 0.1.12; las carpetas anteriores no la tienen)."""
     m = RE_CARPETA.match(carpeta)
     base = m.group(3) if m else carpeta.rsplit("/", 1)[-1]
-    texto = re.sub(r"[-_]+", " ", base).strip()
+    nombre, _, impresora = base.partition("_")
+    return (m.group(2) if m else None), nombre, (impresora or None)
+
+
+def nombre_desde_carpeta(carpeta: str) -> str:
+    texto = re.sub(r"[-_]+", " ", partes_de_carpeta(carpeta)[1]).strip()
     return texto[:1].upper() + texto[1:] if texto else carpeta
 
 
@@ -133,15 +162,17 @@ def agregar(catalogo: dict, carpeta: str, **campos) -> dict:
     carpeta = normalizar_carpeta(carpeta)
     pieza = next((p for p in catalogo["piezas"] if p.get("carpeta") == carpeta), None)
     if pieza is None:
-        m = RE_CARPETA.match(carpeta)
+        fecha, _, impresora = partes_de_carpeta(carpeta)
         pieza = {
             "carpeta": carpeta,
             "tipo": "diseno" if carpeta.startswith("disenos/") else "impresion",
             "nombre": nombre_desde_carpeta(carpeta),
-            "fecha": m.group(2) if m else time.strftime("%Y-%m-%d"),
+            "fecha": fecha or time.strftime("%Y-%m-%d"),
             "estado": "disenada",
             "archivos": [],
         }
+        if impresora:
+            pieza["impresora"] = impresora
         catalogo["piezas"].append(pieza)
     for clave, valor in campos.items():
         if valor in (None, "", [], {}):
@@ -319,6 +350,8 @@ def _tarjeta(p: dict) -> str:
         chips.append(f'<span class="chip">{e(material)}</span>')
     chips.append(f'<span class="chip estado">{e(ESTADOS.get(p.get("estado"), p.get("estado") or ""))}</span>')
     filas = []
+    if p.get("impresora"):
+        filas.append(("Impresora", p["impresora"]))
     if p.get("medidas_mm"):
         filas.append(("Medidas", " × ".join(_numero(x) for x in p["medidas_mm"]) + " mm"))
     if p.get("tiempo"):
@@ -338,7 +371,8 @@ def _tarjeta(p: dict) -> str:
     if p.get("url_tienda"):
         enlaces += f'<a href="{e(p["url_tienda"])}" rel="noopener noreferrer">en la tienda</a>'
     fecha = p.get("fecha") or ""
-    texto = " ".join(str(x) for x in (nombre, p.get("material"), p.get("color"), p.get("nota"), carpeta) if x).lower()
+    texto = " ".join(str(x) for x in (nombre, p.get("material"), p.get("color"), p.get("impresora"), p.get("nota"),
+                                      carpeta) if x).lower()
     return f"""<article data-tipo="{e(p.get('tipo') or '')}" data-estado="{e(p.get('estado') or '')}" data-texto="{e(texto)}">
 <div class="imagen">{img}</div>
 <div class="cuerpo">
@@ -440,6 +474,7 @@ def main(argv=None) -> None:
     a.add_argument("--fecha", help="AAAA-MM-DD (si no, la del nombre de la carpeta)")
     a.add_argument("--material")
     a.add_argument("--color")
+    a.add_argument("--impresora", help="nombre de la impresora para la que se hizo (el de config.json)")
     a.add_argument("--informe-gcode")
     a.add_argument("--informe-stl")
     a.add_argument("--producto", help="producto.json de /publicar")
@@ -454,6 +489,12 @@ def main(argv=None) -> None:
     d.add_argument("--catalogo", required=True, type=Path)
     d.add_argument("--listado", required=True, type=Path, help="JSON de device_list_dir (recursive) o lista de rutas")
 
+    c = sub.add_parser("carpeta", help="nombre de la carpeta de una pieza nueva y de su G-code y proyecto")
+    c.add_argument("--tipo", choices=sorted(TIPOS), default="impresion")
+    c.add_argument("--nombre", required=True)
+    c.add_argument("--impresora", help="la impresora para la que se lamina (en diseños, solo si se hizo para una)")
+    c.add_argument("--fecha", help="AAAA-MM-DD (si no, hoy)")
+
     h = sub.add_parser("html", help="arma catalogo.html")
     h.add_argument("--catalogo", required=True, type=Path)
     h.add_argument("--salida", required=True, type=Path)
@@ -464,6 +505,10 @@ def main(argv=None) -> None:
     r.add_argument("--buscar")
 
     args = ap.parse_args(argv)
+    if args.accion == "carpeta":
+        print(json.dumps({"carpeta": carpeta_de_pieza(args.tipo, args.nombre, args.impresora, args.fecha),
+                          "archivo": archivo_de_pieza(args.nombre, args.impresora)}, ensure_ascii=False))
+        return
     catalogo = cargar(args.catalogo)
     if args.accion == "agregar":
         extra = datos_de_informes(_leer_json(args.informe_gcode), _leer_json(args.informe_stl),
@@ -474,6 +519,7 @@ def main(argv=None) -> None:
             extra["precio"]["moneda"] = args.moneda
         pieza = agregar(catalogo, args.carpeta, nombre=args.nombre, tipo=args.tipo, fecha=args.fecha,
                         material=args.material or extra.pop("material", None), color=args.color,
+                        impresora=args.impresora,
                         archivos=args.archivos, imagen=args.imagen, nota=args.nota, url_tienda=args.url_tienda,
                         **{k: v for k, v in extra.items() if k != "material"})
         guardar(args.catalogo, catalogo)
