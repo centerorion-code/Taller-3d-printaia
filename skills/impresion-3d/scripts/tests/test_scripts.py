@@ -2362,5 +2362,44 @@ class TestGuardia(unittest.TestCase):
         self.assertEqual(r.returncode, 0)
 
 
+@unittest.skipUnless(__import__("shutil").which("ffmpeg"), "falta ffmpeg")
+class PruebaReel(unittest.TestCase):
+    def test_reel_vertical_con_cierre(self):
+        import reel_pieza
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as t:
+            d = Path(t)
+            fotos = []
+            for i, color in enumerate(["#C62828", "#1F5FD6"]):
+                f = d / f"foto-{i}.jpg"
+                Image.new("RGB", (800, 600), color).save(f)
+                fotos.append(f)
+            pub = d / "publicacion.json"
+            pub.write_text(json.dumps({"producto": {"name": "Soporte", "regular_price": "4500"},
+                                       "material": "PETG", "medidas_mm": [40, 20, 60]}), encoding="utf-8")
+            r = reel_pieza.armar(fotos, d / "video" / "reel.mp4", gancho="¿Estante flojo?", segundos=1.0,
+                                 marca="mi-tienda", publicacion=pub)
+            self.assertTrue(Path(r["video"]).exists())
+            self.assertTrue(Path(r["portada"]).exists())
+            self.assertEqual(r["guion"][-1]["texto"], "$ 4.500 · mi-tienda")
+            self.assertEqual(r["guion"][1]["texto"], "Soporte")
+            self.assertIn("1080x1920", r["formato"])
+
+    def test_rotulo_largo_y_sin_fotos(self):
+        import reel_pieza
+        with self.assertRaises(ValueError):
+            reel_pieza.armar([], Path("x.mp4"))
+        with tempfile.TemporaryDirectory() as t:
+            from PIL import Image
+            f = Path(t) / "f.jpg"
+            Image.new("RGB", (10, 10)).save(f)
+            with self.assertRaises(ValueError):
+                reel_pieza.armar([f], Path(t) / "r.mp4", gancho="x" * 61)
+
+    def test_plata(self):
+        import reel_pieza
+        self.assertEqual(reel_pieza.plata("12300"), "$ 12.300")
+
+
 if __name__ == "__main__":
     unittest.main()

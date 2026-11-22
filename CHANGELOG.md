@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.1.34 (2026-11-22)
+
+- **Reels de cada pieza:** `/taller-3d:video` arma un video vertical (1080x1920) para Instagram Reels, TikTok o YouTube Shorts con las fotos de la pieza, el timelapse si hay, un gancho, los datos y el precio, más el guion, el texto de la publicación y los hashtags por red. Lo hace `reel_pieza.py` (Pillow y ffmpeg): acercamiento lento sobre cada foto, rótulos en zona segura (lejos de los botones de las apps), fundidos y música opcional con licencia. Nunca publica en redes.
+- **`/taller-3d:publicar` ofrece el reel** al terminar la publicación.
+- **Skills de redes incluidas:** 15 skills de social-media-skills (MIT, Frank Heijdenrijk) para guion, ganchos, textos, hashtags, música, CapCut y publicación en Reels, TikTok y Shorts. Detalle en `AVISOS-DE-TERCEROS.md`.
+
 ## 0.1.33 (2026-11-22)
 
 - **Daño y desgaste que se ven naturales:** para utilería y réplicas, los golpes, tajos y rayones ya no se hacen restando formas (dejaban cortes perfectos): se deforma la malla. `cad.py` suma `desgastar` con `marca_golpe` (hundimiento de bordes suaves con labio), `marca_tajo` (surco con el material corrido a un costado y astillados), `marca_rayon` (tiembla, cambia de hondo y se corta) y `marca_picadura`, y `deformar` para cualquier otra deformación. Una pared abollada conserva su espesor.

@@ -92,4 +92,5 @@ Los datos del producto están en `publicacion.json`, clave `producto`: nombre, S
 2. Decir dónde quedó el borrador (enlace al producto en el administrador si se creó, y en WooCommerce también su vista previa real, la de "Vista previa" del borrador; y el enlace `computer://` a la carpeta `producto/` de la pieza) y qué falta revisar antes de publicarlo: si quedó sin fotos, decirlo primero.
 3. Actualizar el panel (skill `panel`): si se cargó en la tienda, `catalogo.py agregar … --id-tienda <número del producto>` (queda como borrador en "Publicaciones", y la próxima vez se actualiza ese producto en vez de crear otro) y el enlace en `--url-tienda`; si no se cargó, queda como vista previa. Cuando el usuario cuente que la publicó, `--estado-publicacion publicada`.
 4. Registrar en `historial.csv`.
-5. Terminar con una línea "Te toca: …" (revisar el borrador y publicarlo, o imprimir la pieza y sacarle fotos).
+5. **Ofrecer el reel:** en una línea, si quiere un video para Instagram, TikTok o Shorts de la pieza (skill `video`, sale de lo que ya está en `producto/`). Si dice que sí, seguir con `/taller-3d:video`.
+6. Terminar con una línea "Te toca: …" (revisar el borrador y publicarlo, o imprimir la pieza y sacarle fotos).

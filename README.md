@@ -17,6 +17,7 @@ En la app, los comandos llevan el nombre del plugin adelante: escribí `/taller-
 | `/taller-3d:calibrar` | Calibrar un filamento con los tests de Orca, leyendo los resultados en fotos |
 | `/taller-3d:impresoras` | Agregar o revisar impresoras (límites, perfiles, cama) y ver qué perfiles sobran |
 | `/taller-3d:publicar` | Armar el producto (fotos de producto con Blender, ficha y precio por canal con el margen que elegís para ese producto) y cargarlo como borrador en tu tienda |
+| `/taller-3d:video` | Un reel vertical de la pieza para Instagram Reels, TikTok o YouTube Shorts (fotos, timelapse, rótulos y precio), con el guion, el texto y los hashtags. No publica: lo subís vos desde la app |
 | `/taller-3d:instalar` | Instalar o revisar que todo ande (saltea lo que ya está) y hacer una pieza de prueba |
 | `/taller-3d:panel` | El panel del taller (`panel.html`, y en claude.ai al costado del chat): tus ideas y piezas, en qué paso está cada una (idea, diseño, lista para imprimir, impresa, en la tienda), a quién le toca lo que sigue y lo que falta para tus costos. También anota ideas para más adelante |
 | `/taller-3d:restaurar` | Volver atrás un perfil, ordenar perfiles de prueba, desinstalar |
@@ -63,8 +64,9 @@ Por ahora el taller se instala desde este repositorio de GitHub. Se hace en **Cl
 
 ## Componentes
 
-- `skills/impresion-3d/`: conocimiento, reglas de seguridad, scripts (`cad.py`, `revisar_stl.py`, `vista_previa.py`, `perfil_orca.py`, `revisar_gcode.py`, `impresora.py`, `costos.py`, `producto_tienda.py`, `render_producto.py`, `novedades_orca.py`, `catalogo.py`, `proyecto_3mf.py`), datos de materiales, catálogo de parámetros de Orca, guía de plugins de Orca y pruebas (`scripts/tests/`).
-- `skills/pieza`, `diseno`, `calibrar`, `impresoras`, `publicar`, `panel`, `instalar`, `restaurar`, `ayuda`: flujos de trabajo.
+- `skills/impresion-3d/`: conocimiento, reglas de seguridad, scripts (`cad.py`, `revisar_stl.py`, `vista_previa.py`, `perfil_orca.py`, `revisar_gcode.py`, `impresora.py`, `costos.py`, `producto_tienda.py`, `render_producto.py`, `novedades_orca.py`, `catalogo.py`, `proyecto_3mf.py`, `reel_pieza.py`), datos de materiales, catálogo de parámetros de Orca, guía de plugins de Orca y pruebas (`scripts/tests/`).
+- `skills/pieza`, `diseno`, `calibrar`, `impresoras`, `publicar`, `video`, `panel`, `instalar`, `restaurar`, `ayuda`: flujos de trabajo.
+- `skills/reels-script`, `tiktok-script`, `youtube-shorts` y las demás skills de redes: vienen de social-media-skills (MIT), ver `AVISOS-DE-TERCEROS.md`.
 - `MANUAL.md`: manual de uso.
 - `hooks/`: bloqueos automáticos de seguridad.
 - `instalador/`: instaladores y desinstaladores para Linux y Windows.
@@ -75,7 +77,7 @@ Ubuntu 24.04, OrcaSlicer 2.5.1, orca-mcp 0.1.0, Creality Ender-3 V3 Plus. El ins
 
 ## Versión
 
-0.1.20. Cambios en [CHANGELOG.md](CHANGELOG.md).
+0.1.34. Cambios en [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 
