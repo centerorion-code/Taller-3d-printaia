@@ -297,10 +297,21 @@ def quien_sigue(p: dict) -> str | None:
     return "vos" if "impresa" not in h else None
 
 
+def _en_una_linea(texto, largo: int = 80) -> str:
+    """Un nombre para meter en un pedido: una sola línea, sin caracteres de control y corto."""
+    limpio = re.sub(r"[\x00-\x1f\x7f\u2028\u2029«»]+", " ", str(texto or ""))
+    limpio = re.sub(r"\s+", " ", limpio).strip()
+    return limpio if len(limpio) <= largo else limpio[:largo - 1].rstrip() + "…"
+
+
 def acciones(p: dict) -> list[tuple[str, str]]:
-    """Los botones de la tarjeta: (etiqueta, pedido a Claude). El pedido nombra la pieza y su carpeta."""
-    nombre = p.get("nombre") or p["carpeta"]
-    cual = f"«{nombre}» ({p['carpeta']})"
+    """Los botones de la tarjeta: (etiqueta, pedido a Claude). El pedido nombra la pieza y su carpeta.
+
+    El nombre va en una sola línea y recortado: puede venir de un modelo bajado de internet, y el pedido le llega
+    a Claude como si lo escribiera el usuario. La orden es el verbo del botón; el nombre y la carpeta son datos."""
+    carpeta = _en_una_linea(p["carpeta"], 160)
+    nombre = _en_una_linea(p.get("nombre")) or carpeta
+    cual = f"«{nombre}» ({carpeta})"
     h = hechos(p)
     if h == {"idea"}:
         return [("Diseñala", f"Desde el panel: diseñá la idea {cual} y dejala lista para imprimir."),
@@ -364,6 +375,17 @@ def imagen_de(pieza: dict) -> str | None:
         if elegida:
             return elegida
     return "vista.png" if not archivos else (imagenes[0] if imagenes else None)
+
+
+def _imagen_publicada(src) -> str | None:
+    """En la página de claude.ai, solo imágenes propias de la página (ruta relativa) o datos de imagen."""
+    if not isinstance(src, str) or not src:
+        return None
+    if src.startswith("data:image/"):
+        return src
+    if re.match(r"^[a-z][a-z0-9+.-]*:", src, re.I) or src.startswith(("/", "\\")) or ".." in src.split("/"):
+        return None
+    return src
 
 
 def _href(carpeta: str, archivo: str) -> str:
@@ -538,11 +560,11 @@ def _tarjeta(p: dict, modo: str = "archivo", imagenes: dict | None = None) -> st
     """modo archivo: panel.html en la carpeta de trabajo (vistas y archivos por ruta relativa).
     modo claude: la página de claude.ai, sin acceso a la PC (las imágenes vienen en `imagenes`, carpeta → ruta)."""
     e = html.escape
-    carpeta = p["carpeta"]
-    nombre = p.get("nombre") or carpeta
+    carpeta = str(p["carpeta"])
+    nombre = str(p.get("nombre") or carpeta)
     es_idea = p.get("tipo") == "idea"
     if modo == "claude":
-        src = (imagenes or {}).get(carpeta)
+        src = _imagen_publicada((imagenes or {}).get(carpeta))
     else:
         imagen = None if es_idea else imagen_de(p)
         src = _href(carpeta, imagen) if imagen else None
@@ -587,8 +609,9 @@ def _tarjeta(p: dict, modo: str = "archivo", imagenes: dict | None = None) -> st
         enlaces = "".join(f'<span>{e(a.rsplit("/", 1)[-1])}</span>' for a in archivos[:8])
     else:
         enlaces = "".join(f'<a href="{e(_href(carpeta, a))}">{e(a.rsplit("/", 1)[-1])}</a>' for a in archivos[:8])
-    if p.get("url_tienda"):
-        enlaces += f'<a href="{e(p["url_tienda"])}" rel="noopener noreferrer">en la tienda</a>'
+    tienda = url_segura(p.get("url_tienda")) if isinstance(p.get("url_tienda"), str) else None
+    if tienda:                                           # se revisa también acá: el índice se puede tocar a mano
+        enlaces += f'<a href="{e(tienda)}" rel="noopener noreferrer">en la tienda</a>'
     botones = "".join(f'<button type="button" data-pedido="{e(pedido)}">{e(etiqueta)}</button>'
                       for etiqueta, pedido in acciones(p))
     botones += '<button type="button" class="solo-claude" data-comentar>Otra cosa…</button>'
@@ -607,7 +630,7 @@ def _tarjeta(p: dict, modo: str = "archivo", imagenes: dict | None = None) -> st
 <p class="aviso" role="status" aria-live="polite"></p>
 <div class="chips">{''.join(chips)}</div>
 {f'<dl>{dl}</dl>' if dl else ''}
-{f'<p class="nota">{e(p["nota"])}</p>' if p.get("nota") else ''}
+{f'<p class="nota">{e(str(p["nota"]))}</p>' if p.get("nota") else ''}
 {f'<div class="archivos">{enlaces}</div>' if enlaces else ''}
 <div class="ubicacion">{e(ubicacion)}</div>
 </div>
@@ -640,7 +663,8 @@ def generar_html(catalogo: dict, titulo: str = "Panel del taller", modo: str = "
     e = html.escape
     if modo not in ("archivo", "claude"):
         raise ValueError(f"Modo desconocido: {modo}")
-    piezas = sorted(catalogo["piezas"], key=lambda p: (p.get("fecha") or "", p.get("carpeta") or ""), reverse=True)
+    piezas = [p for p in catalogo.get("piezas") or [] if isinstance(p, dict) and p.get("carpeta")]
+    piezas = sorted(piezas, key=lambda p: (str(p.get("fecha") or ""), str(p.get("carpeta"))), reverse=True)
     # Para hacer: primero lo más avanzado (listas para imprimir, después diseños, al final las ideas)
     por_hacer = sorted((p for p in piezas if grupo_de(p) != "terminada"), key=_avance, reverse=True)
     terminadas = [p for p in piezas if grupo_de(p) == "terminada"]

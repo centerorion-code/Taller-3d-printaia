@@ -608,10 +608,17 @@ def informe_texto(r: dict) -> str:
     lineas.append(f"Tiempo: {est['duracion']} | Filamento: {est['gramos']} g | Capas: {est['capas']}")
     if r.get("costo"):
         c = r["costo"]
-        partes = [f"material {c['material']}" if "material" in c else None,
-                  f"luz {c['energia']}" if "energia" in c else None]
-        partes = [p for p in partes if p]
+        if c.get("partes"):
+            nombres = {"material": "material", "luz": "luz", "maquina": "desgaste de la impresora", "fallas": "fallas",
+                       "mano_de_obra": "tu tiempo", "embalaje": "embalaje"}
+            partes = [f"{nombres.get(k, k)} {v}" for k, v in c["partes"].items() if v]
+        else:
+            partes = [f"material {c['material']}" if "material" in c else None,
+                      f"luz {c['energia']}" if "energia" in c else None]
+            partes = [p for p in partes if p]
         lineas.append(f"Costo estimado: {c['total']} {c['moneda']} ({', '.join(partes)})")
+        lineas += [f"  Supuesto: {s}" for s in c.get("supuestos") or []]
+        lineas += [f"  Falta: {f}" for f in c.get("faltan") or []]
     if r["hallazgos"]:
         lineas.append("Hallazgos:")
         etiqueta = {RECHAZO: "[RECHAZO]", ADVERTENCIA: "[ADVERTENCIA]", APROBADO: "[OK]"}

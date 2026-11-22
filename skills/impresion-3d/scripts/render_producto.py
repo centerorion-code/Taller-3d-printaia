@@ -32,7 +32,9 @@ COLORES = {
     "negro": "#242424", "blanco": "#EDEDED", "gris": "#8A8D91", "plateado": "#B8BCC2", "rojo": "#C62828",
     "azul": "#1F5FD6", "celeste": "#4FA3E0", "verde": "#2E8B57", "amarillo": "#F2C200", "naranja": "#F26A1B",
     "violeta": "#7B3FBF", "rosa": "#E86A9E", "marron": "#7A4B2A", "marrón": "#7A4B2A", "dorado": "#C9A227",
-    "beige": "#D8C3A0", "natural": "#E6DCC8",
+    "beige": "#D8C3A0", "natural": "#E6DCC8", "turquesa": "#1BA6A6", "lila": "#B79CD9", "bordo": "#7B1E2B",
+    "transparente": "#DDE6EA", "black": "#242424", "white": "#EDEDED", "grey": "#8A8D91", "gray": "#8A8D91",
+    "red": "#C62828", "blue": "#1F5FD6", "green": "#2E8B57", "yellow": "#F2C200", "orange": "#F26A1B",
 }
 BRILLO = {"PETG": 0.28, "PLA": 0.42, "ABS": 0.5, "ASA": 0.55, "TPU": 0.6, "PC": 0.3, "PA": 0.55}
 VISTAS = {"tres_cuartos": (-38, 24), "frente": (0, 8), "arriba": (-30, 62)}
@@ -44,14 +46,16 @@ TOMAS = {  # toma: (vista, fondo, archivo)
 }
 
 
+COLOR_POR_DEFECTO = "#8A8D91"   # gris neutro si el color no se reconoce (y se avisa)
+
+
 def color_de(texto: str) -> str:
+    """#RRGGBB del color dicho: el nombre que aparece primero (\"verde azulado\" es verde)."""
     t = (texto or "").strip().lower()
     if t.startswith("#") and len(t) == 7:
         return t
-    for nombre, valor in COLORES.items():
-        if nombre in t:
-            return valor
-    return "#E8590C"
+    hallados = sorted((t.find(n), -len(n), v) for n, v in COLORES.items() if n in t)
+    return hallados[0][2] if hallados else COLOR_POR_DEFECTO
 
 
 def rugosidad(material: str | None, color: str | None) -> float:
@@ -212,14 +216,38 @@ def _escena(stl: Path, color_hex: str, rug: float, capa_mm: float):
     return escena, camara, piso, mathutils.Vector((0, 0, alto / 2)), radio
 
 
-def _apuntar(camara, centro, radio, vista: str):
+def _apuntar(camara, centro, radio, vista: str, pieza=None, escena=None, borde: float = 0.39):
+    """Pone la cámara en la vista y la acerca hasta que la pieza llegue a `borde` del centro del cuadro
+    (0,39 ≈ la pieza en el 78 % del render, que después se recorta al 80 % de la foto sin agrandarla)."""
+    import bpy
     import mathutils
     az, el = (math.radians(x) for x in VISTAS[vista])
     fov = 2 * math.atan(36 / 2 / camara.data.lens)
+    direccion = mathutils.Vector((math.sin(az) * math.cos(el), -math.cos(az) * math.cos(el), math.sin(el)))
+
+    def colocar(d):
+        camara.location = centro + d * direccion
+        camara.rotation_euler = (centro - camara.location).to_track_quat("-Z", "Y").to_euler()
+        bpy.context.view_layer.update()
+
     dist = radio / math.sin(fov / 2) * 1.45
-    camara.location = centro + dist * mathutils.Vector((math.sin(az) * math.cos(el), -math.cos(az) * math.cos(el),
-                                                        math.sin(el)))
-    camara.rotation_euler = (centro - camara.location).to_track_quat("-Z", "Y").to_euler()
+    colocar(dist)
+    if pieza is None or escena is None:
+        return
+    from bpy_extras.object_utils import world_to_camera_view
+    vertices = pieza.data.vertices
+    paso = max(1, len(vertices) // 4000)
+    puntos = [pieza.matrix_world @ vertices[i].co for i in range(0, len(vertices), paso)]
+    for _ in range(4):
+        proy = [world_to_camera_view(escena, camara, p) for p in puntos]
+        lejos = max(max(abs(q.x - 0.5), abs(q.y - 0.5)) for q in proy)
+        if lejos <= 0:
+            break
+        nueva = dist * lejos / borde
+        if abs(nueva - dist) < dist * 0.01:
+            break
+        dist = max(nueva, radio * 1.05)                 # nunca adentro de la pieza
+        colocar(dist)
 
 
 def renderizar(stl: Path, salida: Path, color: str = "", material: str | None = None, capa_mm: float = 0.2,
@@ -232,13 +260,16 @@ def renderizar(stl: Path, salida: Path, color: str = "", material: str | None = 
     if malas:
         raise ValueError(f"Tomas desconocidas: {', '.join(malas)} (hay {', '.join(TOMAS)}).")
     t0 = time.time()
+    if capa_mm <= 0:
+        raise ValueError("La altura de capa tiene que ser mayor que cero.")
     escena, camara, piso, centro, radio = _escena(stl, color_de(color), rugosidad(material, color), capa_mm)
+    pieza = next(o for o in escena.objects if o.type == "MESH" and not o.is_shadow_catcher)
     escena.render.resolution_x = escena.render.resolution_y = round(lado * 1.1)
     salida.mkdir(parents=True, exist_ok=True)
     archivos = []
     with tempfile.TemporaryDirectory() as tmp:
         for vista in dict.fromkeys(TOMAS[t][0] for t in tomas):
-            _apuntar(camara, centro, radio, vista)
+            _apuntar(camara, centro, radio, vista, pieza, escena)
             piso.hide_render = False
             escena.cycles.samples, escena.cycles.use_denoising = muestras, True
             escena.render.filepath = str(Path(tmp) / f"{vista}.png")
@@ -283,6 +314,9 @@ def main(argv=None) -> None:
                        [t.strip() for t in args.tomas.split(",") if t.strip()], args.tam, args.muestras)
     except ValueError as error:
         raise SystemExit(str(error))
+    pedido = (args.color or "").strip().lower()
+    if pedido and not (pedido.startswith("#") and len(pedido) == 7) and not any(n in pedido for n in COLORES):
+        print(f"No reconocí el color «{args.color}»: salió gris. Pasalo como #RRGGBB para el tono justo.")
     for archivo in r["archivos"]:
         print(f"Foto: {archivo}")
     print(f"Listo en {r['segundos']} s.")

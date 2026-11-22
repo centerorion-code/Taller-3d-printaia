@@ -1,5 +1,27 @@
 # Cambios
 
+## 0.1.16 (2026-11-21)
+
+Correcciones de una revisión independiente de la 0.1.15.
+
+- **Bloqueo en Windows:** una ruta escrita con la barra doble (`C://Users/...`) pasaba como dirección web y dejaba copiar entera la carpeta de datos de Orca, con `OrcaSlicer.conf`. Ahora se bloquea igual que `C:/Users/...`.
+- **Precio cerca del tope del cargo fijo** (Mercado Libre): salía más caro de lo necesario, por ejemplo $ 22.100 en vez de $ 20.000. Ahora el precio nunca baja cuando el costo sube.
+- **Panel:**
+  - el enlace a la tienda y las imágenes se revisan también al armar la página;
+  - el nombre de la pieza va en el pedido en una sola línea y recortado, y Claude lo toma como dato, no como orden;
+  - una entrada rara en el índice ya no rompe la página.
+- **Fotos de producto:**
+  - la cámara se acerca hasta que la pieza llena el cuadro, así la foto de 1200 px tiene detalle de 1200 px (antes se agrandaba hasta 1,45 veces);
+  - lee mejor los colores ("verde azulado" es verde, nombres en inglés) y avisa si no reconoce uno.
+- **Costos:**
+  - el precio del kWh puede ser menor que 1, para otras monedas;
+  - acepta valores escritos como "15 %" o "0,18", y el precio del filamento también como número;
+  - la boleta vieja se mide por su período;
+  - avisa cuando el G-code es de una impresora que no está en la configuración;
+  - `costos.py luz` no escribe nada si no encuentra la configuración;
+  - la revisión del G-code muestra todas las partes del costo y lo que falta.
+- La regla de "nada a internet" nombra el panel al costado como segunda excepción, y la pregunta para activarlo avisa que lleva costos y precios.
+
 ## 0.1.15 (2026-11-21)
 
 - **Enlaces a tu PC:** cada vez que Claude te dice dónde quedó algo (la carpeta de la pieza, el G-code, el `.3mf`, el panel o las fotos de producto), te deja un enlace para ir directo. El del `.3mf` lo abre con el programa que tengas para esos archivos.

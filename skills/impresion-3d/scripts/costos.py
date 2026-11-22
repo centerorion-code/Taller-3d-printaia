@@ -56,10 +56,20 @@ LUZ_VIEJA_DIAS = 120       # después de esto, pedir una boleta más nueva
 
 
 def _num(valor) -> float | None:
+    """Un número de la configuración; también "15 %" o "0,18". None si no hay o no se entiende."""
+    if isinstance(valor, str):
+        valor = valor.replace("%", "").replace(" ", "").strip()
+        if valor.count(",") == 1 and "." not in valor:
+            valor = valor.replace(",", ".")
     try:
-        return None if valor in (None, "") else float(valor)
+        return None if valor in (None, "") or isinstance(valor, bool) else float(valor)
     except (TypeError, ValueError):
         return None
+
+
+def _precio_kg(dato) -> float | None:
+    """El precio del kg de un filamento: {"precio_kg": 25000} o directamente 25000."""
+    return _num(dato.get("precio_kg")) if isinstance(dato, dict) else _num(dato)
 
 
 # ------------------------------------------------------------------ luz
@@ -69,10 +79,13 @@ def precio_kwh_de_boleta(kwh=None, total=None, cargo_variable=None, impuestos_pc
     kwh, total, cv = _num(kwh), _num(total), _num(cargo_variable)
     imp, fijos = _num(impuestos_pct) or 0.0, _num(cargos_fijos) or 0.0
     r: dict = {}
+    def redondear(x: float) -> float:                    # 152,9 ARS o 0,1815 EUR: sin perder el precio chico
+        return round(x, 4) if abs(x) < 10 else round(x, 2)
+
     if kwh and kwh > 0 and total and total > 0:
-        r["promedio_kwh"] = round((total - fijos) / kwh, 2)
+        r["promedio_kwh"] = redondear((total - fijos) / kwh)
     if cv and cv > 0:
-        r["marginal_kwh"] = round(cv * (1 + imp / 100), 2)
+        r["marginal_kwh"] = redondear(cv * (1 + imp / 100))
     if "marginal_kwh" in r:
         r["precio_kwh"], r["metodo"] = r["marginal_kwh"], "marginal"
     elif "promedio_kwh" in r:
@@ -80,7 +93,7 @@ def precio_kwh_de_boleta(kwh=None, total=None, cargo_variable=None, impuestos_pc
     else:
         raise ValueError("Faltan datos de la boleta: hacen falta los kWh consumidos y el total, o el cargo variable "
                          "por kWh.")
-    if not 1 <= r["precio_kwh"] <= 100000:
+    if not 0.005 <= r["precio_kwh"] <= 100000:          # de medio centavo (otras monedas) a 100.000
         raise ValueError(f"El precio del kWh da {r['precio_kwh']}: revisá los números de la boleta.")
     return r
 
@@ -90,12 +103,16 @@ def luz_de_config(config: dict) -> dict:
     luz = costos.get("luz") if isinstance(costos.get("luz"), dict) else {}
     precio = _num(luz.get("precio_kwh")) or _num(costos.get("precio_kwh"))
     vieja = False
-    cargado = luz.get("cargado")
-    if cargado:
-        try:
+    periodo, cargado = str(luz.get("periodo") or ""), luz.get("cargado")
+    try:
+        if len(periodo) >= 7:                          # AAAA-MM: la boleta vale desde el fin de ese mes
+            anio, mes = int(periodo[:4]), int(periodo[5:7])
+            desde = date(anio + mes // 12, mes % 12 + 1, 1)
+            vieja = (date.today() - desde).days > LUZ_VIEJA_DIAS
+        elif cargado:
             vieja = (date.today() - date.fromisoformat(str(cargado)[:10])).days > LUZ_VIEJA_DIAS
-        except ValueError:
-            vieja = False
+    except ValueError:
+        vieja = False
     return {"precio_kwh": precio, "de_boleta": bool(luz.get("precio_kwh")), "vieja": vieja,
             "metodo": luz.get("metodo"), "periodo": luz.get("periodo"), "empresa": luz.get("empresa")}
 
@@ -112,7 +129,13 @@ def impresora_de_config(config: dict, clave: str | None) -> dict:
             nombres = [i.get("id"), i.get("nombre"), Path(str(i.get("datos") or "")).stem]
             if any(n and comun.plano(n) == c for n in nombres):
                 return i
-    return impresoras[0] if len(impresoras) == 1 else {}
+    if len(impresoras) == 1:
+        unica = impresoras[0]
+        if clave:                                       # se pidió otra: usar la única, pero decirlo
+            return dict(unica, _aviso=f"«{clave}» no está en tu configuración: usé los datos de la "
+                                      f"{unica.get('nombre') or unica.get('id')}")
+        return unica
+    return {}
 
 
 # ------------------------------------------------------------------ costo de una pieza
@@ -127,10 +150,13 @@ def costo_pieza(gramos, segundos, material: str | None, config: dict, impresora:
     horas = segundos / 3600
     faltan, supuestos = [], []
     nombre_imp = f"la {imp.get('nombre') or imp.get('id')}" if (imp.get("nombre") or imp.get("id")) else "la impresora"
+    if imp.get("_aviso"):
+        supuestos.append(imp["_aviso"])
 
     precios = costos.get("filamentos") or {}
+    precios = precios if isinstance(precios, dict) else {}
     datos_mat = precios.get(filamento or "") or precios.get(material or "") or {}
-    precio_kg = _num(datos_mat.get("precio_kg"))
+    precio_kg = _precio_kg(datos_mat)
     if precio_kg is None:
         faltan.append(f"precio del kg de {material or 'filamento'}")
     material_c = gramos / 1000 * (precio_kg or 0)
@@ -231,6 +257,7 @@ def canales_de_config(tienda: dict) -> dict:
 
 
 def _redondear(valor: float, paso: float) -> float:
+    paso = abs(paso or 0)
     return float(math.ceil(valor / paso - 1e-9) * paso) if paso else round(valor, 2)
 
 
@@ -271,9 +298,8 @@ def precio_canal(costo: float, canal: dict, margen_pct: float, redondeo: float =
                          "que cierre. Bajá el margen.")
     precio = (costo + fijo) / divisor
     if hasta and precio >= hasta:                       # el cargo fijo solo va en las ventas baratas
-        sin_fijo = costo / divisor
-        if sin_fijo >= hasta:
-            precio = sin_fijo
+        # Desde el tope ya no hay cargo fijo: alcanza con el precio sin cargo, o con el tope si ese da menos.
+        precio = max(costo / divisor, hasta)
     return desglose(costo, canal, _redondear(precio, redondeo))
 
 
@@ -303,7 +329,7 @@ def precios(costo: float, config: dict, margen_pct: float | None = None, precio:
 def margenes_sugeridos(habitual: float | None) -> list[float]:
     """Tres márgenes para que el usuario elija en cada producto: uno más bajo, el habitual y uno más alto."""
     h = habitual if habitual is not None else 40.0
-    return sorted({max(15.0, h - 15), h, min(h + 20, 75.0)})
+    return sorted({max(min(15.0, h), h - 15), h, min(h + 20, max(75.0, min(h + 5, 95.0)))})
 
 
 def opciones(costo: float, config: dict, margenes: list[float] | None = None) -> list[dict]:
@@ -351,10 +377,11 @@ def estado_taller(config: dict) -> list[dict]:
                 _plata(_num(ci.get("precio")), costos.get("moneda") or "ARS") if _num(ci.get("precio")) else
                 "Falta cuánto la pagaste (para el desgaste)", f"La {nombre} me costó $…")
     filamentos = costos.get("filamentos") or {}
-    sin_precio = [m for m, d in filamentos.items() if not isinstance(d, dict) or _num(d.get("precio_kg")) is None]
+    filamentos = filamentos if isinstance(filamentos, dict) else {}
+    sin_precio = [m for m, d in filamentos.items() if _precio_kg(d) is None]
     agregar("Filamentos", bool(filamentos) and not sin_precio,
-            "Precio por kg: " + ", ".join(f"{m} {_plata(_num(d.get('precio_kg')), '').strip()}" for m, d in filamentos.items()
-                                          if isinstance(d, dict) and _num(d.get("precio_kg")) is not None)
+            "Precio por kg: " + ", ".join(f"{m} {_plata(_precio_kg(d), '').strip()}" for m, d in filamentos.items()
+                                          if _precio_kg(d) is not None)
             if filamentos and not sin_precio else f"Falta el precio por kg de {', '.join(sin_precio) or 'tus filamentos'}",
             f"El rollo de {sin_precio[0] if sin_precio else 'PETG'} me sale $… el kilo")
     mano = costos.get("mano_de_obra") if isinstance(costos.get("mano_de_obra"), dict) else {}
@@ -421,6 +448,10 @@ def main(argv=None) -> None:
     es.add_argument("--config", type=Path, required=True)
     es.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
+    if a.accion == "luz" and not a.config.exists():
+        raise SystemExit(f"No encuentro {a.config}: pasá el config.json del taller (no se escribió nada).")
+    if a.accion == "pieza" and a.precio is not None and a.precio <= 0:
+        raise SystemExit("--precio tiene que ser mayor que cero.")
     config = comun.cargar_json(a.config) if a.config.exists() else {}
 
     if a.accion == "luz":

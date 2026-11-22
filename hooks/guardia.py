@@ -514,7 +514,8 @@ def toca_conf_de_orca(comando: str) -> bool:
                         continue                          # el nombre del programa (orcaslicer --help)
                     # Una dirección web (git clone https://github.com/OrcaSlicer/OrcaSlicer) no es la carpeta de
                     # datos; file:// sí puede serlo, así que esa sigue como ruta.
-                    web = bool(re.match(r"[a-z][a-z0-9+.-]*://", ruta)) and not ruta.startswith("file://")
+                    # El esquema tiene dos letras o más: C://Users/... es una unidad de Windows, no la web.
+                    web = bool(re.match(r"[a-z][a-z0-9+.-]+://", ruta)) and not ruta.startswith("file://")
                     con_carpeta = "/" in ruta or ruta.startswith("~")
                     carpeta, _, final = ruta.rstrip("/").rpartition("/")
                     if not mira and _es_nombre_conf(final, False) and (con_carpeta or en_raiz):
