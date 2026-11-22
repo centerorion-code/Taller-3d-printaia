@@ -34,7 +34,7 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
   - `producto_tienda.py`: ficha de producto, precio y vista previa (lo usa `/publicar`).
   - `textos_ia.py`: pedido para que Gemini escriba el texto de venta y revisión de lo que devuelve, o de lo que escribe Claude (`references/textos-con-gemini.md`).
   - `vista_publicacion.py`: la vista previa de la publicación como página de la tienda, para el archivo y para la página al costado del chat.
-  - `render_producto.py`: fotos de producto con Blender (`pip install --break-system-packages bpy pillow`, unos 400 MB): cuadradas, sin texto, fondo blanco puro para Mercado Libre y otra con sombra (lo usa `/publicar`).
+  - `render_producto.py`: fotos de producto con Blender (`pip install --break-system-packages bpy pillow`, unos 400 MB): cuatro ángulos (tres cuartos, el otro lado, de frente y desde arriba), cuadradas, sin texto, la primera con fondo blanco puro para Mercado Libre (lo usa `/publicar`).
   - `catalogo.py`: el panel del taller: índice de ideas y piezas (`taller-3d/catalogo.json`) y página `panel.html` con el paso en que está cada una, a quién le toca lo que sigue, vistas, datos y archivos; con `--modo claude`, la página para el panel al costado del chat en claude.ai (skill `panel`); `carpeta` da el nombre de la carpeta de una pieza y de su G-code, con la impresora.
   - `proyecto_3mf.py`: proyecto de Orca (`.3mf`) de una pieza, a partir del STL y del G-code laminado: el modelo con los perfiles y la cama real, para abrirlo con doble clic.
   - `novedades_orca.py`: compara el Orca del usuario con lo que conoce el taller (parámetros nuevos o que ya no están, claves viejas en perfiles, perfiles TEST o AUTO que sobran) y dice cuándo toca revisar en la web (sección 7).

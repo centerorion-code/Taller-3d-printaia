@@ -122,5 +122,5 @@ Después, en `pieza.py`: `importar_stl("figura.stl")` e `importar_stl("texto.stl
    python3 -I render_producto.py --stl pieza.stl --salida <carpeta>/producto --tomas tienda --tam 800 \
      --muestras 16 [--color "<color>"] [--material <m>]
    ```
-   Tarda unos 40 segundos y deja `producto/producto-2-tienda.jpg`; `/publicar` después la rehace en alta. Si no se puede instalar Blender, `vista_previa.py pieza.stl foto.png --producto --color "<color>"`.
+   Tarda unos 40 segundos y deja `producto/producto-5-tienda.jpg`; `/publicar` después hace las cuatro fotos de la galería. Si no se puede instalar Blender, `vista_previa.py pieza.stl foto.png --producto --color "<color>"`.
 4. Antes de mostrarla, mirarla (leer la imagen): ¿se reconoce lo pedido sin que lo digan? ¿Coincide con la foto o el dibujo que mandó el usuario? ¿Falta algo, como un texto que quedó adentro de la base? Si no cierra, corregir o cambiar de herramienta antes de mostrarla. Al mostrarla, decir qué es aproximado ("las orejas son simplificadas").

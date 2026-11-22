@@ -1,5 +1,10 @@
 # Cambios
 
+## 0.1.27 (2026-11-22)
+
+- **La publicación trae cuatro fotos desde ángulos distintos:** a tres cuartos con fondo blanco (la primera de Mercado Libre), desde el otro lado, de frente y desde arriba, numeradas en el orden de la galería (`producto-1-principal.jpg` … `producto-4-arriba.jpg`). Antes salían dos fotos del mismo ángulo. El otro lado se hace girando la pieza, así la luz y la sombra quedan iguales. La foto con fondo cálido para redes sale si se pide (toma `tienda`), ahora como `producto-5-tienda.jpg`.
+- **`render_producto.py`:** toma nueva `atras` (con menos contraluz, para que no se queme lo que queda detrás); por defecto `principal,atras,frente,arriba` con 16 muestras (unos 7 minutos las cuatro con 2 núcleos). En la pieza desde una foto, el dorso de una cáscara se muestra con la toma `atras`.
+
 ## 0.1.26 (2026-11-22)
 
 - **Vista previa de la publicación:** antes de cargar el producto, `/publicar` muestra cómo se vería la página en tu tienda (galería de fotos, título, precio, descripción y ficha técnica) y, abajo, lo que conviene revisar: si las fotos son ilustrativas, el título para Mercado Libre con sus caracteres, si la primera foto tiene fondo blanco, el precio y la ganancia en cada canal y quién escribió el texto. Se abre al costado del chat (siempre la misma página) y queda como `vista-previa.html` en la carpeta `producto/` de la pieza. Se aprueba con su botón o en el chat, también desde el celular; recién ahí se carga el borrador.

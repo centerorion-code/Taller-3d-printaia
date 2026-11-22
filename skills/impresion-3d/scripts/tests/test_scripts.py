@@ -597,7 +597,7 @@ class TestPublicacion(unittest.TestCase):
             d = Path(d)
             producto = d / "producto"
             producto.mkdir()
-            for nombre in ("producto-1-principal.jpg", "producto-2-tienda.jpg"):
+            for nombre in FOTOS_POR_DEFECTO:
                 (producto / nombre).write_bytes(b"\xff\xd8\xff")
             (d / "stl.json").write_text(json.dumps({"medidas_mm": [60, 30, 40]}), encoding="utf-8")
             (d / "gcode.json").write_text(json.dumps({"material": "PETG", "estimaciones": {"gramos": 25.4,
@@ -637,7 +637,7 @@ class TestPublicacion(unittest.TestCase):
         self.assertEqual([t["name"] for t in woo["tags"]], ["PETG", "soporte router"])
         self.assertIn(f"**Título para Mercado Libre:** {self.BIEN['titulo']} (53/60 caracteres)", ficha)
         self.assertIn("escrito por Gemini (gratis), revisado por Claude", ficha)
-        self.assertEqual(pub["fotos"], ["producto-1-principal.jpg", "producto-2-tienda.jpg"])
+        self.assertEqual(pub["fotos"], list(FOTOS_POR_DEFECTO))
         # La vista previa: como la página de la tienda, y abajo lo que hay que revisar
         self.assertIn("así se vería en <strong>mitienda.com</strong>", pagina)
         self.assertIn("Soporte &lt;b&gt;router&lt;/b&gt;", pagina)
@@ -1291,6 +1291,19 @@ class TestFotosDeProducto(unittest.TestCase):
         self.assertEqual(rp.color_de("verde azulado"), rp.COLORES["verde"])   # el nombre que aparece primero
         self.assertEqual(rp.color_de("fucsia neón"), rp.COLOR_POR_DEFECTO)
 
+    def test_cuatro_angulos_por_defecto(self):
+        import render_producto as rp
+        tomas = rp.TOMAS_POR_DEFECTO
+        self.assertEqual(len(tomas), 4)
+        # cuatro ángulos distintos, y el número del archivo es el orden de la galería
+        self.assertEqual(len({rp.VISTAS[rp.TOMAS[t][0]] for t in tomas}), 4)
+        self.assertEqual([rp.TOMAS[t][2] for t in tomas], list(FOTOS_POR_DEFECTO))
+        self.assertEqual(rp.TOMAS["principal"][1], "blanco_sin_sombra")       # la primera de Mercado Libre
+        self.assertEqual(rp.VISTAS["atras"], rp.VISTAS["tres_cuartos"][:2] + (180,))
+        numeros = [rp.TOMAS[t][2].split("-")[1] for t in rp.TOMAS]
+        self.assertEqual(len(numeros), len(set(numeros)))
+        self.assertTrue(all(len(v) == 3 for v in rp.VISTAS.values()))
+
     def test_sin_blender_avisa(self):
         try:
             import bpy  # noqa: F401
@@ -1316,6 +1329,10 @@ class TestFotosDeProducto(unittest.TestCase):
         # Fondo blanco puro y nada escrito abajo (Mercado Libre no admite texto)
         self.assertEqual(img.getpixel((0, 0)), (255, 255, 255))
         self.assertEqual(img.crop((0, 1140, 1200, 1200)).getcolors(), [(1200 * 60, (255, 255, 255))])
+
+
+FOTOS_POR_DEFECTO = ("producto-1-principal.jpg", "producto-2-atras.jpg", "producto-3-frente.jpg",
+                     "producto-4-arriba.jpg")
 
 
 def stl_cubo(ruta: Path, x=30.0, y=20.0, z=10.0, z0=5.0) -> Path:

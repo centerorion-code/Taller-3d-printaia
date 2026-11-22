@@ -4,19 +4,22 @@
 """Fotos de producto de una pieza, renderizadas con Blender (el módulo bpy) en el espacio de Claude.
 
 La pieza va con un material de plástico del color y el tipo de filamento (PETG brillante, PLA satinado),
-líneas de capa sutiles, tres luces de estudio y la cámara a tres cuartos. Sale cuadrada, sin texto:
-  producto-1-principal.jpg  fondo blanco puro y sin sombra (la primera foto de Mercado Libre)
-  producto-2-tienda.jpg     fondo claro cálido con sombra suave (tu tienda, redes)
+líneas de capa sutiles y tres luces de estudio. Por defecto salen cuatro fotos desde ángulos distintos,
+cuadradas y sin texto, numeradas en el orden de la galería:
+  producto-1-principal.jpg  a tres cuartos, fondo blanco puro y sin sombra (la primera foto de Mercado Libre)
+  producto-2-atras.jpg      a tres cuartos desde el otro lado, fondo blanco con sombra
   producto-3-frente.jpg     de frente, fondo blanco con sombra
   producto-4-arriba.jpg     desde arriba, fondo blanco con sombra
+  producto-5-tienda.jpg     solo si se pide: el ángulo de la principal con fondo claro cálido (redes)
 La pieza ocupa el 80 % del cuadro. Son imágenes ilustrativas: la descripción lo aclara hasta que haya
 fotos reales de la pieza impresa.
 
 Requiere: pip install --break-system-packages bpy pillow   (bpy pesa unos 400 MB; una vez por conversación)
 Uso:
   python3 -I render_producto.py --stl pieza.stl --salida <carpeta de la pieza>/producto --color azul \\
-      [--material PETG] [--capa 0.2] [--tomas principal,tienda,frente,arriba] [--tam 1200] [--muestras 32]
-Cada vista tarda unos minutos en una computadora de 2 núcleos: principal y tienda comparten la misma.
+      [--material PETG] [--capa 0.2] [--tomas principal,atras,frente,arriba] [--tam 1200] [--muestras 16]
+Cada ángulo se renderiza una vez (principal y tienda comparten el mismo): con 2 núcleos, 1200 px y
+16 muestras, las cuatro tardan unos 7 minutos.
 """
 from __future__ import annotations
 
@@ -37,13 +40,20 @@ COLORES = {
     "red": "#C62828", "blue": "#1F5FD6", "green": "#2E8B57", "yellow": "#F2C200", "orange": "#F26A1B",
 }
 BRILLO = {"PETG": 0.28, "PLA": 0.42, "ABS": 0.5, "ASA": 0.55, "TPU": 0.6, "PC": 0.3, "PA": 0.55}
-VISTAS = {"tres_cuartos": (-38, 24), "frente": (0, 8), "arriba": (-30, 62)}
-TOMAS = {  # toma: (vista, fondo, archivo)
+VISTAS = {  # vista: (azimut de la cámara, elevación, giro de la pieza), en grados
+    # el otro lado se muestra girando la pieza y no la cámara: la luz y la sombra quedan iguales
+    "tres_cuartos": (-38, 24, 0), "atras": (-38, 24, 180), "frente": (0, 8, 0), "arriba": (-30, 62, 0),
+}
+TOMAS = {  # toma: (vista, fondo, archivo); el número del archivo es el orden en la galería
     "principal": ("tres_cuartos", "blanco_sin_sombra", "producto-1-principal.jpg"),
-    "tienda": ("tres_cuartos", "calido", "producto-2-tienda.jpg"),
+    "atras": ("atras", "blanco", "producto-2-atras.jpg"),
     "frente": ("frente", "blanco", "producto-3-frente.jpg"),
     "arriba": ("arriba", "blanco", "producto-4-arriba.jpg"),
+    "tienda": ("tres_cuartos", "calido", "producto-5-tienda.jpg"),
 }
+TOMAS_POR_DEFECTO = ["principal", "atras", "frente", "arriba"]   # cuatro ángulos distintos para la galería
+# De espaldas, lo que queda detrás (la base de un soporte) mira a la contraluz y se quema: se baja.
+CONTRALUZ = {"atras": 0.4}
 
 
 COLOR_POR_DEFECTO = "#8A8D91"   # gris neutro si el color no se reconoce (y se avisa)
@@ -221,7 +231,7 @@ def _apuntar(camara, centro, radio, vista: str, pieza=None, escena=None, borde: 
     (0,39 ≈ la pieza en el 78 % del render, que después se recorta al 80 % de la foto sin agrandarla)."""
     import bpy
     import mathutils
-    az, el = (math.radians(x) for x in VISTAS[vista])
+    az, el = (math.radians(x) for x in VISTAS[vista][:2])
     fov = 2 * math.atan(36 / 2 / camara.data.lens)
     direccion = mathutils.Vector((math.sin(az) * math.cos(el), -math.cos(az) * math.cos(el), math.sin(el)))
 
@@ -251,11 +261,11 @@ def _apuntar(camara, centro, radio, vista: str, pieza=None, escena=None, borde: 
 
 
 def renderizar(stl: Path, salida: Path, color: str = "", material: str | None = None, capa_mm: float = 0.2,
-               tomas: list[str] | None = None, lado: int = 1200, muestras: int = 32) -> dict:
+               tomas: list[str] | None = None, lado: int = 1200, muestras: int = 16) -> dict:
     import bpy
     from PIL import Image
 
-    tomas = tomas or ["principal", "tienda"]
+    tomas = tomas or list(TOMAS_POR_DEFECTO)
     malas = [t for t in tomas if t not in TOMAS]
     if malas:
         raise ValueError(f"Tomas desconocidas: {', '.join(malas)} (hay {', '.join(TOMAS)}).")
@@ -267,8 +277,13 @@ def renderizar(stl: Path, salida: Path, color: str = "", material: str | None = 
     escena.render.resolution_x = escena.render.resolution_y = round(lado * 1.1)
     salida.mkdir(parents=True, exist_ok=True)
     archivos = []
+    contra = escena.objects.get("contra")
+    energia_contra = contra.data.energy if contra else 0
     with tempfile.TemporaryDirectory() as tmp:
         for vista in dict.fromkeys(TOMAS[t][0] for t in tomas):
+            pieza.rotation_euler = (0, 0, math.radians(VISTAS[vista][2]))
+            if contra:
+                contra.data.energy = energia_contra * CONTRALUZ.get(vista, 1.0)
             _apuntar(camara, centro, radio, vista, pieza, escena)
             piso.hide_render = False
             escena.cycles.samples, escena.cycles.use_denoising = muestras, True
@@ -296,9 +311,9 @@ def main(argv=None) -> None:
     a.add_argument("--color", default="", help="nombre (azul, negro mate, PLA seda dorado…) o #RRGGBB")
     a.add_argument("--material", help="PLA, PETG, ABS, ASA, TPU…")
     a.add_argument("--capa", type=float, default=0.2, help="altura de capa en mm (para las líneas de capa)")
-    a.add_argument("--tomas", default="principal,tienda", help=f"separadas por coma: {', '.join(TOMAS)}")
+    a.add_argument("--tomas", default=",".join(TOMAS_POR_DEFECTO), help=f"separadas por coma: {', '.join(TOMAS)}")
     a.add_argument("--tam", type=int, default=1200)
-    a.add_argument("--muestras", type=int, default=32)
+    a.add_argument("--muestras", type=int, default=16)
     a.add_argument("--json", type=Path)
     args = a.parse_args(argv)
     if not args.stl.exists():

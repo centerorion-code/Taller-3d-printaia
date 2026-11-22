@@ -45,7 +45,7 @@ Hunyuan también genera desde un texto (la otra pestaña de la misma página): e
    python3 -I engrosar_stl.py --stl <nombre>.stl --salida <nombre>.stl --pared 2
    ```
    Mueve hacia el hueco solo la superficie de adentro, así el detalle de afuera queda (informa cuánto se movió, que tiene que ser casi nada), rehace la malla con voxels y saca las sobras. Necesita `bpy`, como las fotos de producto. Tarda alrededor de un minuto. Volver a revisar.
-3. **Mostrar:** `render_producto.py` con las tomas `tienda,frente`; si es hueca, también el dorso (girarla con `revisar_stl.py --rotar 0,0,180 --salida`). Mirarlas al lado de la foto y decir con franqueza qué copió bien y qué perdió: los grabados finos de una foto de frente suelen quedar en la textura de Hunyuan y no en el relieve, que es lo que se imprime.
+3. **Mostrar:** `render_producto.py` con las tomas `tienda,frente` y, si es hueca, también `atras` (el dorso). Mirarlas al lado de la foto y decir con franqueza qué copió bien y qué perdió: los grabados finos de una foto de frente suelen quedar en la textura de Hunyuan y no en el relieve, que es lo que se imprime.
 4. **Imprimir:** una máscara o una figura parada lleva soportes tipo árbol; decirlo. Si es más grande que la cama, escalarla o partirla.
 
 ## 5. Pieza compuesta: lo generado y lo diseñado
