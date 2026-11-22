@@ -1,5 +1,13 @@
 # Cambios
 
+## 0.1.18 (2026-11-21)
+
+Correcciones del instalador de Linux, de la primera prueba en una PC real.
+
+- En el modo prueba (`--prueba`), el paso "Abrir Orca desde Claude y desde el panel" se salteaba porque el lanzador de Orca todavía no existía. Ahora muestra lo que haría.
+- Si ya tenías el taller instalado, el final dice que fue una actualización y qué hacer: reiniciar la app y escribir `/taller-3d:instalar`. Antes repetía los pasos de una instalación nueva.
+- Recuerda usar `--carpeta-trabajo` si la carpeta que toma no es la que usás con Claude. Toma la de una instalación anterior, y el programa que abre Orca solo abre proyectos de esa carpeta.
+
 ## 0.1.17 (2026-11-21)
 
 - **"Abrila en Orca" abre Orca de verdad** (Linux). El instalador puede agregar `taller3d-orca` (`instalador/abrir_orca.py`), un programa chico del taller que la app de Claude arranca como servidor MCP local. Hace una sola cosa: abrir en la ventana de Orca el proyecto `.3mf` de una pieza de tu carpeta de trabajo.

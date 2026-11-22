@@ -30,7 +30,7 @@
 #     --sin-app         no tocar la configuración de la app de Claude
 set -euo pipefail
 
-VERSION_PLUGIN="0.1.17"
+VERSION_PLUGIN="0.1.18"
 ORCA_VERSION="2.5.1"
 ORCA_ARCHIVO="OrcaSlicer_Linux_AppImage_Ubuntu2404_V${ORCA_VERSION}.AppImage"
 ORCA_URL="https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v${ORCA_VERSION}/${ORCA_ARCHIVO}"
@@ -43,6 +43,7 @@ PRUEBA=0
 SIN_APP=0
 CARPETA_APPS=""
 CARPETA_TRABAJO=""
+YA_CONFIGURADO=0
 ORCA_OPCION=""
 DATOS_OPCION=""
 
@@ -498,6 +499,7 @@ for d in impresiones disenos respaldos calibraciones "taller-3d/impresoras"; do
   [ -d "$CARPETA_TRABAJO/$d" ] || hacer mkdir -p "$CARPETA_TRABAJO/$d"
 done
 if [ -f "$CONFIG" ]; then
+  YA_CONFIGURADO=1
   info "Ya existe la configuración: $CONFIG (no la toco)."
 elif [ "$PRUEBA" -eq 0 ]; then
   CARPETA_TRABAJO="$CARPETA_TRABAJO" ACEPTACION_FECHA="$ACEPTACION_FECHA" VERSION_PLUGIN="$VERSION_PLUGIN" \
@@ -559,7 +561,7 @@ if [ -z "$ORCA_VENTANA" ] && [ "$APP_TIENE_MCP" -eq 1 ]; then          # el mism
 fi
 if [ ! -f "$AQUI/abrir_orca.py" ]; then
   info "No está abrir_orca.py al lado del instalador: salteo este paso."
-elif [ -z "$ORCA_VENTANA" ] || [ ! -x "$ORCA_VENTANA" ]; then
+elif [ -z "$ORCA_VENTANA" ] || { [ ! -x "$ORCA_VENTANA" ] && ! { [ "$PRUEBA" -eq 1 ] && [ "$ORCA_VENTANA" = "$LANZADOR" ]; }; }; then
   info "No encontré el programa de Orca para abrir su ventana: salteo este paso."
 else
   info "Deja que Claude y los botones del panel te abran Orca con el proyecto .3mf de una pieza."
@@ -655,6 +657,18 @@ info "orca-mcp: $ORCA_MCP_BIN"
 info "Carpeta de trabajo: $CARPETA_TRABAJO"
 [ "$PRUEBA" -eq 1 ] || info "Registro de la instalación: $REGISTRO"
 DATOS_MOSTRAR="${DATOS_ORCA:-$HOME/.config/OrcaSlicer}"
+if [ "$YA_CONFIGURADO" -eq 1 ]; then
+  cat <<EOF_ACTUALIZAR
+
+Próximos pasos (ya tenías el taller: esto fue una actualización):
+  1. Si cambió la configuración de la app, cerrala del todo (también desde la bandeja) y volvé a abrirla.
+  2. En Claude escribí: /taller-3d:instalar
+     Claude revisa que todo ande y te dice qué quedó nuevo.
+  Si la carpeta de trabajo de arriba no es la que usás con Claude, corré de nuevo con
+  --carpeta-trabajo "<la tuya>" (por ejemplo la que conectaste en la app).
+EOF_ACTUALIZAR
+  exit 0
+fi
 cat <<EOF_FIN
 
 Próximos pasos:
