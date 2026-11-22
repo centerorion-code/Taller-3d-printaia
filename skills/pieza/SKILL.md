@@ -32,6 +32,8 @@ Si el pedido no lo dice, preguntar con AskUserQuestion (hasta 4 preguntas juntas
 
 Además, en texto: medidas críticas (con calibre si es un encastre), cantidad, color y fecha si la hay. **No inventar medidas:** si falta una que importa, preguntarla. Si manda una foto, usarla para la forma y pedir las medidas que la foto no da.
 
+Si el pedido es una idea anotada en el panel, partir de su nota (medidas, uso, material) y preguntar solo lo que falte. Si el usuario lo deja para otro momento, ofrecer anotarlo como idea (skill `panel`).
+
 Con las respuestas, decidir y anotar: material (si va al sol o al calor, nunca PLA), receta (`references/recetas.md`), orientación y si es un uso crítico (regla 9). Si las medidas ya muestran que no entra en la impresora elegida, avisarlo antes de modelar y sugerir otra suya donde entre (Revisar, paso 1).
 
 ## 2. Modelo
@@ -110,7 +112,7 @@ Revisar:
 
 Si no se puede (sin sesión gráfica, sin ejecutable o sin `device_bash`), decir en una línea: "Abrí `<archivo>.3mf` con doble clic". Abrir la ventana está bien; imprimir es del usuario (skill `impresion-3d`, regla 1): nunca usar la pestaña Dispositivo (Device) de Orca ni sus botones Imprimir o Enviar, tampoco con el control del escritorio.
 
-Registrar la entrega en `historial.csv` y actualizar el catálogo (skill `catalogo`, "Agregar o actualizar una pieza") con `--impresora "<nombre de la impresora>"`, `informe_gcode.json`, `informe_stl.json` y los archivos de la carpeta (`<archivo>.gcode`, `<archivo>.3mf`, `pieza.stl`, `pieza.py`, `vista.png`, `informe.md`).
+Registrar la entrega en `historial.csv` y actualizar el panel (skill `panel`, "Agregar o actualizar una pieza"; con `--de-idea` si salió de una idea anotada) con `--impresora "<nombre de la impresora>"`, `informe_gcode.json`, `informe_stl.json` y los archivos de la carpeta (`<archivo>.gcode`, `<archivo>.3mf`, `pieza.stl`, `pieza.py`, `vista.png`, `informe.md`).
 
 ### En paralelo: la publicación
 
@@ -122,5 +124,5 @@ Si el usuario cuenta cómo salió o manda una foto:
 1. Diagnosticar con `references/diagnostico.md`.
 2. Anotar en `taller-3d/aprendizajes.md`: fecha, pieza, perfil, material, resultado, problema y ajuste que funcionó (por ejemplo, la holgura real de un encastre).
 3. Si el ajuste sirve para todo el material, proponer llevarlo al perfil con `/calibrar` o al AUTO de la próxima pieza.
-4. Marcarla como impresa en el catálogo (`--estado impresa`); si mandó una foto, guardarla como `foto.jpg` en la carpeta de la pieza y sumarla.
+4. Marcarla como impresa en el panel (`--estado impresa`); si mandó una foto, guardarla como `foto.jpg` en la carpeta de la pieza y sumarla.
 5. Si quiere venderla, ofrecer `/publicar`.

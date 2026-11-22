@@ -18,7 +18,7 @@ En la app, los comandos llevan el nombre del plugin adelante: escribí `/taller-
 | `/taller-3d:impresoras` | Agregar o revisar impresoras (límites, perfiles, cama) y ver qué perfiles sobran |
 | `/taller-3d:publicar` | Armar el producto con precio por costo y margen y cargarlo como borrador en tu tienda |
 | `/taller-3d:instalar` | Instalar o revisar que todo ande (saltea lo que ya está) y hacer una pieza de prueba |
-| `/taller-3d:catalogo` | Ver todas tus piezas en una página (`catalogo.html`) con su vista, datos y archivos, buscarlas y marcarlas como impresas |
+| `/taller-3d:panel` | El panel del taller (`panel.html`): tus ideas y piezas, en qué paso está cada una (idea, diseño, lista para imprimir, impresa, en la tienda) y qué sigue, con su vista, impresora, datos y archivos. También anota ideas para más adelante |
 | `/taller-3d:restaurar` | Volver atrás un perfil, ordenar perfiles de prueba, desinstalar |
 | `/taller-3d:ayuda` | Cómo pedir una pieza, el circuito y los comandos (el manual de uso) |
 
@@ -62,7 +62,7 @@ Por ahora el taller se instala desde este repositorio de GitHub. Se hace en **Cl
 ## Componentes
 
 - `skills/impresion-3d/`: conocimiento, reglas de seguridad, scripts (`cad.py`, `revisar_stl.py`, `vista_previa.py`, `perfil_orca.py`, `revisar_gcode.py`, `impresora.py`, `producto_tienda.py`, `novedades_orca.py`, `catalogo.py`, `proyecto_3mf.py`), datos de materiales, catálogo de parámetros de Orca, guía de plugins de Orca y pruebas (`scripts/tests/`).
-- `skills/pieza`, `diseno`, `calibrar`, `impresoras`, `publicar`, `catalogo`, `instalar`, `restaurar`, `ayuda`: flujos de trabajo.
+- `skills/pieza`, `diseno`, `calibrar`, `impresoras`, `publicar`, `panel`, `instalar`, `restaurar`, `ayuda`: flujos de trabajo.
 - `MANUAL.md`: manual de uso.
 - `hooks/`: bloqueos automáticos de seguridad.
 - `instalador/`: instaladores y desinstaladores para Linux y Windows.

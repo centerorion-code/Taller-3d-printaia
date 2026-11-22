@@ -106,7 +106,7 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
 En tu carpeta de trabajo, la que elegiste al instalar (si apretaste Enter, `Documentos/Taller 3D`). Para usar otra, movela vos a donde quieras y decile a Claude la ruta nueva: te pide acceso y sigue desde ahí.
 
 ```
-catalogo.html           todas tus piezas en una página: abrila con doble clic
+panel.html              el panel del taller: tus ideas y piezas y en qué paso está cada una (doble clic)
 impresiones/2026-11-21_soporte-router_ender-3-v3-plus/
     soporte-router_ender-3-v3-plus.gcode   lo que se imprime (solo en esa impresora)
     soporte-router_ender-3-v3-plus.3mf     el proyecto de Orca: abrilo con doble clic
@@ -120,10 +120,24 @@ disenos/2026-11-21_organizador/
     pieza.py, pieza.stl, vista.png, parametros.md   pedidos de solo diseño
 respaldos/              copias de lo que se cambió
 calibraciones/          resultados de calibración por filamento
-taller-3d/              tu configuración, el historial, el índice del catálogo, los aprendizajes y las novedades de tu Orca
+taller-3d/              tu configuración, el historial, el índice del panel, los aprendizajes y las novedades de tu Orca
 ```
 
-El catálogo (`catalogo.html`) se actualiza solo cada vez que Claude guarda, lamina o publica una pieza. Muestra la vista (o la foto, si le mandaste una de la pieza impresa), las medidas, el material, el tiempo, los gramos, el costo, el precio y los archivos de cada una, ordenadas por mes, con buscador. Si tenías piezas de antes, pedí "armá el catálogo" y las suma.
+## El panel del taller
+
+`panel.html`, en tu carpeta de trabajo, es tu administrador: abrilo con doble clic (conviene guardarlo como favorito del navegador). Cada idea y cada pieza es una tarjeta con su recorrido:
+
+```
+Idea → Diseño → Lista para imprimir → Impresa → En la tienda
+```
+
+- Arriba, cuántas ideas están **pendientes**, cuántas piezas **en proceso** y cuántas **terminadas**, con filtros y un buscador.
+- Primero va **"Para hacer"** (lo más avanzado primero) y después las terminadas, por mes.
+- Cada tarjeta dice **qué sigue** ("Imprimirla", "Dejarla lista para imprimir"…), para qué impresora es, la vista (o la foto de la pieza impresa), medidas, material, tiempo, gramos, costo, precio y los archivos.
+- **Ideas para después:** contale a Claude "anotá esta idea: un soporte para la tele, 15 × 10 cm" y queda pendiente con lo que ya se sabe. Cuando la quieras hacer, pedila por su nombre.
+- Al empezar a usar el taller, Claude te dice en una línea qué tenés pendiente.
+
+Se actualiza solo cada vez que Claude anota una idea o guarda, lamina o publica una pieza. Una pieza impresa ya está terminada: publicarla es opcional. Si tenías piezas de antes, pedí "armá el panel" y las suma.
 
 ## Cambiar una pieza ya hecha
 
@@ -139,7 +153,8 @@ Los comandos llevan el nombre del plugin adelante (`/taller-3d:...`): si escrib�
 | Calibrar un rollo nuevo | `/taller-3d:calibrar` o "calibrá el PETG nuevo" |
 | Trabajar con otra impresora | `/taller-3d:impresoras`, o decilo en el pedido ("en la Bambu") |
 | Vender una pieza | `/taller-3d:publicar` |
-| Ver todas tus piezas o buscar una | `/taller-3d:catalogo` |
+| Ver tus ideas y piezas y qué sigue en cada una | `/taller-3d:panel` o "¿qué tengo pendiente?" |
+| Anotar una idea para más adelante | "Anotá esta idea: …" |
 | Volver atrás un cambio de perfil | `/taller-3d:restaurar` |
 | Revisar que todo ande | `/taller-3d:instalar` |
 | Una duda de configuración | "¿Qué es la costura en bisel?", "¿por qué salen hilos?" |

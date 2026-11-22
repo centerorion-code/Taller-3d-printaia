@@ -30,7 +30,7 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
   - `revisar_gcode.py`: revisión de seguridad del G-code; con `--json` y precios, también calcula el costo.
   - `impresora.py`: impresoras del usuario y sus datos (`detectar` las que tiene en Orca, `validar`, `desde-gcode` para leer lo que usa Orca y `comparar`). Ver `references/impresoras.md`.
   - `producto_tienda.py`: ficha de producto y precio (lo usa `/publicar`).
-  - `catalogo.py`: índice de las piezas (`taller-3d/catalogo.json`) y página `catalogo.html` con vistas, datos y archivos (skill `catalogo`); `carpeta` da el nombre de la carpeta de una pieza y de su G-code, con la impresora.
+  - `catalogo.py`: el panel del taller: índice de ideas y piezas (`taller-3d/catalogo.json`) y página `panel.html` con el paso en que está cada una, lo que sigue, vistas, datos y archivos (skill `panel`); `carpeta` da el nombre de la carpeta de una pieza y de su G-code, con la impresora.
   - `proyecto_3mf.py`: proyecto de Orca (`.3mf`) de una pieza, a partir del STL y del G-code laminado: el modelo con los perfiles y la cama real, para abrirlo con doble clic.
   - `novedades_orca.py`: compara el Orca del usuario con lo que conoce el taller (parámetros nuevos o que ya no están, claves viejas en perfiles, perfiles TEST o AUTO que sobran) y dice cuándo toca revisar en la web (sección 7).
   - Dependencias de CAD y vistas: `pip install --break-system-packages -q manifold3d numpy matplotlib`.
@@ -51,8 +51,10 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
   - `disenos/AAAA-MM-DD_nombre/`: pedidos de solo diseño (`/diseno`): `pieza.py`, STL, vista y `parametros.md`. Si se diseñó para una impresora puntual, también lleva su nombre al final.
   - `respaldos/AAAA-MM-DD_HHMMSS/`: copias previas de lo que se cambió.
   - `calibraciones/<filamento>.md`: resultados de calibración.
-  - `taller-3d/`: `config.json`, `impresoras/<id>.json` (datos de cada impresora preparada), `historial.csv`, `aprendizajes.md`, `novedades-orca.json` (lo que se aprendió del Orca del usuario; sección 7), `catalogo.json` (índice de piezas).
-  - `catalogo.html`: la página con todas las piezas. **Cada vez que se guarda, lamina, imprime o publica una pieza, actualizar el catálogo** (`catalogo.py agregar` y `html`, y escribir los dos archivos; skill `catalogo`).
+  - `taller-3d/`: `config.json`, `impresoras/<id>.json` (datos de cada impresora preparada), `historial.csv`, `aprendizajes.md`, `novedades-orca.json` (lo que se aprendió del Orca del usuario; sección 7), `catalogo.json` (índice del panel: ideas y piezas).
+  - `panel.html`: el panel del taller, con cada idea y pieza y el paso en que está. **Cada vez que se anota una idea o se guarda, lamina, imprime o publica una pieza, actualizar el panel** (`catalogo.py agregar` o `idea`, y `html`, y escribir los dos archivos; skill `panel`).
+- **Al empezar una conversación con el taller** (el primer pedido), traer `taller-3d/catalogo.json` junto con `config.json` y, si hay algo pendiente, decirlo en una línea con `catalogo.py resumen --corto` ("Tenés 2 ideas pendientes y 1 lista para imprimir…"). Si el pedido es una de esas ideas, partir de su nota.
+- **Ideas para después:** si el usuario cuenta algo que quiere hacer más adelante o deja un pedido para otro momento, ofrecer anotarlo en el panel como idea (`catalogo.py idea`, skill `panel`).
 - Perfiles de usuario de Orca: `~/.config/OrcaSlicer/user/default/{machine,process,filament}/` en Linux (Flatpak: `~/.var/app/<id>/config/OrcaSlicer/user/default/...`; portable: la carpeta de datos que diga `config.json` en `orca.carpeta_usuario`). Si el usuario inició sesión en Orca, `default` es su número de usuario: confirmar con las rutas que devuelve `list_profiles`. macOS: `~/Library/Application Support/OrcaSlicer/user/...`.
 - **Windows:** la app de Claude (MSIX) no puede crear archivos dentro de `AppData` que Orca vea. El instalador deja los datos de Orca en `C:\Users\<usuario>\OrcaSlicer` (con una unión en `%APPDATA%\OrcaSlicer`). Escribir perfiles solo por esa ruta; si los perfiles están bajo `AppData` sin la unión, no escribir y derivar a `/instalar` (sección 2).
 

@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (C) 2026 Leo y colaboradores de taller-3d
-"""Catálogo de los diseños e impresiones del taller.
+"""Panel del taller: las ideas y piezas del usuario y en qué paso está cada una.
 
-Lleva un índice (`taller-3d/catalogo.json` en la carpeta de trabajo) con una entrada por pieza y
-arma `catalogo.html`, una página que se abre con el navegador desde la carpeta de trabajo: muestra
-la vista de cada pieza, sus datos y enlaces a sus archivos, ordenadas por mes, con buscador y
-filtros. Las imágenes se cargan desde la carpeta de cada pieza: no hace falta traerlas.
+Lleva un índice (`taller-3d/catalogo.json` en la carpeta de trabajo) con una entrada por idea o pieza
+y arma `panel.html`, una página que se abre con el navegador desde la carpeta de trabajo. Cada
+tarjeta muestra el recorrido (Idea → Diseño → Lista para imprimir → Impresa → En la tienda), lo que
+sigue, la vista, la impresora, los datos y enlaces a los archivos. Arriba, "Para hacer" (ideas y
+piezas en proceso); abajo, las terminadas por mes. Tiene buscador y filtros. Las imágenes se cargan
+desde la carpeta de cada pieza: no hace falta traerlas.
 
 Las carpetas de las piezas llevan la impresora para la que se hicieron:
 impresiones/AAAA-MM-DD_nombre_impresora/ (los diseños sin impresora, disenos/AAAA-MM-DD_nombre/).
@@ -25,14 +27,21 @@ Uso:
       [--archivos pieza.stl pieza.py vista.png informe.md] [--imagen vista.png] \\
       [--estado disenada|laminada|impresa|en_tienda] [--nota "..."] [--url-tienda https://...] [--moneda ARS]
 
+  # Anotar una idea para más adelante (y quitarla si el usuario la descarta)
+  python3 catalogo.py idea --catalogo catalogo.json --nombre "Soporte para la tele" [--nota "..."] [--impresora X]
+  python3 catalogo.py quitar-idea --catalogo catalogo.json --carpeta ideas/2026-11-21_soporte-para-la-tele
+
+  # Cuando una idea se hace pieza: agregar la pieza con --de-idea ideas/AAAA-MM-DD_nombre (la idea pasa a la pieza)
+
   # Sumar las piezas que ya estaban: listado de device_list_dir (recursive=true) de la carpeta de trabajo
   python3 catalogo.py desde-listado --catalogo catalogo.json --listado listado.json
 
-  # Armar la página
-  python3 catalogo.py html --catalogo catalogo.json --salida catalogo.html [--titulo "Taller 3D"]
+  # Armar la página (y, una sola vez, reemplazar el catalogo.html de antes de la 0.1.13 por un acceso al panel)
+  python3 catalogo.py html --catalogo catalogo.json --salida panel.html [--titulo "Panel del taller"]
+  python3 catalogo.py redireccion --salida catalogo.html
 
-  # Resumen en texto (para contestar "¿qué piezas hice?")
-  python3 catalogo.py resumen --catalogo catalogo.json [--buscar texto]
+  # Resumen en texto: --corto da una línea para el comienzo de la conversación
+  python3 catalogo.py resumen --catalogo catalogo.json [--buscar texto] [--corto]
 """
 from __future__ import annotations
 
@@ -49,8 +58,9 @@ from urllib.parse import quote, urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import comun  # noqa: E402
 
-TIPOS = {"impresion": "Impresión", "diseno": "Diseño"}
+TIPOS = {"idea": "Idea", "impresion": "Impresión", "diseno": "Diseño"}
 ESTADOS = {
+    "idea": "Idea",
     "disenada": "Diseñada",
     "laminada": "Lista para imprimir",
     "impresa": "Impresa",
@@ -58,7 +68,12 @@ ESTADOS = {
 }
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
          "noviembre", "diciembre"]
-RE_CARPETA = re.compile(r"^(impresiones|disenos)/(\d{4}-\d{2}-\d{2})_([^/]+)$")
+RE_CARPETA = re.compile(r"^(impresiones|disenos|ideas)/(\d{4}-\d{2}-\d{2})_([^/]+)$")
+# El recorrido de una idea hasta la tienda, y los grupos del panel
+PASOS = [("idea", "Idea"), ("disenada", "Diseño"), ("laminada", "Lista para imprimir"), ("impresa", "Impresa"),
+         ("en_tienda", "En la tienda")]
+GRUPOS = {"pendiente": "Pendientes", "en_proceso": "En proceso", "terminada": "Terminadas"}
+G_CODE = (".gcode", ".gco", ".gcode.3mf")
 IMAGENES = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 
 
@@ -158,17 +173,19 @@ def datos_de_informes(gcode: dict, stl: dict, producto: dict) -> dict:
     return d
 
 
-def agregar(catalogo: dict, carpeta: str, **campos) -> dict:
+def agregar(catalogo: dict, carpeta: str, de_idea: str | None = None, **campos) -> dict:
+    """Agrega o actualiza una pieza (o idea). Con de_idea, la idea anotada pasa a esta pieza."""
     carpeta = normalizar_carpeta(carpeta)
     pieza = next((p for p in catalogo["piezas"] if p.get("carpeta") == carpeta), None)
     if pieza is None:
         fecha, _, impresora = partes_de_carpeta(carpeta)
+        es_idea = carpeta.startswith("ideas/")
         pieza = {
             "carpeta": carpeta,
-            "tipo": "diseno" if carpeta.startswith("disenos/") else "impresion",
+            "tipo": "idea" if es_idea else "diseno" if carpeta.startswith("disenos/") else "impresion",
             "nombre": nombre_desde_carpeta(carpeta),
             "fecha": fecha or time.strftime("%Y-%m-%d"),
-            "estado": "disenada",
+            "estado": "idea" if es_idea else "disenada",
             "archivos": [],
         }
         if impresora:
@@ -188,14 +205,88 @@ def agregar(catalogo: dict, carpeta: str, **campos) -> dict:
             raise SystemExit(f"Tipo desconocido: {valor} (impresion o diseno).")
         elif clave == "estado" and valor not in ESTADOS:
             raise SystemExit(f"Estado desconocido: {valor} ({', '.join(ESTADOS)}).")
+        elif clave == "estado":
+            pieza["estado"] = valor
+            if valor in ("impresa", "en_tienda"):
+                pieza[valor] = True                       # se recuerda aunque después cambie el estado
         else:
             pieza[clave] = valor
+    if de_idea:
+        _pasar_idea(catalogo, pieza, de_idea, nombre_dado="nombre" in campos and bool(campos["nombre"]))
     if pieza.get("precio") and "moneda" not in pieza["precio"]:
         moneda = (pieza.get("costo") or {}).get("moneda")
         if moneda:
             pieza["precio"]["moneda"] = moneda
     pieza["actualizado"] = _ahora()
     return pieza
+
+
+def _pasar_idea(catalogo: dict, pieza: dict, carpeta_idea: str, nombre_dado: bool) -> None:
+    carpeta_idea = normalizar_carpeta(carpeta_idea)
+    idea = next((p for p in catalogo["piezas"] if p.get("carpeta") == carpeta_idea and p.get("tipo") == "idea"), None)
+    if idea is None or idea is pieza:
+        return
+    catalogo["piezas"].remove(idea)
+    if idea.get("nombre") and not nombre_dado:
+        pieza["nombre"] = idea["nombre"]
+    if idea.get("nota") and not pieza.get("nota"):
+        pieza["nota"] = idea["nota"]
+    pieza["idea_fecha"] = idea.get("fecha")
+
+
+def agregar_idea(catalogo: dict, nombre: str, nota: str | None = None, impresora: str | None = None,
+                 fecha: str | None = None) -> dict:
+    carpeta = f"ideas/{fecha or time.strftime('%Y-%m-%d')}_{comun.slug(nombre, 'idea')}"
+    return agregar(catalogo, carpeta, nombre=nombre, nota=nota, impresora=impresora)
+
+
+def quitar_idea(catalogo: dict, carpeta: str) -> bool:
+    """Saca una idea que el usuario descartó. Las piezas no se sacan: tienen archivos."""
+    carpeta = normalizar_carpeta(carpeta)
+    idea = next((p for p in catalogo["piezas"] if p.get("carpeta") == carpeta), None)
+    if idea is None:
+        return False
+    if idea.get("tipo") != "idea":
+        raise SystemExit(f"{carpeta} no es una idea: las piezas no se sacan del panel.")
+    catalogo["piezas"].remove(idea)
+    return True
+
+
+def hechos(p: dict) -> set[str]:
+    """Pasos del recorrido que ya se cumplieron."""
+    if p.get("tipo") == "idea" or p.get("estado") == "idea":
+        return {"idea"}
+    estado = p.get("estado") or "disenada"
+    archivos = [str(a).lower() for a in p.get("archivos") or []]
+    h = {"idea", "disenada"}
+    foto = any(a.rsplit("/", 1)[-1].startswith("foto") and not a.startswith("producto/") for a in archivos)
+    if p.get("impresa") or estado == "impresa" or foto:
+        h |= {"laminada", "impresa"}
+    if estado in ("laminada", "impresa", "en_tienda") or any(a.endswith(G_CODE) for a in archivos):
+        h.add("laminada")
+    if p.get("en_tienda") or estado == "en_tienda":
+        h.add("en_tienda")
+    return h
+
+
+def grupo_de(p: dict) -> str:
+    h = hechos(p)
+    if h == {"idea"}:
+        return "pendiente"
+    return "terminada" if "impresa" in h else "en_proceso"
+
+
+def siguiente(p: dict) -> str | None:
+    """Lo que falta hacer, en una frase (None si está terminada)."""
+    h = hechos(p)
+    if h == {"idea"}:
+        return "Diseñarla: /taller-3d:pieza (lista para imprimir) o /taller-3d:diseno (solo el modelo)."
+    if "laminada" not in h:
+        return "Dejarla lista para imprimir en tu impresora: /taller-3d:pieza."
+    if "impresa" not in h:
+        return ("Imprimirla: pasá el G-code a la impresora (abrí el .3mf para verla en Orca) y después "
+                "contale a Claude cómo salió.")
+    return None
 
 
 def _rutas_del_listado(listado) -> list[str]:
@@ -223,10 +314,12 @@ def desde_listado(catalogo: dict, listado) -> list[str]:
             estado = "laminada"
         if any(a.lower().startswith("producto/") for a in archivos):
             estado = "en_tienda"
+        impresa = any(a.rsplit("/", 1)[-1].lower().startswith("foto") and not a.lower().startswith("producto/")
+                      for a in archivos)                   # una foto de la pieza impresa
         if carpeta in existentes:
-            agregar(catalogo, carpeta, archivos=archivos)
+            agregar(catalogo, carpeta, archivos=archivos, impresa=impresa or None)
         else:
-            agregar(catalogo, carpeta, archivos=archivos, estado=estado)
+            agregar(catalogo, carpeta, archivos=archivos, estado=estado, impresa=impresa or None)
             nuevas.append(carpeta)
     return nuevas
 
@@ -282,7 +375,7 @@ h1{margin:0;font-size:34px;letter-spacing:-.02em}
 .controles button{min-height:44px;padding:8px 14px;border:1.5px solid var(--tinta);border-radius:999px;background:#fff;font:inherit;cursor:pointer}
 .controles button[aria-pressed="true"]{background:var(--tinta);color:#fff}
 main{max-width:1200px;margin:0 auto;padding:8px 24px 48px}
-h2{margin:28px 0 12px;font-size:20px;text-transform:capitalize}
+h2{margin:28px 0 12px;font-size:20px}
 .grilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
 article{background:#fff;border:1.5px solid var(--tinta);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
 .imagen{aspect-ratio:4/3;background:#EFEAE0;display:flex;align-items:center;justify-content:center;border-bottom:1.5px solid var(--tinta)}
@@ -302,6 +395,17 @@ dt{color:var(--suave)}dd{margin:0}
 .ubicacion{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--suave);word-break:break-all}
 footer{max-width:1200px;margin:0 auto;padding:0 24px 32px;color:var(--suave);font-size:13px}
 .vacio{padding:40px 0;color:var(--suave)}
+.contadores{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:0;list-style:none}
+.contadores li{padding:6px 12px;border:1.5px solid var(--tinta);border-radius:10px;background:#fff;font-size:15px}
+.contadores strong{font-size:20px;margin-right:4px}
+.camino{display:flex;gap:3px;margin:0;padding:0;list-style:none;font-size:11px;line-height:1.2}
+.camino li{flex:1;padding-top:6px;border-top:5px solid var(--borde);color:var(--suave);text-align:center}
+.camino li.hecho{border-top-color:var(--tinta);color:var(--tinta)}
+.camino li.actual{border-top-color:var(--acento);font-weight:700}
+.sigue{margin:0;font-size:14px;padding:6px 8px;border-left:4px solid var(--acento);background:var(--papel)}
+.terminada{margin:0;font-size:14px;color:var(--suave)}
+.idea .imagen{background:var(--papel)}
+.idea .imagen span{font-size:15px;color:var(--suave)}
 [hidden]{display:none!important}
 @media print{.controles{display:none}article{break-inside:avoid}}
 """
@@ -312,10 +416,10 @@ GUION = """
   var botones=document.querySelectorAll('[data-filtro]');
   function aplicar(){
     var q=(buscar.value||'').toLowerCase().trim();
-    document.querySelectorAll('section[data-mes]').forEach(function(s){
+    document.querySelectorAll('section[data-seccion]').forEach(function(s){
       var visibles=0;
       s.querySelectorAll('article').forEach(function(a){
-        var ok=(filtro==='todo'||a.getAttribute('data-tipo')===filtro||a.getAttribute('data-estado')===filtro)
+        var ok=(filtro==='todo'||a.getAttribute('data-grupo')===filtro)
           &&(!q||a.getAttribute('data-texto').indexOf(q)>=0);
         a.hidden=!ok; if(ok){visibles++;}
       });
@@ -339,8 +443,11 @@ def _tarjeta(p: dict) -> str:
     e = html.escape
     carpeta = p["carpeta"]
     nombre = p.get("nombre") or carpeta
-    imagen = imagen_de(p)
-    if imagen:
+    es_idea = p.get("tipo") == "idea"
+    imagen = None if es_idea else imagen_de(p)
+    if es_idea:
+        img = '<span>Idea anotada, sin diseño todavía</span>'
+    elif imagen:
         img = (f'<img src="{e(_href(carpeta, imagen))}" alt="{e("Vista de " + nombre)}" loading="lazy">')
     else:
         img = '<span class="sin">Sin vista</span>'
@@ -348,7 +455,14 @@ def _tarjeta(p: dict) -> str:
     if p.get("material"):
         material = p["material"] + (f' {p["color"]}' if p.get("color") else "")
         chips.append(f'<span class="chip">{e(material)}</span>')
-    chips.append(f'<span class="chip estado">{e(ESTADOS.get(p.get("estado"), p.get("estado") or ""))}</span>')
+    h = hechos(p)
+    ultimo = max((i for i, (clave, _) in enumerate(PASOS) if clave in h), default=0)
+    camino = "".join(f'<li class="{"hecho" if clave in h else ""}{" actual" if i == ultimo else ""}"'
+                     f'{" aria-current=\"step\"" if i == ultimo else ""}>{e(etiqueta)}</li>'
+                     for i, (clave, etiqueta) in enumerate(PASOS))
+    sigue = siguiente(p)
+    paso = (f'<p class="sigue"><strong>Sigue:</strong> {e(sigue)}</p>' if sigue
+            else '<p class="terminada">Terminada.</p>')
     filas = []
     if p.get("impresora"):
         filas.append(("Impresora", p["impresora"]))
@@ -373,43 +487,51 @@ def _tarjeta(p: dict) -> str:
     fecha = p.get("fecha") or ""
     texto = " ".join(str(x) for x in (nombre, p.get("material"), p.get("color"), p.get("impresora"), p.get("nota"),
                                       carpeta) if x).lower()
-    return f"""<article data-tipo="{e(p.get('tipo') or '')}" data-estado="{e(p.get('estado') or '')}" data-texto="{e(texto)}">
+    clase = ' class="idea"' if es_idea else ""
+    ubicacion = f"anotada el {fecha}" if es_idea else f"{carpeta} · {fecha}"
+    return f"""<article{clase} data-tipo="{e(p.get('tipo') or '')}" data-grupo="{e(grupo_de(p))}" data-texto="{e(texto)}">
 <div class="imagen">{img}</div>
 <div class="cuerpo">
 <h3>{e(nombre)}</h3>
+<ol class="camino" aria-label="Recorrido">{camino}</ol>
+{paso}
 <div class="chips">{''.join(chips)}</div>
 {f'<dl>{dl}</dl>' if dl else ''}
 {f'<p class="nota">{e(p["nota"])}</p>' if p.get("nota") else ''}
 {f'<div class="archivos">{enlaces}</div>' if enlaces else ''}
-<div class="ubicacion">{e(carpeta)} · {e(fecha)}</div>
+<div class="ubicacion">{e(ubicacion)}</div>
 </div>
 </article>"""
 
 
-def generar_html(catalogo: dict, titulo: str = "Mis piezas 3D") -> str:
+def generar_html(catalogo: dict, titulo: str = "Panel del taller") -> str:
     e = html.escape
     piezas = sorted(catalogo["piezas"], key=lambda p: (p.get("fecha") or "", p.get("carpeta") or ""), reverse=True)
+    # Para hacer: primero lo más avanzado (listas para imprimir, después diseños, al final las ideas)
+    por_hacer = sorted((p for p in piezas if grupo_de(p) != "terminada"), key=_avance, reverse=True)
+    terminadas = [p for p in piezas if grupo_de(p) == "terminada"]
     secciones = []
-    for pieza in piezas:
-        fecha = pieza.get("fecha") or ""
-        clave = fecha[:7]
+    if por_hacer:
+        secciones.append(("hacer", "Para hacer", [_tarjeta(p) for p in por_hacer]))
+    for pieza in terminadas:
+        clave = (pieza.get("fecha") or "")[:7]
         if not secciones or secciones[-1][0] != clave:
             try:
-                etiqueta = f"{MESES[int(clave[5:7]) - 1]} {clave[:4]}"
+                etiqueta = f"Terminadas · {MESES[int(clave[5:7]) - 1]} {clave[:4]}"
             except (ValueError, IndexError):
-                etiqueta = "Sin fecha"
+                etiqueta = "Terminadas · sin fecha"
             secciones.append((clave, etiqueta, []))
         secciones[-1][2].append(_tarjeta(pieza))
     cuerpo = "\n".join(
-        f'<section data-mes="{e(clave)}"><h2>{e(etiqueta)}</h2><div class="grilla">\n' + "\n".join(tarjetas)
+        f'<section data-seccion="{e(clave)}"><h2>{e(etiqueta)}</h2><div class="grilla">\n' + "\n".join(tarjetas)
         + "\n</div></section>" for clave, etiqueta, tarjetas in secciones)
     if not piezas:
-        cuerpo = '<p class="vacio">Todavía no hay piezas. Cada vez que Claude guarde una, aparece acá.</p>'
-    impresiones = sum(1 for p in piezas if p.get("tipo") == "impresion")
-    disenos = sum(1 for p in piezas if p.get("tipo") == "diseno")
+        cuerpo = ('<p class="vacio">Todavía no hay ideas ni piezas. Cada vez que Claude anote una idea o guarde una pieza, '
+                  'aparece acá.</p>')
+    cuenta = {g: sum(1 for p in piezas if grupo_de(p) == g) for g in GRUPOS}
+    contadores = "".join(f"<li><strong>{cuenta[g]}</strong>{e(t.lower())}</li>" for g, t in GRUPOS.items())
     actualizado = (catalogo.get("actualizado") or _ahora())[:16].replace("T", " ")
-    filtros = [("todo", "Todo"), ("impresion", "Impresiones"), ("diseno", "Diseños"), ("impresa", "Impresas"),
-               ("en_tienda", "En la tienda")]
+    filtros = [("todo", "Todo")] + list(GRUPOS.items())
     botones = "".join(f'<button type="button" data-filtro="{f}" aria-pressed="{"true" if f == "todo" else "false"}">'
                       f'{e(t)}</button>' for f, t in filtros)
     return f"""<!doctype html>
@@ -424,21 +546,64 @@ def generar_html(catalogo: dict, titulo: str = "Mis piezas 3D") -> str:
 <body>
 <header>
 <h1>{e(titulo)}</h1>
-<p class="sub">{len(piezas)} piezas · {impresiones} impresiones y {disenos} diseños · actualizado el {e(actualizado)}</p>
+<p class="sub">Tus ideas y piezas, y en qué paso está cada una · actualizado el {e(actualizado)}</p>
+<ul class="contadores" aria-label="Resumen">{contadores}</ul>
 <div class="controles">
 <label for="buscar" hidden>Buscar</label>
-<input id="buscar" type="search" placeholder="Buscar por nombre, material o nota" aria-label="Buscar por nombre, material o nota">
+<input id="buscar" type="search" placeholder="Buscar por nombre, impresora, material o nota" aria-label="Buscar por nombre, impresora, material o nota">
 {botones}
 </div>
 </header>
 <main>
 {cuerpo}
 </main>
-<footer>Lo arma taller-3d cada vez que Claude guarda una pieza. Abrilo desde tu carpeta de trabajo: las vistas y los archivos se cargan de la carpeta de cada pieza.</footer>
+<footer>Lo arma taller-3d cada vez que Claude anota una idea o guarda una pieza. Abrilo desde tu carpeta de trabajo: las vistas y los archivos se cargan de la carpeta de cada pieza. Para seguir con algo, pedíselo a Claude con el nombre de la pieza.</footer>
 <script>{GUION}</script>
 </body>
 </html>
 """
+
+
+REDIRECCION = """<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0; url=panel.html">
+<title>Panel del taller</title>
+</head>
+<body>
+<p>El catálogo ahora es el <a href="panel.html">panel del taller</a>.</p>
+</body>
+</html>
+"""
+
+
+def _avance(p: dict) -> tuple[int, str]:
+    h = hechos(p)
+    return max(i for i, (clave, _) in enumerate(PASOS) if clave in h), p.get("fecha") or ""
+
+
+def _cantidad(n: int, una: str, varias: str) -> str:
+    return f"{n} {una if n == 1 else varias}"
+
+
+def resumen_corto(catalogo: dict) -> str:
+    """Una línea para el comienzo de la conversación."""
+    piezas = catalogo["piezas"]
+    if not piezas:
+        return "Todavía no hay ideas ni piezas en el panel."
+    ideas = sum(1 for p in piezas if grupo_de(p) == "pendiente")
+    sin_laminar = sum(1 for p in piezas if grupo_de(p) == "en_proceso" and "laminada" not in hechos(p))
+    listas = sum(1 for p in piezas if grupo_de(p) == "en_proceso" and "laminada" in hechos(p))
+    terminadas = sum(1 for p in piezas if grupo_de(p) == "terminada")
+    partes = [x for x in (
+        _cantidad(ideas, "idea pendiente", "ideas pendientes") if ideas else "",
+        _cantidad(sin_laminar, "pieza diseñada sin laminar", "piezas diseñadas sin laminar") if sin_laminar else "",
+        _cantidad(listas, "lista para imprimir", "listas para imprimir") if listas else "") if x]
+    if not partes:
+        return f"Nada pendiente: {_cantidad(terminadas, 'pieza terminada', 'piezas terminadas')}. Todo está en panel.html."
+    texto = partes[0] if len(partes) == 1 else ", ".join(partes[:-1]) + " y " + partes[-1]
+    return f"Tenés {texto}. Todo está en panel.html, en tu carpeta de trabajo."
 
 
 def resumen(catalogo: dict, buscar: str | None = None) -> str:
@@ -446,19 +611,25 @@ def resumen(catalogo: dict, buscar: str | None = None) -> str:
     if buscar:
         q = buscar.lower()
         piezas = [p for p in piezas if q in " ".join(str(p.get(k) or "") for k in
-                                                   ("nombre", "material", "color", "nota", "carpeta")).lower()]
+                                                   ("nombre", "material", "color", "impresora", "nota",
+                                                    "carpeta")).lower()]
     if not piezas:
-        return "No hay piezas" + (f" que coincidan con «{buscar}»." if buscar else " en el catálogo.")
-    lineas = [f"{len(piezas)} piezas:"]
-    for p in piezas:
-        datos = [ESTADOS.get(p.get("estado"), p.get("estado") or "")]
+        return "No hay nada" + (f" que coincida con «{buscar}»." if buscar else " en el panel.")
+    lineas = [f"{len(piezas)} entre ideas y piezas:"]
+    ordenadas = sorted(piezas, key=lambda x: x.get("fecha") or "", reverse=True)       # lo más nuevo primero
+    for p in sorted(ordenadas, key=lambda x: list(GRUPOS).index(grupo_de(x))):
+        datos = [GRUPOS[grupo_de(p)][:-1].lower() if grupo_de(p) != "en_proceso" else "en proceso"]
+        if p.get("impresora"):
+            datos.append(p["impresora"])
         if p.get("material"):
             datos.append(p["material"])
         if p.get("tiempo"):
             datos.append(p["tiempo"])
         if _plata(p.get("precio")):
             datos.append("precio " + _plata(p["precio"]))
-        lineas.append(f"- {p.get('fecha', '')} {p.get('nombre', '')} ({', '.join(d for d in datos if d)}) → {p['carpeta']}")
+        sigue = siguiente(p)
+        lineas.append(f"- {p.get('fecha', '')} {p.get('nombre', '')} ({', '.join(d for d in datos if d)})"
+                      + (f" → sigue: {sigue}" if sigue else "") + f" [{p['carpeta']}]")
     return "\n".join(lineas)
 
 
@@ -475,6 +646,7 @@ def main(argv=None) -> None:
     a.add_argument("--material")
     a.add_argument("--color")
     a.add_argument("--impresora", help="nombre de la impresora para la que se hizo (el de config.json)")
+    a.add_argument("--de-idea", help="la idea anotada que se hizo pieza (ideas/AAAA-MM-DD_nombre): pasa a esta pieza")
     a.add_argument("--informe-gcode")
     a.add_argument("--informe-stl")
     a.add_argument("--producto", help="producto.json de /publicar")
@@ -484,6 +656,17 @@ def main(argv=None) -> None:
     a.add_argument("--nota")
     a.add_argument("--url-tienda")
     a.add_argument("--moneda", help="moneda del precio, si no sale del costo")
+
+    i = sub.add_parser("idea", help="anota una idea para más adelante")
+    i.add_argument("--catalogo", required=True, type=Path)
+    i.add_argument("--nombre", required=True)
+    i.add_argument("--nota")
+    i.add_argument("--impresora")
+    i.add_argument("--fecha", help="AAAA-MM-DD (si no, hoy)")
+
+    q = sub.add_parser("quitar-idea", help="saca una idea que el usuario descartó")
+    q.add_argument("--catalogo", required=True, type=Path)
+    q.add_argument("--carpeta", required=True, help="ideas/AAAA-MM-DD_nombre")
 
     d = sub.add_parser("desde-listado", help="suma las piezas que ya estaban en la carpeta de trabajo")
     d.add_argument("--catalogo", required=True, type=Path)
@@ -495,16 +678,25 @@ def main(argv=None) -> None:
     c.add_argument("--impresora", help="la impresora para la que se lamina (en diseños, solo si se hizo para una)")
     c.add_argument("--fecha", help="AAAA-MM-DD (si no, hoy)")
 
-    h = sub.add_parser("html", help="arma catalogo.html")
+    h = sub.add_parser("html", help="arma panel.html")
     h.add_argument("--catalogo", required=True, type=Path)
     h.add_argument("--salida", required=True, type=Path)
-    h.add_argument("--titulo", default="Mis piezas 3D")
+    h.add_argument("--titulo", default="Panel del taller")
+
+    rd = sub.add_parser("redireccion", help="catalogo.html que lleva al panel (para el de antes de la 0.1.13)")
+    rd.add_argument("--salida", required=True, type=Path)
 
     r = sub.add_parser("resumen", help="lista las piezas en texto")
     r.add_argument("--catalogo", required=True, type=Path)
     r.add_argument("--buscar")
+    r.add_argument("--corto", action="store_true", help="una línea: qué está pendiente")
 
     args = ap.parse_args(argv)
+    if args.accion == "redireccion":
+        args.salida.parent.mkdir(parents=True, exist_ok=True)
+        args.salida.write_text(REDIRECCION, encoding="utf-8")
+        print(f"Acceso al panel: {args.salida}")
+        return
     if args.accion == "carpeta":
         print(json.dumps({"carpeta": carpeta_de_pieza(args.tipo, args.nombre, args.impresora, args.fecha),
                           "archivo": archivo_de_pieza(args.nombre, args.impresora)}, ensure_ascii=False))
@@ -519,12 +711,20 @@ def main(argv=None) -> None:
             extra["precio"]["moneda"] = args.moneda
         pieza = agregar(catalogo, args.carpeta, nombre=args.nombre, tipo=args.tipo, fecha=args.fecha,
                         material=args.material or extra.pop("material", None), color=args.color,
-                        impresora=args.impresora,
+                        impresora=args.impresora, de_idea=args.de_idea,
                         archivos=args.archivos, imagen=args.imagen, nota=args.nota, url_tienda=args.url_tienda,
                         **{k: v for k, v in extra.items() if k != "material"})
         guardar(args.catalogo, catalogo)
         print(f"Catálogo: {pieza['nombre']} ({ESTADOS.get(pieza['estado'], pieza['estado'])}) — "
               f"{len(catalogo['piezas'])} piezas en total.")
+    elif args.accion == "idea":
+        idea = agregar_idea(catalogo, args.nombre, args.nota, args.impresora, args.fecha)
+        guardar(args.catalogo, catalogo)
+        print(json.dumps({"carpeta": idea["carpeta"], "nombre": idea["nombre"]}, ensure_ascii=False))
+    elif args.accion == "quitar-idea":
+        quitada = quitar_idea(catalogo, args.carpeta)
+        guardar(args.catalogo, catalogo)
+        print("Idea quitada." if quitada else "No encontré esa idea.")
     elif args.accion == "desde-listado":
         listado = json.loads(args.listado.read_text(encoding="utf-8"))
         nuevas = desde_listado(catalogo, listado)
@@ -533,9 +733,9 @@ def main(argv=None) -> None:
     elif args.accion == "html":
         args.salida.parent.mkdir(parents=True, exist_ok=True)
         args.salida.write_text(generar_html(catalogo, args.titulo), encoding="utf-8")
-        print(f"Página: {args.salida} ({len(catalogo['piezas'])} piezas).")
+        print(f"Página: {args.salida} ({len(catalogo['piezas'])} entre ideas y piezas).")
     else:
-        print(resumen(catalogo, args.buscar))
+        print(resumen_corto(catalogo) if args.corto else resumen(catalogo, args.buscar))
 
 
 if __name__ == "__main__":

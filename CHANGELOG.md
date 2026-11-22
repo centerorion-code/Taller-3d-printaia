@@ -1,5 +1,12 @@
 # Cambios
 
+## 0.1.13 (2026-11-21)
+
+- **El panel del taller** (`/taller-3d:panel`, reemplaza a `/taller-3d:catalogo`). `panel.html`, en la carpeta de trabajo, muestra cada idea y pieza con su recorrido (Idea → Diseño → Lista para imprimir → Impresa → En la tienda), qué sigue, para qué impresora es, su vista, datos y archivos. Arriba dice cuántas hay pendientes, en proceso y terminadas, con filtros y buscador; primero va "Para hacer" (lo más avanzado primero) y después las terminadas, por mes. Una pieza impresa ya cuenta como terminada: publicarla es opcional.
+- **Ideas para después:** "anotá esta idea: …" la deja pendiente en el panel con lo que ya se sabe (medidas, uso). Cuando se hace, pasa a la pieza con su nombre y su nota.
+- Al empezar a usar el taller, Claude dice en una línea lo pendiente ("Tenés 2 ideas pendientes y 1 lista para imprimir").
+- El `catalogo.html` de antes se reemplaza una vez por un acceso al panel, así el favorito viejo sigue sirviendo.
+
 ## 0.1.12 (2026-11-21)
 
 - **Proyecto de Orca de cada pieza.** Junto con el G-code queda un `.3mf`: con doble clic, Orca abre la pieza en el centro de la cama con la impresora, el filamento y el proceso AUTO elegidos, y con tu tipo de cama real (por línea de comandos Orca usa Cool Plate). Lo arma `proyecto_3mf.py` con el STL y la configuración completa que Orca escribe en el G-code, porque orca-mcp no exporta proyectos. Se probó en la ventana de Orca 2.5.1: abre con los tres perfiles sin cambios, y Orca por línea de comandos lo lamina con la misma configuración. Si Orca estaba abierto desde antes de crear los AUTO, hay que cerrarlo: si no, los muestra como cambios sobre el perfil de sistema.

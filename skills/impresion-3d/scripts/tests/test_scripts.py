@@ -378,10 +378,73 @@ class TestCatalogo(unittest.TestCase):
         self.assertNotIn("<script>alert", pagina)
         self.assertNotIn("javascript:", pagina)
         self.assertIn("&lt;script&gt;", pagina)
-        self.assertLess(pagina.index("noviembre 2026"), pagina.index("septiembre 2026"))
+        # Arriba lo que falta (el soporte sin imprimir, la caja sin laminar); el llavero tiene foto: terminado
+        self.assertLess(pagina.index("Para hacer"), pagina.index("Terminadas · septiembre 2026"))
+        self.assertEqual(cat.grupo_de(llavero), "terminada")
         with self.assertRaises(SystemExit):
             cat.agregar(c, "../afuera")
 
+
+    def test_ideas_y_recorrido(self):
+        import catalogo as cat
+        c = {"version": 1, "piezas": []}
+        idea = cat.agregar_idea(c, "Soporte para la tele", nota="15 × 10 cm", fecha="2026-11-20")
+        self.assertEqual((idea["carpeta"], idea["tipo"], cat.grupo_de(idea)),
+                         ("ideas/2026-11-20_soporte-para-la-tele", "idea", "pendiente"))
+        self.assertIn("/taller-3d:pieza", cat.siguiente(idea))
+        self.assertEqual(cat.resumen_corto(c),
+                         "Tenés 1 idea pendiente. Todo está en panel.html, en tu carpeta de trabajo.")
+        # La idea se hace pieza: pasa su nombre y su nota, y deja de estar pendiente
+        carpeta = cat.carpeta_de_pieza("impresion", "Soporte para la tele", "Creality Hi", "2026-11-21")
+        pieza = cat.agregar(c, carpeta, de_idea=idea["carpeta"], archivos=["soporte-para-la-tele_creality-hi.gcode"])
+        self.assertEqual([x["carpeta"] for x in c["piezas"]], [carpeta])
+        self.assertEqual((pieza["nombre"], pieza["nota"], pieza["idea_fecha"]), ("Soporte para la tele", "15 × 10 cm",
+                                                                                 "2026-11-20"))
+        self.assertEqual(cat.grupo_de(pieza), "en_proceso")
+        self.assertIn("Imprimirla", cat.siguiente(pieza))
+        self.assertEqual(cat.resumen_corto(c), "Tenés 1 lista para imprimir. Todo está en panel.html, en tu carpeta "
+                                               "de trabajo.")
+        # Impresa y después a la tienda: sigue contando como impresa (terminada)
+        cat.agregar(c, carpeta, estado="impresa")
+        cat.agregar(c, carpeta, estado="en_tienda")
+        self.assertEqual(cat.hechos(pieza), {"idea", "disenada", "laminada", "impresa", "en_tienda"})
+        self.assertIsNone(cat.siguiente(pieza))
+        self.assertTrue(cat.resumen_corto(c).startswith("Nada pendiente: 1 pieza terminada."))
+        # A la tienda antes de imprimirla (imagen ilustrativa): todavía falta imprimirla
+        otra = cat.agregar(c, "impresiones/2026-11-21_llavero_creality-hi", estado="en_tienda",
+                           archivos=["llavero_creality-hi.gcode"])
+        self.assertEqual((cat.grupo_de(otra), "impresa" in cat.hechos(otra)), ("en_proceso", False))
+        # Solo se sacan ideas
+        with self.assertRaises(SystemExit):
+            cat.quitar_idea(c, carpeta)
+        nueva = cat.agregar_idea(c, "Maceta", fecha="2026-11-22")
+        self.assertTrue(cat.quitar_idea(c, nueva["carpeta"]))
+        self.assertFalse(cat.quitar_idea(c, nueva["carpeta"]))
+        pagina = cat.generar_html(c)
+        self.assertIn('data-grupo="en_proceso"', pagina)
+        self.assertIn('aria-current="step"', pagina)
+        self.assertIn("<strong>1</strong>terminadas", pagina)
+        self.assertEqual(cat.resumen_corto({"piezas": []}), "Todavía no hay ideas ni piezas en el panel.")
+
+    def test_panel_por_linea_de_comandos(self):
+        tmp = Path(tempfile.mkdtemp())
+        indice = tmp / "catalogo.json"
+
+        def correr(*args):
+            r = subprocess.run([sys.executable, str(SCRIPTS / "catalogo.py"), *args], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            return r.stdout
+        salida = json.loads(correr("idea", "--catalogo", str(indice), "--nombre", "Caja con tapa", "--nota", "para tornillos",
+                                   "--fecha", "2026-11-21"))
+        self.assertEqual(salida["carpeta"], "ideas/2026-11-21_caja-con-tapa")
+        self.assertIn("1 idea pendiente", correr("resumen", "--catalogo", str(indice), "--corto"))
+        correr("agregar", "--catalogo", str(indice), "--carpeta", "disenos/2026-11-22_caja-con-tapa",
+               "--de-idea", "ideas/2026-11-21_caja-con-tapa")
+        self.assertIn("sigue: Dejarla lista para imprimir", correr("resumen", "--catalogo", str(indice)))
+        correr("html", "--catalogo", str(indice), "--salida", str(tmp / "panel.html"))
+        self.assertIn("Panel del taller", (tmp / "panel.html").read_text())
+        correr("redireccion", "--salida", str(tmp / "catalogo.html"))
+        self.assertIn('url=panel.html', (tmp / "catalogo.html").read_text())
 
     def test_carpeta_con_impresora(self):
         import catalogo as cat
