@@ -45,7 +45,7 @@ python3 -I costos.py luz --config config.json --kwh 310 --total 53072 --cargo-va
 
 ### El consumo de la impresora
 
-Se busca en internet **sin preguntarle al usuario y sin esperar a que toque un botón**: cada vez que una impresora entra al taller (`/impresoras`, `/instalar`), al empezar una conversación con el taller y al armar o rehacer el panel si alguna impresora preparada no lo tiene (pasa con las que se prepararon antes de la 0.1.19), y cada vez que una cuenta de costo usa una impresora que no lo tiene (`/pieza`, `/publicar`). Si no se encuentra el promedio, se estima en el momento (paso 3): "Falta el consumo" no queda en el panel. El botón "Buscá el consumo…" del panel queda solo para cuando no se pudo buscar (sin internet). Lo que importa es el **promedio mientras imprime**. La potencia nominal de la ficha ("Rated power", la de la fuente) es el máximo calentando: con una fuente de 350 W se imprime con 100 a 170 W, según la cama y el material, y una Creality Hi dice 1150 W a 220 V (390 W a 110 V), que no es lo que gasta imprimiendo.
+Se busca en internet **sin preguntarle al usuario y sin esperar a que toque un botón**: cada vez que una impresora entra al taller (`/impresoras`, `/instalar`), al empezar una conversación con el taller y al armar o rehacer el panel si alguna impresora preparada no lo tiene (pasa con las que se prepararon antes de la 0.1.19), y cada vez que una cuenta de costo usa una impresora que no lo tiene (`/pieza`, `/publicar`). Si no se encuentra el promedio, se estima en el momento (paso 3). En "Tu taller" del panel el consumo no lleva botón: con un dato, del origen que sea, queda listo; si todavía falta (por ejemplo, no se pudo buscar), dice que Claude lo busca solo. Lo que importa es el **promedio mientras imprime**. La potencia nominal de la ficha ("Rated power", la de la fuente) es el máximo calentando: con una fuente de 350 W se imprime con 100 a 170 W, según la cama y el material, y una Creality Hi dice 1150 W a 220 V (390 W a 110 V), que no es lo que gasta imprimiendo.
 
 En este orden, con el modelo exacto de la impresora:
 
@@ -59,7 +59,7 @@ python3 -I costos.py consumo --config config.json --impresora <id> --datos <impr
     --nominal 350 --fuente "<enlace de la ficha>" --salida config.json
 ```
 
-Guardarlo con `--salida` y escribir `config.json` con el procedimiento de escritura (respaldo). El script anota `consumo_w`, `consumo_fuente` (de dónde salió), `consumo_fecha` y `potencia_nominal_w`, y no pisa un dato mejor (un medido con un estimado) salvo con `--reemplazar`. Decirle al usuario en una línea lo que se encontró y de dónde, con el enlace; si es estimado, que con un medidor de enchufe se puede medir el real ("Quiero medir el consumo real…" en el panel).
+Guardarlo con `--salida` y escribir `config.json` con el procedimiento de escritura (respaldo). El script anota `consumo_w`, `consumo_fuente` (de dónde salió), `consumo_fecha` y `potencia_nominal_w`, y no pisa un dato mejor (un medido con un estimado) salvo con `--reemplazar`. Decirle al usuario en una línea lo que se encontró y de dónde, con el enlace; si es estimado, que con un medidor de enchufe se puede medir el real y pasárselo en el chat.
 
 - **Medido por el usuario:** con un medidor de enchufe, los kWh de una impresión entera divididos por sus horas: `--promedio <W> --origen medido`. Es el mejor dato.
 - **Lo que diga el usuario sin medirlo:** `--origen usuario`. Si es el número de la etiqueta de la fuente, es la potencia nominal: estimarlo con `--nominal` en vez de usarlo como promedio.

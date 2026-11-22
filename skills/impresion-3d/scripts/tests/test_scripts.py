@@ -715,16 +715,16 @@ class TestCostos(unittest.TestCase):
         ci = entrada["costo"]
         self.assertEqual((ci["consumo_w"], ci["potencia_nominal_w"], ci["precio"]), (119, 1150, 600000))
         self.assertTrue(ci["consumo_fuente"].startswith("estimado: ") and ci["consumo_fecha"])
-        # El panel: lo que falta se busca; lo estimado se puede medir; lo oficial está listo
+        # El panel: el consumo no lleva botón (Claude lo busca o lo estima solo); con dato está listo, venga de donde venga
         def consumo(ci):
             cfg = {"impresoras": [{"id": "hi", "nombre": "Creality Hi", "costo": ci}], "costos": {}, "tienda": {}}
             return next(i for i in costos.estado_taller(cfg) if i["tema"] == "Consumo de Creality Hi")
         falta = consumo({})
-        self.assertEqual((falta["estado"], falta["frase"]), ("falta", "Buscá el consumo de la Creality Hi en internet"))
+        self.assertEqual((falta["estado"], falta["frase"]), ("falta", None))
+        self.assertIn("lo busca solo", falta["texto"])
         estimado = consumo({"consumo_w": 120, "consumo_fuente": "estimado: cama"})
-        self.assertEqual((estimado["estado"], estimado["texto"]), ("revisar", "120 W (estimado)"))
-        self.assertIn("medir el consumo real", estimado["frase"])
-        self.assertEqual(consumo({"consumo_w": 145})["frase"], "Buscá el consumo de la Creality Hi en internet")
+        self.assertEqual((estimado["estado"], estimado["texto"], estimado["frase"]), ("listo", "120 W (estimado)", None))
+        self.assertEqual((consumo({"consumo_w": 145})["estado"], consumo({"consumo_w": 145})["frase"]), ("listo", None))
         oficial = consumo({"consumo_w": 80, "consumo_fuente": "oficial: https://help.prusa3d.com"})
         self.assertEqual((oficial["estado"], oficial["texto"], oficial["frase"]), ("listo", "80 W (ficha oficial)", None))
         # En el costo de la pieza, el supuesto dice de dónde salió

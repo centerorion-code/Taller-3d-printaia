@@ -1,5 +1,9 @@
 # Cambios
 
+## 0.1.24 (2026-11-22)
+
+- **"Tu taller" ya no tiene botón para el consumo:** como Claude lo busca o lo estima y lo guarda solo, el consumo de cada impresora queda tildado con su origen ("130 W (estimado)") y no se pide. Si todavía falta, dice que Claude lo busca solo. Si medís el real con un medidor de enchufe, se lo pasás en el chat.
+
 ## 0.1.23 (2026-11-22)
 
 - **El consumo de la impresora se completa solo, también en las impresoras preparadas antes de la 0.1.19:** al empezar una conversación con el taller y al armar el panel, si a una impresora le falta el consumo, Claude lo busca en internet y, si el fabricante solo publica la potencia máxima, lo estima por el tamaño de la cama, sin preguntarte ni esperar a que toques el botón. "Falta el consumo" ya no queda en "Tu taller".

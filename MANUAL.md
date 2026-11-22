@@ -148,7 +148,7 @@ Idea → Diseño → Lista para imprimir → Impresa → En la tienda
 - Arriba, cuántas ideas están **pendientes**, cuántas piezas **en proceso** y cuántas **terminadas**, con filtros y un buscador.
 - Primero va **"Para hacer"** (lo más avanzado primero) y después las terminadas, por mes.
 - Cada tarjeta dice **a quién le toca lo que sigue**: "Le toca a Claude: dejarla lista para imprimir" o "Te toca: imprimirla". Tiene botones con el pedido ("Diseñala", "Ya la imprimí", "Publicala"…), para qué impresora es, la vista (o la foto de la pieza impresa), medidas, material, tiempo, gramos, costo, precio y los archivos.
-- **Tu taller:** arriba, lo que falta para que los costos y precios sean reales (la boleta de luz, cuánto pagaste la impresora, tu hora…), con un botón para cada cosa. El consumo de cada impresora lo busca Claude en internet; si es estimado, el botón es para medir el real.
+- **Tu taller:** arriba, lo que falta para que los costos y precios sean reales (la boleta de luz, cuánto pagaste la impresora, tu hora…), con un botón para cada cosa. El consumo de cada impresora no te lo pide: Claude lo busca en internet o, si no lo encuentra, lo estima por el tamaño de la cama, y lo guarda solo (si medís el real con un medidor de enchufe, pasáselo en el chat).
 - En el archivo, los botones copian el pedido para que lo pegues en el chat.
 - **Ideas para después:** contale a Claude "anotá esta idea: un soporte para la tele, 15 × 10 cm" y queda pendiente con lo que ya se sabe. Cuando la quieras hacer, pedila por su nombre.
 - **Pieza desde una foto:** el botón de arriba manda el pedido a Claude (o lo copia) y te recuerda adjuntar la foto en el chat: la página no puede mandar fotos.

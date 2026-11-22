@@ -472,10 +472,10 @@ def estado_taller(config: dict) -> list[dict]:
         nombre = i.get("nombre") or i.get("id")
         consumo = _num(ci.get("consumo_w"))
         origen = origen_consumo(ci)
-        agregar(f"Consumo de {nombre}", consumo is not None,
-                f"{consumo:.0f} W ({ETIQUETAS_CONSUMO[origen]})" if consumo is not None else "Falta el consumo",
-                f"Buscá el consumo de la {nombre} en internet" if origen in ("falta", "sin fuente") else
-                f"Quiero medir el consumo real de la {nombre}", aviso=origen in ("estimado", "sin fuente"))
+        # El consumo no se le pide al usuario: Claude lo busca o lo estima y lo guarda solo, así que no lleva botón.
+        items.append({"tema": f"Consumo de {nombre}", "estado": "listo" if consumo is not None else "falta",
+                      "texto": f"{consumo:.0f} W ({ETIQUETAS_CONSUMO[origen]})" if consumo is not None else
+                      "Falta: Claude lo busca solo en la próxima conversación", "frase": None})
         agregar(f"Precio de {nombre}", _num(ci.get("precio")) is not None,
                 _plata(_num(ci.get("precio")), costos.get("moneda") or "ARS") if _num(ci.get("precio")) else
                 "Falta cuánto la pagaste (para el desgaste)", f"La {nombre} me costó $…")
