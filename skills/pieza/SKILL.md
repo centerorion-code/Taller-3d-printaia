@@ -97,20 +97,20 @@ Revisar:
 3. Dejar también en la carpeta: `pieza.py` (si se modeló), `pieza.stl`, `vista.png`, `config_usada.json`, `informe_gcode.json` e `informe.md`. En `laminado/` quedan las vueltas de Orca: se pueden borrar.
 
 `informe.md` y la respuesta al usuario (breve):
-- El G-code a imprimir (`<archivo>.gcode`) y su carpeta.
+- El G-code a imprimir (`<archivo>.gcode`) y su carpeta, con enlaces `computer://` a la carpeta y al `.3mf` (skill `impresion-3d`, sección 3).
 - Tiempo, gramos y costo real con sus partes (material, luz, desgaste de la impresora, fallas, tu tiempo, embalaje; sale en `informe_gcode.json`, `references/costos.md`). Si faltan datos, decir cuáles en una línea con su frase de `costos.py estado` ("Te paso mi boleta de luz…"); el costo sale igual con lo que hay.
 - 3 a 6 decisiones clave con el porqué (material, orientación, paredes/relleno, costura, soportes, cama).
 - Resultado de la revisión de seguridad (APROBADO o advertencias explicadas).
 - Qué mirar durante la impresión (primera capa, voladizos en tal altura) y el recordatorio de no dejarla sin supervisión.
 - Cómo imprimir: pasar `<archivo>.gcode` por USB o por la app de la impresora y arrancar desde la impresora. **No arrancarla nunca desde acá.**
-- Para verla o tocarla en Orca: abrir `<archivo>.3mf` con doble clic; se abre con la impresora, el filamento, el proceso y la cama elegidos. Si Orca ya estaba abierto desde antes de que se crearan los perfiles AUTO, cerrarlo primero: si no, los muestra como cambios sobre el perfil de sistema (con los mismos valores).
+- Para verla o tocarla en Orca: tocar el enlace del `<archivo>.3mf` o abrirlo con doble clic; se abre con la impresora, el filamento, el proceso y la cama elegidos. Si Orca ya estaba abierto desde antes de que se crearan los perfiles AUTO, cerrarlo primero: si no, los muestra como cambios sobre el perfil de sistema (con los mismos valores).
 
 **Abrir Orca con la pieza** (opcional): solo si hay `device_bash` en la PC y después de preguntar "¿Te abro Orca con la pieza?". Si dice que sí, lanzarlo en segundo plano con el proyecto, con `orca.ejecutable` de `config.json`:
 - Linux, solo con sesión gráfica (`[ -n "$DISPLAY$WAYLAND_DISPLAY" ]`): `nohup "<ejecutable>" "<ruta del .3mf>" >/dev/null 2>&1 &` (Flatpak: `nohup flatpak run com.orcaslicer.OrcaSlicer "<ruta del .3mf>" >/dev/null 2>&1 &`).
 - Windows (PowerShell): `Start-Process -FilePath "<ejecutable>" -ArgumentList '"<ruta del .3mf>"'`.
 - macOS: `open -a OrcaSlicer "<ruta del .3mf>"`.
 
-Si no se puede (sin sesión gráfica, sin ejecutable o sin `device_bash`), decir en una línea: "Abrí `<archivo>.3mf` con doble clic". Abrir la ventana está bien; imprimir es del usuario (skill `impresion-3d`, regla 1): nunca usar la pestaña Dispositivo (Device) de Orca ni sus botones Imprimir o Enviar, tampoco con el control del escritorio.
+Si no se puede (sin sesión gráfica, sin ejecutable o sin `device_bash`), decir en una línea: "Tocá el enlace o abrí `<archivo>.3mf` con doble clic", con el enlace `computer://` al archivo. Abrir la ventana está bien; imprimir es del usuario (skill `impresion-3d`, regla 1): nunca usar la pestaña Dispositivo (Device) de Orca ni sus botones Imprimir o Enviar, tampoco con el control del escritorio.
 
 Registrar la entrega en `historial.csv` y actualizar el panel (skill `panel`, "Agregar o actualizar una pieza"; con `--de-idea` si salió de una idea anotada) con `--impresora "<nombre de la impresora>"`, `informe_gcode.json`, `informe_stl.json` y los archivos de la carpeta (`<archivo>.gcode`, `<archivo>.3mf`, `pieza.stl`, `pieza.py`, `vista.png`, `informe.md`).
 

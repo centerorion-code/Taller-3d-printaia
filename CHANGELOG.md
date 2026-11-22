@@ -1,5 +1,10 @@
 # Cambios
 
+## 0.1.15 (2026-11-21)
+
+- **Enlaces a tu PC:** cada vez que Claude te dice dónde quedó algo (la carpeta de la pieza, el G-code, el `.3mf`, el panel o las fotos de producto), te deja un enlace para ir directo. El del `.3mf` lo abre con el programa que tengas para esos archivos.
+- **Los botones del panel al costado sí le mandan el pedido a Claude** (probado): le llega a la conversación que publicó el panel. Claude te contesta en el comentario antes de volver a publicar el panel, porque al republicarlo los comentarios de antes pueden desaparecer. Si tocás dos veces el mismo botón, lo hace una sola vez.
+
 ## 0.1.14 (2026-11-21)
 
 - **Costo real de cada pieza** (`costos.py`, `references/costos.md`): material, luz, desgaste de la impresora, las que salen mal, tu tiempo y embalaje. La luz sale de tu boleta: mandale una foto o el PDF y saca el precio del kWh (el del último escalón más impuestos, o el promedio sin los cargos fijos si la boleta no lo separa). Guarda solo los números de la tarifa, nada personal. Cada impresora tiene su consumo (medido con un medidor de enchufe, o estimado con su fuente) y su precio, repartido en sus horas de vida. El tiempo es el de Orca más el calentamiento.
