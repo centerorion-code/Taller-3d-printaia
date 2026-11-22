@@ -7,7 +7,7 @@ description: Diseña, configura y lamina una pieza de punta a punta, con revisi�
 
 Cargar antes la skill `impresion-3d` (reglas de seguridad, rutas y procedimiento de escritura) y seguir sus reglas en todo momento. Scripts: `<raíz del plugin>/skills/impresion-3d/scripts/`. Las referencias (`references/...`) son las de la skill `impresion-3d`.
 
-Usar una lista de tareas si la pieza lleva modelado. Mantener informado con frases cortas; las decisiones y resultados van en el informe final.
+Usar siempre una lista de tareas con las etapas (Entender la pieza, Modelo, Configuración, Laminar y revisar, Entregar) y tildar cada una al terminarla: es la guía del usuario, que ve en qué etapa está. Mantener informado con frases cortas; las decisiones y resultados van en el informe final. En cada pausa en la que el usuario tiene que hacer algo (contestar, aprobar la vista, imprimir), terminar con una línea **"Te toca: …"** que diga qué y cómo.
 
 **¿Hace falta laminar?** Si el usuario quiere solo el modelo (el STL, el archivo editable, "lo imprimo en otro lado", "un diseño paramétrico") o la PC no está conectada, seguir `/diseno`. Si no queda claro, preguntarlo una sola vez (tabla de `/diseno`).
 
@@ -79,7 +79,7 @@ Revisar:
 4. Traer el G-code con `device_stage_files` y correr:
    ```bash
    python3 -I revisar_gcode.py <gcode> --impresora <datos> --material <m> --json informe_gcode.json \
-     --cama-primera-capa <temperatura anotada> [--precio-kg <costos> --precio-kwh <costos> --watts <consumo_w>]
+     --cama-primera-capa <temperatura anotada> --config <config.json>
    ```
 5. Verificar en el informe: temperaturas (la cama de la primera capa tiene que coincidir), ventilador, zona impresa, tiempo y gramos razonables para el volumen. Correr también `novedades_orca.py gcode <gcode> --estado <novedades-orca.json>` (skill `impresion-3d`, sección 7) y guardar el estado actualizado en la PC; si hay novedades, contarlas en una línea.
 6. Si algo no cierra (tiempo excesivo para la prioridad, voladizos sin soporte, cama equivocada, advertencias), ajustar los perfiles (sección 3), la orientación o el modelo (sección 2) y volver a laminar. Máximo 3 vueltas sin consultar; si no converge, explicar el dilema y preguntar.
@@ -98,7 +98,7 @@ Revisar:
 
 `informe.md` y la respuesta al usuario (breve):
 - El G-code a imprimir (`<archivo>.gcode`) y su carpeta.
-- Tiempo, gramos y costo (si hay precios en la configuración; si faltan, ofrecer cargarlos).
+- Tiempo, gramos y costo real con sus partes (material, luz, desgaste de la impresora, fallas, tu tiempo, embalaje; sale en `informe_gcode.json`, `references/costos.md`). Si faltan datos, decir cuáles en una línea con su frase de `costos.py estado` ("Te paso mi boleta de luz…"); el costo sale igual con lo que hay.
 - 3 a 6 decisiones clave con el porqué (material, orientación, paredes/relleno, costura, soportes, cama).
 - Resultado de la revisión de seguridad (APROBADO o advertencias explicadas).
 - Qué mirar durante la impresión (primera capa, voladizos en tal altura) y el recordatorio de no dejarla sin supervisión.
@@ -116,7 +116,9 @@ Registrar la entrega en `historial.csv` y actualizar el panel (skill `panel`, "A
 
 ### En paralelo: la publicación
 
-Si `config.json` tiene `tienda.plataforma` y la pieza es para vender (o el usuario lo pidió), ofrecer en la misma respuesta: "¿Te armo ya la publicación? Queda en borrador con una imagen ilustrativa hasta que tengas la foto real." Si dice que sí, seguir `/publicar` con los datos de este laminado (tiempo y gramos reales). El usuario puede aprobar desde la app de Claude en el celular; nada se publica sin su OK.
+Si `config.json` tiene `tienda.plataforma` y la pieza es para vender (o el usuario lo pidió), ofrecer en la misma respuesta: "¿Te armo ya la publicación? Queda en borrador con fotos de producto renderizadas hasta que tengas las reales." Si dice que sí, seguir `/publicar` con los datos de este laminado (tiempo y gramos reales); ahí se elige el margen de este producto. El usuario puede aprobar desde la app de Claude en el celular; nada se publica sin su OK.
+
+Cerrar la entrega con **"Te toca: imprimir `<archivo>.gcode`** (pasalo a la impresora y arrancala desde ahí) **y después contame cómo salió"**. Si hay AskUserQuestion, ofrecer además las opciones que siguen: "Ya la imprimí", "Abrila en Orca" (si hay `device_bash`), "Armá la publicación" (si hay tienda) y "Cambiar algo".
 
 ## 6. Después de imprimir (aprendizaje)
 

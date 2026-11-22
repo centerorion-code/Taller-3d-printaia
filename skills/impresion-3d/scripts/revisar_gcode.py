@@ -14,7 +14,8 @@ Revisa:
 Uso:
   python3 revisar_gcode.py ARCHIVO.gcode [--impresora taller-3d/impresoras/<id>.json | --buscar <carpeta>]
          [--material PETG] [--json informe.json]
-         [--precio-kg 25000] [--precio-kwh 150] [--watts 180] [--moneda ARS]
+         [--config <config.json>]       # costo real y precio por canal (costos.py)
+         [--precio-kg 25000] [--precio-kwh 150] [--watts 180] [--moneda ARS]   # costo simple, sin config
 
 Código de salida: 0 aprobado, 1 con advertencias, 2 rechazado (no entregar).
 """
@@ -522,7 +523,18 @@ def revisar(ruta: Path | None, impresora: dict, material: str | None = None, cos
     gramos = _num(cfg.get("total filament used [g]") or cfg.get("filament used [g]"))
     capas_cfg = _num(cfg.get("total layers count") or cfg.get("total layer number"))
     costo = None
-    if costos and gramos is not None:
+    if costos and costos.get("config") is not None and gramos is not None:
+        import costos as costos_mod
+        config = costos["config"]
+        imp = costos_mod.impresora_de_config(config, impresora.get("id") or impresora.get("modelo"))
+        filamento = str(cfg.get("filament_settings_id", "")).strip('"') or None
+        c = costos_mod.costo_pieza(gramos, segundos, material_clave, config, imp, filamento)
+        costo = {"moneda": c["moneda"], "material": c["partes"]["material"], "energia": c["partes"]["luz"],
+                 "partes": c["partes"], "total": c["total"], "kwh": c["kwh"], "faltan": c["faltan"],
+                 "supuestos": c["supuestos"]}
+        if (config.get("tienda") or {}).get("plataforma"):
+            costo["precios"] = costos_mod.precios(c["total"], config)
+    elif costos and gramos is not None:
         moneda = costos.get("moneda") or ""
         costo = {"moneda": moneda}
         if costos.get("precio_kg"):
@@ -621,6 +633,8 @@ def main(argv=None) -> None:
                     help="carpeta con datos de impresoras del usuario, para --impresora auto")
     ap.add_argument("--material", help="PLA, PETG, TPU, ABS, ASA... (si no, lo toma del G-code)")
     ap.add_argument("--json", type=Path, help="guardar el informe en JSON")
+    ap.add_argument("--config", type=Path, help="config.json del usuario: costo real (luz de la boleta, consumo de la "
+                                                "impresora, desgaste, fallas) y precio por canal")
     ap.add_argument("--precio-kg", type=float)
     ap.add_argument("--precio-kwh", type=float)
     ap.add_argument("--watts", type=float, default=None)
@@ -630,7 +644,9 @@ def main(argv=None) -> None:
     if not a.gcode.exists():
         raise SystemExit(f"No existe {a.gcode}")
     costos = None
-    if a.precio_kg or a.precio_kwh:
+    if a.config:
+        costos = {"config": comun.cargar_json(a.config)}
+    elif a.precio_kg or a.precio_kwh:
         costos = {"precio_kg": a.precio_kg, "precio_kwh": a.precio_kwh, "watts": a.watts, "moneda": a.moneda}
     if a.impresora == "auto":
         impresora = detectar_impresora(a.gcode, candidatas=comun.impresoras_en(a.buscar))

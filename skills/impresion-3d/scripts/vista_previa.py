@@ -5,7 +5,7 @@
 
 Uso:
   python3 vista_previa.py pieza.stl vista.png [--titulo "Soporte en L"]
-  python3 vista_previa.py pieza.stl foto_producto.png --producto --color rojo   # imagen para la tienda
+  python3 vista_previa.py pieza.stl foto_producto.png --producto --color rojo   # imagen para la tienda (sin Blender)
 
 Requiere: pip install --break-system-packages numpy matplotlib
 """
@@ -74,10 +74,13 @@ def color_rgb(color: str | None) -> np.ndarray:
     return np.array([int(texto[i:i + 2], 16) / 255 for i in (0, 2, 4)])
 
 
-def renderizar_producto(stl: Path, salida: Path, color: str | None = None, fondo: str = "#f4f5f7") -> Path:
+def renderizar_producto(stl: Path, salida: Path, color: str | None = None, fondo: str = "#ffffff",
+                        leyenda: bool = False) -> Path:
     """Una sola vista en perspectiva, del color del filamento, para la ficha de la tienda.
 
-    Lleva la leyenda "Imagen ilustrativa": no reemplaza la foto de la pieza impresa.
+    Fondo blanco y la pieza en el 80 % del cuadro, sin texto (Mercado Libre no admite texto en las fotos): la
+    descripción aclara que es ilustrativa. leyenda=True agrega "Imagen ilustrativa (render 3D)" abajo, para
+    tiendas propias. No reemplaza la foto de la pieza impresa. Si hay Blender, render_producto.py sale mejor.
     """
     import matplotlib
 
@@ -129,12 +132,12 @@ def renderizar_producto(stl: Path, salida: Path, color: str | None = None, fondo
     salida.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(salida, facecolor=fondo)
     plt.close(fig)
-    _encuadrar(salida, fondo)
+    _encuadrar(salida, fondo, leyenda=leyenda)
     return salida
 
 
-def _encuadrar(png: Path, fondo: str, lado: int = 1200, margen: float = 0.12) -> None:
-    """Recorta el fondo sobrante, centra la pieza en un cuadrado y agrega la leyenda."""
+def _encuadrar(png: Path, fondo: str, lado: int = 1200, margen: float = 0.10, leyenda: bool = False) -> None:
+    """Recorta el fondo sobrante y centra la pieza en un cuadrado (80 % del lado); la leyenda, si se pide."""
     from PIL import Image, ImageChops, ImageDraw, ImageFont
 
     img = Image.open(png).convert("RGB")
@@ -147,6 +150,9 @@ def _encuadrar(png: Path, fondo: str, lado: int = 1200, margen: float = 0.12) ->
     img = img.resize((max(1, round(img.width * escala)), max(1, round(img.height * escala))), Image.LANCZOS)
     lienzo = Image.new("RGB", (lado, lado), color_fondo)
     lienzo.paste(img, ((lado - img.width) // 2, (lado - img.height) // 2))
+    if not leyenda:
+        lienzo.save(png)
+        return
     dibujo = ImageDraw.Draw(lienzo)
     try:
         fuente = ImageFont.truetype("DejaVuSans.ttf", 18)
@@ -207,11 +213,13 @@ def main(argv=None) -> None:
     ap.add_argument("png", type=Path)
     ap.add_argument("--titulo")
     ap.add_argument("--producto", action="store_true",
-                    help="una sola vista del color del filamento, para la tienda (con leyenda de imagen ilustrativa)")
+                    help="una sola vista del color del filamento, para la tienda (fondo blanco, sin texto)")
+    ap.add_argument("--leyenda", action="store_true",
+                    help="con --producto: agrega «Imagen ilustrativa (render 3D)» abajo (Mercado Libre no admite texto)")
     ap.add_argument("--color", help="con --producto: color del filamento (nombre o #RRGGBB)")
     a = ap.parse_args(argv)
     if a.producto:
-        print(renderizar_producto(a.stl, a.png, a.color))
+        print(renderizar_producto(a.stl, a.png, a.color, leyenda=a.leyenda))
     else:
         print(renderizar(a.stl, a.png, a.titulo))
 

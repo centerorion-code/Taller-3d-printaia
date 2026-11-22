@@ -75,8 +75,13 @@ Hacen falta dos: la **carpeta de trabajo** (diseños, impresiones con sus vistas
 
 1. **Aviso de uso:** si `config.json` no tiene `aceptacion`, mostrar un resumen de `DISCLAIMER.md` (puntos 1-8 en una línea cada uno) y pedir que escriba ACEPTO. Guardar fecha, versión del plugin y texto.
 2. **Impresora:** ver todas las impresoras de Orca, no solo las que tienen copia de usuario (`references/impresoras.md`, sección 1), preguntar en cuál quiere trabajar y prepararla con `/impresoras`: datos investigados en internet, tipo de cama, perfiles propios que ya tenga y perfiles AUTO óptimos. Las demás se preparan cuando las elija.
-3. **Costos (opcional):** precio del kWh, precio por kg de cada filamento, consumo de la impresora (180 W si no lo sabe; mejor medirlo).
-4. **Tienda (opcional):** plataforma (WooCommerce, Tiendanube, Shopify, Mercado Libre u otra), URL, margen, costo por hora de máquina, embalaje, redondeo y demora. Sin contraseñas.
+3. **Costos (opcional, se puede hacer después):** para que el costo de cada pieza sea real (`references/costos.md` de la skill `impresion-3d`). Pedir de a uno y guardar cada respuesta:
+   - **La boleta de luz:** "Mandame una foto o el PDF de tu última boleta de luz". Leer los números de la tarifa y correr `costos.py luz` (solo se guardan esos números, nada personal).
+   - **La impresora:** cuánto la pagó y su consumo. Si tiene un medidor de enchufe, que lo mida en una impresión; si no, el estimado que dejó `/impresoras` (con su fuente).
+   - **El filamento:** cuánto paga el kilo de cada material que usa.
+   - **Su tiempo:** cuánto vale su hora y cuántos minutos le dedica a cada pieza (preparar, sacar soportes, embalar). Fallas: 10 % si no sabe.
+4. **Tienda (opcional):** plataforma (WooCommerce, Tiendanube, Shopify, Mercado Libre u otra), URL, dónde vende (`tienda.canales`: la comisión de cada canal; la de Mercado Libre, buscarla en la web para su categoría), su margen habitual **sobre el precio** (explicar que un recargo del 50 % es un margen del 33 %; en cada producto se vuelve a elegir), embalaje, redondeo y demora. Sin contraseñas.
+   Al final, `costos.py estado --config config.json` muestra lo que quedó listo y lo que falta: decirlo en pocas líneas, con la frase para completarlo después.
 5. Escribir `config.json` (formato en `references/configuracion.md` de la skill `impresion-3d`) con el procedimiento de escritura y crear `historial.csv` con encabezado. Si ya existe, completar solo lo que falte.
 
 ## 5. Pieza de prueba
@@ -84,5 +89,6 @@ Hacen falta dos: la **carpeta de trabajo** (diseños, impresiones con sus vistas
 1. Generar con `cad.py` un cubo de calibración de 20 × 20 × 20 mm con chaflán inferior.
 2. Laminar con los perfiles de la impresora elegida: `AUTO proceso` y `AUTO filamento` creado con `--cama` de la configuración (como en `/pieza`).
 3. Traer el G-code y correr `revisar_gcode.py --impresora <json> --cama-primera-capa <temperatura>`: tiene que salir APROBADO, con las temperaturas y la cama correctas.
-4. Mostrar tiempo, gramos y costo (si hay precios) y dejar todo en la carpeta de `catalogo.py carpeta --nombre "Cubo de prueba" --impresora "<impresora>"`, con el G-code con nombre y el proyecto `.3mf` como en `/pieza` (sección 5). Decir que abra el `.3mf` con doble clic para ver la pieza en Orca con todo elegido.
-5. Cerrar con: qué quedó listo, qué falta (si algo), los comandos disponibles, que en la app llevan el prefijo del plugin (`/taller-3d:pieza`, `/taller-3d:diseno`, `/taller-3d:calibrar`, `/taller-3d:impresoras`, `/taller-3d:publicar`, `/taller-3d:panel`, `/taller-3d:restaurar`, `/taller-3d:ayuda`), y que también puede pedir todo con sus palabras, y cómo pedir una pieza con un ejemplo de `MANUAL.md`. Ofrecer dejar el manual en la carpeta de trabajo.
+4. Mostrar tiempo, gramos y costo (con `revisar_gcode.py … --config config.json`; si faltan datos, decir cuáles) y dejar todo en la carpeta de `catalogo.py carpeta --nombre "Cubo de prueba" --impresora "<impresora>"`, con el G-code con nombre y el proyecto `.3mf` como en `/pieza` (sección 5). Decir que abra el `.3mf` con doble clic para ver la pieza en Orca con todo elegido.
+5. Armar el panel (skill `panel`) con el cubo y la caja "Tu taller". En claude.ai, ofrecer el panel al costado del chat (skill `panel`).
+6. Cerrar con: qué quedó listo, qué falta (si algo), los comandos disponibles, que en la app llevan el prefijo del plugin (`/taller-3d:pieza`, `/taller-3d:diseno`, `/taller-3d:calibrar`, `/taller-3d:impresoras`, `/taller-3d:publicar`, `/taller-3d:panel`, `/taller-3d:restaurar`, `/taller-3d:ayuda`), y que también puede pedir todo con sus palabras, y cómo pedir una pieza con un ejemplo de `MANUAL.md`. Ofrecer dejar el manual en la carpeta de trabajo.

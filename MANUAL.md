@@ -16,7 +16,7 @@ La PC tiene que estar prendida y con la app de Claude abierta, porque ahí está
 |---|---|---|
 | **Solo el diseño** (lo imprimís en otro lado, lo mandás a un servicio o querés el archivo) | "Diseñame…", "necesito el STL de…", `/taller-3d:diseno` | Modelo paramétrico: STL, archivo editable con las medidas arriba y una vista. No hace falta la PC. |
 | **La pieza lista para imprimir** en tu impresora | "Haceme…", "imprimime…", `/taller-3d:pieza` | Todo lo anterior más la configuración, el G-code revisado y el costo. |
-| **La pieza y su publicación** en tu tienda | "…y publicala", o decí que sí cuando Claude te lo ofrece | Además, el borrador del producto con precio, imagen y descripción. |
+| **La pieza y su publicación** en tu tienda | "…y publicala", o decí que sí cuando Claude te lo ofrece | Además, el borrador del producto con fotos, descripción y el precio con el margen que elijas. |
 
 Si no queda claro cuál querés, Claude te lo pregunta una sola vez.
 
@@ -66,15 +66,15 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
         ↓
  6. Revisión de seguridad ── no pasa → se corrige; no se entrega
         ↓ pasa
- 7. Entrega en tu carpeta (G-code, modelo, vista, informe, costo)
+ 7. Entrega en tu carpeta (G-code, modelo, vista, informe, costo real)
         ├── en paralelo, si tenés tienda: borrador de la publicación
-        │   (precio, imagen ilustrativa, descripción) → lo aprobás vos
+        │   (fotos de producto, descripción, el margen que elegís) → lo aprobás vos
         ↓
  8. Imprimís vos (USB o app de la impresora)
         ↓
  9. Contás cómo salió → Claude ajusta y aprende
         ↓
-10. Foto real de la pieza → reemplaza la imagen ilustrativa
+10. Foto real de la pieza → va primera en la publicación
     y publicás el producto cuando quieras
 ```
 
@@ -86,11 +86,11 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
 4. **Configuración.** Elige los ajustes según el uso: paredes, relleno, velocidades, temperaturas, soportes y orientación. Los guarda en dos perfiles de trabajo llamados "AUTO". **Tus perfiles no se tocan.**
 5. **Laminado.** Lamina en tu Orca y mira el resultado: tiempo, gramos, voladizos y temperaturas. Si algo no cierra, ajusta y vuelve a laminar, hasta tres veces antes de consultarte.
 6. **Revisión de seguridad.** Revisa el G-code: temperaturas, que no salga de la cama, que no tenga comandos que cambien la configuración de la impresora y que apague todo al terminar. **Si no pasa, no se entrega.**
-7. **Entrega.** Deja todo en una carpeta con el nombre de la pieza y de la impresora, y te resume tiempo, gramos, costo (si cargaste precios), las decisiones con el porqué y qué mirar durante la impresión. **Para verla o tocarla en Orca, abrí el proyecto (`.3mf`) con doble clic:** se abre con tu impresora, el filamento, el proceso AUTO y tu tipo de cama ya elegidos. Si Claude tiene terminal en tu PC, te pregunta si querés que te abra Orca con la pieza.
-   **En paralelo, la publicación:** si tenés tienda configurada, Claude te ofrece armar el producto en ese momento, con el precio calculado con el tiempo y los gramos reales y una imagen ilustrativa (dice "Imagen ilustrativa"). Lo aprobás vos, también desde la app de Claude en el celular, y queda como borrador.
+7. **Entrega.** Deja todo en una carpeta con el nombre de la pieza y de la impresora, y te resume tiempo, gramos, costo real (con lo que cargaste; si falta algo, te dice qué), las decisiones con el porqué y qué mirar durante la impresión. **Para verla o tocarla en Orca, abrí el proyecto (`.3mf`) con doble clic:** se abre con tu impresora, el filamento, el proceso AUTO y tu tipo de cama ya elegidos. Si Claude tiene terminal en tu PC, te pregunta si querés que te abra Orca con la pieza.
+   **En paralelo, la publicación:** si tenés tienda configurada, Claude te ofrece armar el producto en ese momento: fotos de producto hechas con Blender (fondo blanco, como pide Mercado Libre, y otra con sombra), la descripción y el precio con el tiempo y los gramos reales. **Te pregunta qué margen querés en ese producto**, con tres opciones y lo que ganás en cada canal, o le decís un precio. Lo aprobás vos, también desde la app de Claude en el celular, y queda como borrador.
 8. **Imprimís vos.** Pasás el G-code a la impresora (por USB o con la app de la marca) y la arrancás desde ahí. **Claude nunca arranca una impresión.** Mirá la primera capa completa y no dejes la impresora sola.
 9. **Contale cómo salió.** Mandale una foto, aunque haya salido bien. Si algo falló, lo diagnostica y lo corrige. Lo que funcionó queda anotado y mejora las próximas piezas.
-10. **Vender.** Cuando tengas la pieza impresa, mandale la foto: la suma al producto como imagen principal. El borrador lo publicás vos desde tu tienda. Si no lo armaste antes, `/taller-3d:publicar` lo hace en cualquier momento.
+10. **Vender.** Cuando tengas la pieza impresa, mandale la foto: la suma al producto como imagen principal (las fotos de Blender son ilustrativas). El borrador lo publicás vos desde tu tienda. Si no lo armaste antes, `/taller-3d:publicar` lo hace en cualquier momento.
 
 ## Qué decidís vos
 
@@ -98,6 +98,7 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
 - El material y la prioridad.
 - Cualquier cambio en tus propios perfiles de Orca (siempre con respaldo).
 - Arrancar la impresión.
+- El margen de cada producto (o su precio).
 - Publicar el producto: queda en borrador hasta que lo publiques vos.
 - Instalar plugins de Orca: Claude solo los sugiere.
 
@@ -114,6 +115,7 @@ impresiones/2026-11-21_soporte-router_ender-3-v3-plus/
     pieza.stl           el modelo
     vista.png           la vista previa
     informe.md          tiempo, gramos, costo, decisiones y qué mirar
+    producto/           la publicación: fotos de producto, ficha y precio
     config_usada.json   configuración usada y por qué
     laminado/           las vueltas de prueba de Orca (se pueden borrar)
 disenos/2026-11-21_organizador/
@@ -133,11 +135,25 @@ Idea → Diseño → Lista para imprimir → Impresa → En la tienda
 
 - Arriba, cuántas ideas están **pendientes**, cuántas piezas **en proceso** y cuántas **terminadas**, con filtros y un buscador.
 - Primero va **"Para hacer"** (lo más avanzado primero) y después las terminadas, por mes.
-- Cada tarjeta dice **qué sigue** ("Imprimirla", "Dejarla lista para imprimir"…), para qué impresora es, la vista (o la foto de la pieza impresa), medidas, material, tiempo, gramos, costo, precio y los archivos.
+- Cada tarjeta dice **a quién le toca lo que sigue**: "Le toca a Claude: dejarla lista para imprimir" o "Te toca: imprimirla". Tiene botones con el pedido ("Diseñala", "Ya la imprimí", "Publicala"…), para qué impresora es, la vista (o la foto de la pieza impresa), medidas, material, tiempo, gramos, costo, precio y los archivos.
+- **Tu taller:** arriba, lo que falta para que los costos y precios sean reales (la boleta de luz, el consumo de tu impresora, tu hora…), con un botón para cada cosa.
+- En el archivo, los botones copian el pedido para que lo pegues en el chat.
 - **Ideas para después:** contale a Claude "anotá esta idea: un soporte para la tele, 15 × 10 cm" y queda pendiente con lo que ya se sabe. Cuando la quieras hacer, pedila por su nombre.
 - Al empezar a usar el taller, Claude te dice en una línea qué tenés pendiente.
 
 Se actualiza solo cada vez que Claude anota una idea o guarda, lamina o publica una pieza. Una pieza impresa ya está terminada: publicarla es opcional. Si tenías piezas de antes, pedí "armá el panel" y las suma.
+
+### El panel al costado del chat
+
+En claude.ai y en la app de Claude, el panel también puede estar **al costado del chat**: Claude lo publica en tu cuenta (es privado: lo ves solo vos) y se actualiza solo. La primera vez te pregunta si lo querés.
+
+Ahí los botones están pensados para mandarle el pedido directo a Claude. Por ahora, claude.ai todavía no deja que una página despierte este tipo de chat, así que los botones copian el pedido para que lo pegues; cuando claude.ai lo habilite, el panel lo detecta solo y empiezan a mandarlo.
+
+### La guía
+
+- Al empezar sin un pedido concreto ("hola", "¿qué hacemos?"), Claude te ofrece opciones para tocar con lo que sigue: la pieza que tenés para imprimir, una idea anotada, lo que falta configurar o algo nuevo.
+- Mientras hace una pieza, ves las etapas en la lista de tareas (entender, modelo, configuración, laminar y revisar, entregar).
+- Cada vez que te toca hacer algo, termina con **"Te toca: …"**: qué hacer y cómo.
 
 ## Cambiar una pieza ya hecha
 
@@ -187,6 +203,14 @@ Los comandos llevan el nombre del plugin adelante (`/taller-3d:...`): si escrib�
 **¿Claude me puede abrir Orca?** Si tiene terminal en tu PC, te pregunta si querés que te lo abra con la pieza. Si no, abrí el `.3mf` con doble clic. Imprimir es siempre tuyo: Claude no usa la pestaña Dispositivo ni los botones Imprimir o Enviar.
 
 **¿Gasta mi plan de Claude?** Sí: diseñar y ajustar consume uso de tu plan. Un pedido claro y con medidas ahorra vueltas.
+
+**¿Cómo calcula el costo?** Suma el material (gramos de Orca × precio del kilo), la luz (el consumo de tu impresora × las horas, con el precio del kWh de tu boleta), el desgaste de la impresora (lo que la pagaste repartido en sus horas de vida), las que salen mal (10 % si no le decís otra cosa), tu tiempo y el embalaje. Si falta un dato, te dice cuál y la frase para dárselo.
+
+**¿Para qué quiere mi boleta de luz?** Para sacar lo que te cuesta de verdad cada kWh. Guarda solo los números de la tarifa (kWh, cargos, impuestos, período y empresa): nunca tu nombre, tu dirección ni tus números de cliente o de medidor.
+
+**¿Cómo pone el precio?** Con tu margen **sobre el precio**: de cada venta, qué parte te queda después de las comisiones. Un 40 % quiere decir que de cada $ 1.000 te quedan $ 400 de ganancia. Ojo: un recargo del 50 % sobre el costo es un margen del 33 %. El precio sale por canal (tu tienda, Mercado Libre con su comisión e IVA…), y en cada producto elegís el margen o le decís un precio y te muestra cuánto ganás en cada canal.
+
+**¿Las fotos de producto son reales?** Son renders 3D de tu pieza, con el color y el tipo de plástico, para tener la publicación lista antes de imprimir. La descripción aclara que son ilustrativas; cuando la imprimas, mandale una foto real y va primera.
 
 **¿Puedo vender piezas de modelos bajados de internet?** Solo si la licencia del modelo lo permite: muchos son de uso no comercial. Revisala antes de publicar.
 

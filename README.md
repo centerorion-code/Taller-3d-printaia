@@ -16,9 +16,9 @@ En la app, los comandos llevan el nombre del plugin adelante: escribí `/taller-
 | `/taller-3d:diseno` | Solo el modelo 3D paramétrico (STL, archivo editable y vista), sin laminar; sirve sin la PC conectada |
 | `/taller-3d:calibrar` | Calibrar un filamento con los tests de Orca, leyendo los resultados en fotos |
 | `/taller-3d:impresoras` | Agregar o revisar impresoras (límites, perfiles, cama) y ver qué perfiles sobran |
-| `/taller-3d:publicar` | Armar el producto con precio por costo y margen y cargarlo como borrador en tu tienda |
+| `/taller-3d:publicar` | Armar el producto (fotos de producto con Blender, ficha y precio por canal con el margen que elegís para ese producto) y cargarlo como borrador en tu tienda |
 | `/taller-3d:instalar` | Instalar o revisar que todo ande (saltea lo que ya está) y hacer una pieza de prueba |
-| `/taller-3d:panel` | El panel del taller (`panel.html`): tus ideas y piezas, en qué paso está cada una (idea, diseño, lista para imprimir, impresa, en la tienda) y qué sigue, con su vista, impresora, datos y archivos. También anota ideas para más adelante |
+| `/taller-3d:panel` | El panel del taller (`panel.html`, y en claude.ai al costado del chat): tus ideas y piezas, en qué paso está cada una (idea, diseño, lista para imprimir, impresa, en la tienda), a quién le toca lo que sigue y lo que falta para tus costos. También anota ideas para más adelante |
 | `/taller-3d:restaurar` | Volver atrás un perfil, ordenar perfiles de prueba, desinstalar |
 | `/taller-3d:ayuda` | Cómo pedir una pieza, el circuito y los comandos (el manual de uso) |
 
@@ -32,7 +32,8 @@ Además, la skill `impresion-3d` responde cualquier duda de configuración: cono
 - Si un plugin de Orca resuelve lo que pedís (un llavero, un cartel, un florero), te lo sugiere con sus riesgos. No instala nada.
 - Después de cada laminado compara tu Orca con lo que conoce (parámetros nuevos o que ya no están) y una vez por mes revisa si salió una versión nueva o hay plugins útiles. Lo anota en tu carpeta de trabajo.
 - Cada pieza queda en su carpeta, con el nombre de la impresora para la que se laminó: modelo editable (`pieza.py`), STL, vista previa, G-code, proyecto de Orca (`.3mf`, se abre con doble clic con los perfiles y la cama ya elegidos), configuración usada e informe.
-- Tus datos (impresoras, nombres de perfiles, precios, tienda) viven en `taller-3d/config.json` dentro de tu carpeta de trabajo, no en el plugin. Los datos de cada impresora, en `taller-3d/impresoras/`.
+- El costo es real: material, luz (con el precio del kWh de tu boleta y el consumo de tu impresora), desgaste de la impresora, fallas, tu tiempo y embalaje. El precio sale por canal (tu tienda, Mercado Libre con su comisión e IVA) con el margen sobre el precio que elegís en cada producto.
+- Tus datos (impresoras, nombres de perfiles, precios, tienda) viven en `taller-3d/config.json` dentro de tu carpeta de trabajo, no en el plugin. Los datos de cada impresora, en `taller-3d/impresoras/`. De la boleta de luz guarda solo los números de la tarifa.
 - Antes de cambiar algo, hace un respaldo y lo anota en el historial.
 - Con el uso, `aprendizajes.md` guarda qué funcionó con tus materiales e impresoras.
 
@@ -53,15 +54,15 @@ Por ahora el taller se instala desde este repositorio de GitHub. Se hace en **Cl
 
 ## Qué corre, qué manda y qué baja
 
-- **En el espacio de Claude:** los scripts de Python de `skills/impresion-3d/scripts/` diseñan las piezas (`cad.py`), revisan el STL y el G-code, validan los perfiles de Orca, calculan costos y precios, comparan tu Orca con lo que conoce el taller y arman el catálogo. Para el CAD y las imágenes instala `manifold3d`, `numpy`, `matplotlib` y `Pillow` con pip, ahí mismo.
+- **En el espacio de Claude:** los scripts de Python de `skills/impresion-3d/scripts/` diseñan las piezas (`cad.py`), revisan el STL y el G-code, validan los perfiles de Orca, calculan costos y precios, comparan tu Orca con lo que conoce el taller y arman el panel. Para el CAD y las imágenes instala `manifold3d`, `numpy`, `matplotlib` y `Pillow` con pip, ahí mismo; para las fotos de producto, el módulo de Blender (`bpy`, unos 400 MB), solo cuando hace falta.
 - **En tu PC, los bloqueos automáticos** (`hooks/guardia.py`, en Cowork y Claude Code): corren con Python antes de que Claude escriba un archivo o use la terminal, leen solo ese archivo o ese comando y bloquean si no pasan la revisión. No mandan nada a ningún lado.
 - **Qué toca en tu PC:** solo las carpetas que conectás (la de trabajo y las de perfiles de usuario de Orca), con respaldo antes de cambiar algo. Lamina con tu OrcaSlicer a través de orca-mcp, que se instala aparte; no viene en el plugin. Blender (por su MCP) es opcional.
 - **Qué baja el instalador**, solo si lo corrés vos: OrcaSlicer 2.5.1 desde el GitHub de OrcaSlicer y uv 0.13.9 desde el GitHub de Astral (solo Windows), los dos con huella SHA-256 fija; orca-mcp 0.1.0 y sus dependencias desde PyPI; en Linux, si aceptás, paquetes del sistema con apt (fuse3, bibliotecas de Orca, pipx, xvfb). Agrega orca-mcp a la configuración de la app de Claude, con respaldo, y en Windows mueve la carpeta de datos de Orca fuera de AppData.
-- **Qué manda a internet:** nada por su cuenta y sin telemetría. Lo único que sale es la publicación de un producto en **tu** tienda (WooCommerce, Tiendanube, Shopify o Mercado Libre), cuando lo pedís y siempre como borrador, por la conexión o el navegador que uses vos. Claude también busca en la web cuando revisa si hay versiones o plugins nuevos de Orca.
+- **Qué manda a internet:** nada por su cuenta y sin telemetría. Lo único que sale es la publicación de un producto en **tu** tienda (WooCommerce, Tiendanube, Shopify o Mercado Libre), cuando lo pedís y siempre como borrador, por la conexión o el navegador que uses vos, y, si lo aceptás, el panel al costado del chat, como página privada en tu cuenta de claude.ai. Claude también busca en la web cuando revisa si hay versiones o plugins nuevos de Orca, o la comisión de tu canal de venta.
 
 ## Componentes
 
-- `skills/impresion-3d/`: conocimiento, reglas de seguridad, scripts (`cad.py`, `revisar_stl.py`, `vista_previa.py`, `perfil_orca.py`, `revisar_gcode.py`, `impresora.py`, `producto_tienda.py`, `novedades_orca.py`, `catalogo.py`, `proyecto_3mf.py`), datos de materiales, catálogo de parámetros de Orca, guía de plugins de Orca y pruebas (`scripts/tests/`).
+- `skills/impresion-3d/`: conocimiento, reglas de seguridad, scripts (`cad.py`, `revisar_stl.py`, `vista_previa.py`, `perfil_orca.py`, `revisar_gcode.py`, `impresora.py`, `costos.py`, `producto_tienda.py`, `render_producto.py`, `novedades_orca.py`, `catalogo.py`, `proyecto_3mf.py`), datos de materiales, catálogo de parámetros de Orca, guía de plugins de Orca y pruebas (`scripts/tests/`).
 - `skills/pieza`, `diseno`, `calibrar`, `impresoras`, `publicar`, `panel`, `instalar`, `restaurar`, `ayuda`: flujos de trabajo.
 - `MANUAL.md`: manual de uso.
 - `hooks/`: bloqueos automáticos de seguridad.
@@ -73,7 +74,7 @@ Ubuntu 24.04, OrcaSlicer 2.5.1, orca-mcp 0.1.0, Creality Ender-3 V3 Plus. El ins
 
 ## Versión
 
-0.1.11. Cambios en [CHANGELOG.md](CHANGELOG.md).
+0.1.14. Cambios en [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 

@@ -342,13 +342,148 @@ class TestCadYStl(unittest.TestCase):
 class TestProducto(unittest.TestCase):
     def test_precio_y_borrador(self):
         import producto_tienda
-        config = {"costos": {"precio_kwh": 100, "consumo_w": 200, "filamentos": {"PETG": {"precio_kg": 20000}}},
+        config = {"costos": {"precio_kwh": 100, "consumo_w": 200, "filamentos": {"PETG": {"precio_kg": 20000}},
+                             "fallas_pct": 0, "mano_de_obra": {"precio_hora": 0}},
                   "tienda": {"margen_pct": 50, "costo_hora_maquina": 0, "embalaje": 0, "redondeo": 10}}
         p = producto_tienda.calcular_precio(100, 3600, "PETG", config)
         self.assertEqual(p["material"], 2000)
-        self.assertEqual(p["luz"], 20)
-        self.assertEqual(p["precio_sugerido"], 3030)
+        self.assertEqual(p["luz"], 21.67)                 # 200 W durante 1 h de Orca + 5 min de calentamiento
+        self.assertEqual(p["margen_pct"], 33.3)           # el 50 % viejo era un recargo: 33,3 % sobre el precio
+        self.assertEqual(p["precio_sugerido"], 3040)
         self.assertEqual(p["faltan_datos"], [])
+        self.assertTrue(any("recargo" in s for s in p["supuestos"]))
+
+
+class TestCostos(unittest.TestCase):
+    CONFIG = {
+        "impresora_por_defecto": "hi",
+        "impresoras": [
+            {"id": "hi", "nombre": "Creality Hi", "datos": "taller-3d/impresoras/creality-hi.json",
+             "costo": {"precio": 600000, "vida_horas": 4000, "mantenimiento_pct": 0, "consumo_w": 120,
+                       "consumo_fuente": "medido", "calentamiento_min": 6}}],
+        "costos": {"moneda": "ARS", "luz": {"precio_kwh": 150, "cargado": "2026-11-21"},
+                   "filamentos": {"PETG": {"precio_kg": 25000}}, "fallas_pct": 10,
+                   "mano_de_obra": {"precio_hora": 6000, "minutos_por_pieza": 10}},
+        "tienda": {"plataforma": "mercadolibre", "margen_precio_pct": 40, "redondeo": 100, "embalaje": 300,
+                   "canales": {"tienda": {"nombre": "Tienda", "comision_pct": 0},
+                               "mercadolibre": {"nombre": "Mercado Libre", "comision_pct": 15, "iva_comision": True,
+                                                "cargo_fijo": 1000, "cargo_fijo_hasta": 20000}}}}
+
+    def test_luz_de_la_boleta(self):
+        import costos
+        r = costos.precio_kwh_de_boleta(kwh=300, total=60000, cargo_variable=150, impuestos_pct=20, cargos_fijos=6000)
+        self.assertEqual((r["metodo"], r["precio_kwh"], r["promedio_kwh"]), ("marginal", 180.0, 180.0))
+        r = costos.precio_kwh_de_boleta(kwh=200, total=40000)
+        self.assertEqual((r["metodo"], r["precio_kwh"]), ("promedio", 200.0))
+        for malo in ({}, {"kwh": 0, "total": 100}, {"cargo_variable": 0.001}):
+            with self.assertRaises(ValueError):
+                costos.precio_kwh_de_boleta(**malo)
+        tmp = Path(tempfile.mkdtemp()) / "config.json"
+        tmp.write_text(json.dumps({"costos": {"moneda": "ARS"}}))
+        r = subprocess.run([sys.executable, str(SCRIPTS / "costos.py"), "luz", "--config", str(tmp), "--kwh", "310",
+                            "--total", "53072", "--cargo-variable", "120.5", "--impuestos-pct", "26.9", "--periodo",
+                            "2026-10", "--empresa", "EDET", "--salida", str(tmp)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        guardado = json.loads(tmp.read_text())["costos"]
+        self.assertEqual((guardado["luz"]["precio_kwh"], guardado["precio_kwh"]), (152.91, 152.91))
+        self.assertEqual(guardado["luz"]["empresa"], "EDET")
+
+    def test_costo_de_la_pieza(self):
+        import costos
+        imp = costos.impresora_de_config(self.CONFIG, "creality-hi")
+        self.assertEqual(imp["id"], "hi")
+        c = costos.costo_pieza(40, 7200, "PETG", self.CONFIG, imp)
+        p = c["partes"]
+        self.assertEqual(p["material"], 1000)                       # 40 g a 25.000 el kilo
+        self.assertEqual(p["luz"], 37.8)                            # 120 W × 2,1 h × 150
+        self.assertEqual(p["maquina"], 300)                         # 600.000 / 4000 h × 2 h
+        self.assertEqual(p["fallas"], round((1000 + 37.8 + 300) / 0.9 * 0.1, 2))
+        self.assertEqual((p["mano_de_obra"], p["embalaje"]), (1000, 300))
+        self.assertEqual(c["faltan"], [])
+        self.assertEqual(c["supuestos"], [])                        # todo medido y de la boleta
+
+    def test_precio_por_canal(self):
+        import costos
+        tienda = costos.precio_canal(1000, {"comision_pct": 0}, 40, 0)
+        self.assertEqual((tienda["precio"], tienda["ganancia"], tienda["margen_real_pct"]), (1666.67, 666.67, 40.0))
+        ml = costos.precio_canal(1000, self.CONFIG["tienda"]["canales"]["mercadolibre"], 40, 100)
+        # (1000 + 1000 × 1,21) / (1 − 0,15 × 1,21 − 0,40) = 5281 → 5300
+        self.assertEqual(ml["precio"], 5300)
+        self.assertEqual(ml["comisiones"], round(5300 * 0.1815 + 1210, 2))
+        caro = costos.precio_canal(20000, self.CONFIG["tienda"]["canales"]["mercadolibre"], 40, 100)
+        self.assertEqual(caro["comisiones"], round(caro["precio"] * 0.1815, 2))   # sin cargo fijo arriba del tope
+        with self.assertRaises(ValueError):
+            costos.precio_canal(1000, {"comision_pct": 70}, 40)
+        p = costos.precios(1000, self.CONFIG)
+        self.assertEqual(set(p["canales"]), {"tienda", "mercadolibre"})
+        import producto_tienda
+        r = producto_tienda.calcular_precio(40, 7200, "PETG", self.CONFIG)
+        self.assertEqual(r["canal"], "mercadolibre")              # la plataforma del usuario
+        self.assertEqual(r["precio_sugerido"], r["canales"]["mercadolibre"]["precio"])
+
+    def test_margen_por_producto(self):
+        import costos
+        import producto_tienda
+        self.assertEqual(costos.margenes_sugeridos(40), [25.0, 40.0, 60.0])
+        self.assertEqual(costos.margenes_sugeridos(None), [25.0, 40.0, 60.0])
+        self.assertEqual(costos.margenes_sugeridos(20), [15.0, 20.0, 40.0])
+        ops = costos.opciones(1000, self.CONFIG)
+        self.assertEqual([o["margen_pct"] for o in ops], [25.0, 40.0, 60.0])
+        self.assertEqual([o["habitual"] for o in ops], [False, True, False])
+        self.assertLess(ops[0]["canales"]["tienda"]["precio"], ops[2]["canales"]["tienda"]["precio"])
+        # Con un margen elegido para el producto, manda ese y no el habitual
+        p = costos.precios(1000, self.CONFIG, margen_pct=50)
+        self.assertEqual((p["margen_pct"], p["margen_habitual_pct"]), (50, 40))
+        self.assertEqual(p["canales"]["tienda"]["precio"], 2000)
+        # Con un precio fijo: el margen real que deja en cada canal
+        fijo = costos.precios(1000, self.CONFIG, precio=4000)
+        self.assertEqual(fijo["canales"]["tienda"]["margen_real_pct"], 75.0)
+        ml = fijo["canales"]["mercadolibre"]
+        self.assertEqual(ml["comisiones"], round(4000 * 0.1815 + 1210, 2))   # abajo del tope: con cargo fijo
+        self.assertEqual(ml["ganancia"], round(4000 - ml["comisiones"] - 1000, 2))
+        self.assertGreater(ml["precio_minimo"], 1000)
+        # La ficha con margen y con precio elegidos
+        r = producto_tienda.calcular_precio(40, 7200, "PETG", self.CONFIG, margen_pct=55)
+        self.assertEqual((r["margen_pct"], r["margen_elegido"]), (55, True))
+        tmp = Path(tempfile.mkdtemp())
+        cfg = tmp / "config.json"
+        cfg.write_text(json.dumps(self.CONFIG), encoding="utf-8")
+        inf = tmp / "informe.json"
+        inf.write_text(json.dumps({"material": "PETG", "estimaciones": {"gramos": 40, "segundos": 7200}}),
+                       encoding="utf-8")
+        salida = subprocess.run([sys.executable, str(SCRIPTS / "costos.py"), "pieza", "--config", str(cfg),
+                                 "--informe-gcode", str(inf), "--margenes"], capture_output=True, text=True)
+        self.assertEqual(salida.returncode, 0, salida.stderr)
+        self.assertIn("40 % (tu margen habitual)", salida.stdout)
+        self.assertIn("60 %:", salida.stdout)
+        ficha = subprocess.run([sys.executable, str(SCRIPTS / "producto_tienda.py"), "--nombre", "Soporte",
+                                "--config", str(cfg), "--informe-gcode", str(inf), "--precio", "9000",
+                                "--salida", str(tmp / "producto")], capture_output=True, text=True)
+        self.assertEqual(ficha.returncode, 0, ficha.stderr)
+        texto = (tmp / "producto" / "ficha.md").read_text(encoding="utf-8")
+        self.assertIn("Precio elegido: 9000", texto)
+        self.assertIn("precio 9000", texto)
+
+    def test_estado_del_taller(self):
+        import costos
+        items = {i["tema"]: i for i in costos.estado_taller({"impresoras": [{"id": "hi", "nombre": "Creality Hi"}],
+                                                              "costos": {}, "tienda": {}})}
+        self.assertEqual(items["Luz"]["estado"], "falta")
+        self.assertIn("boleta de luz", items["Luz"]["frase"])
+        self.assertEqual(items["Consumo de Creality Hi"]["estado"], "falta")
+        items = {i["tema"]: i for i in costos.estado_taller(self.CONFIG)}
+        self.assertTrue(all(i["estado"] == "listo" for i in items.values()), items)
+
+    def test_revision_con_costos(self):
+        cfg = Path(tempfile.mkdtemp()) / "config.json"
+        cfg.write_text(json.dumps({**self.CONFIG, "impresoras": [{**self.CONFIG["impresoras"][0], "id": "prueba-300"}],
+                                   "impresora_por_defecto": "prueba-300"}))
+        informe = Path(tempfile.mkdtemp()) / "informe.json"
+        subprocess.run([sys.executable, str(SCRIPTS / "revisar_gcode.py"), str(gcode(BUENO)), "--impresora",
+                        str(IMPRESORA_PRUEBA), "--config", str(cfg), "--json", str(informe)], capture_output=True)
+        costo = json.loads(informe.read_text())["costo"]
+        self.assertEqual(set(costo["partes"]), {"material", "luz", "maquina", "fallas", "mano_de_obra", "embalaje"})
+        self.assertIn("mercadolibre", costo["precios"]["canales"])
 
 
 class TestCatalogo(unittest.TestCase):
@@ -486,6 +621,109 @@ CONFIG_PROYECTO = r"""; CONFIG_BLOCK_START
 ; clave_nueva_de_orca = 1
 ; CONFIG_BLOCK_END
 """
+
+
+class TestPanelEnClaude(unittest.TestCase):
+    def test_botones_y_pagina_de_claude(self):
+        import catalogo as cat
+        c = {"version": 1, "piezas": []}
+        idea = cat.agregar_idea(c, "Soporte para la tele", fecha="2026-11-20")
+        lista = cat.agregar(c, "impresiones/2026-11-21_soporte_creality-hi", nombre="Soporte",
+                            archivos=["soporte_creality-hi.gcode", "vista.png", "producto/producto-1-principal.jpg"])
+        impresa = cat.agregar(c, "impresiones/2026-11-15_llavero_creality-hi", nombre="Llavero", estado="impresa",
+                              archivos=["llavero_creality-hi.gcode", "vista.png", "foto.jpg"])
+        self.assertEqual([x[0] for x in cat.acciones(idea)], ["Diseñala", "Solo el modelo"])
+        self.assertEqual([x[0] for x in cat.acciones(lista)], ["Abrila en Orca", "Ya la imprimí"])
+        self.assertIn("(impresiones/2026-11-21_soporte_creality-hi)", cat.acciones(lista)[0][1])
+        self.assertEqual([x[0] for x in cat.acciones(impresa)], ["Publicala"])
+        # La foto de producto de Blender va antes que la vista, pero la foto real va primero
+        self.assertEqual(cat.imagen_de(lista), "producto/producto-1-principal.jpg")
+        self.assertEqual(cat.imagen_de(impresa), "foto.jpg")
+        archivo = cat.generar_html(c)
+        self.assertIn("Content-Security-Policy", archivo)
+        self.assertIn("data-pedido=", archivo)
+        self.assertIn('href="impresiones/2026-11-21_soporte_creality-hi/soporte_creality-hi.gcode"', archivo)
+        claude = cat.generar_html(c, modo="claude", imagenes={lista["carpeta"]: "fotos/soporte.jpg"})
+        self.assertNotIn("Content-Security-Policy", claude)     # la pondría claude.ai; una propia corta el puente
+        self.assertIn('src="fotos/soporte.jpg"', claude)
+        self.assertNotIn('href="impresiones/', claude)           # los archivos están en la PC
+        self.assertNotIn("<img", claude.split("Llavero")[1].split("</article>")[0])  # sin foto publicada: sin imagen
+        self.assertIn("sendToClaude", claude)
+        self.assertIn("Anotar idea", claude)
+        with self.assertRaises(ValueError):
+            cat.generar_html(c, modo="otro")
+        # A quién le toca: a Claude diseñar y laminar, a vos imprimir
+        self.assertEqual([cat.quien_sigue(x) for x in (idea, lista, impresa)], ["claude", "vos", None])
+        self.assertIn("<strong>Te toca:</strong>", archivo)
+        self.assertIn("<strong>Le toca a Claude:</strong>", archivo)
+        # La caja «Tu taller» con lo que falta para los costos, y su botón
+        import costos
+        estado = costos.estado_taller({"impresoras": [{"id": "hi", "nombre": "Creality Hi"}], "costos": {}, "tienda": {}})
+        con_taller = cat.generar_html(c, estado_taller=estado)
+        self.assertIn('<details class="taller" open>', con_taller)
+        self.assertIn("Te paso mi boleta de luz para el precio del kWh", con_taller)
+        self.assertNotIn('class="taller"', archivo)
+
+
+class TestFotosDeProducto(unittest.TestCase):
+    def test_componer_sin_blender(self):
+        from PIL import Image, ImageDraw
+        import render_producto as rp
+        render = Image.new("RGBA", (220, 220), (0, 0, 0, 0))
+        dibujo = ImageDraw.Draw(render)
+        dibujo.rectangle((0, 120, 219, 219), fill=(0, 0, 0, 110))        # sombra en el piso, hasta los bordes
+        dibujo.rectangle((60, 70, 160, 130), fill=(31, 95, 214, 255))      # la pieza
+        mascara = Image.new("RGBA", (220, 220), (0, 0, 0, 0))
+        ImageDraw.Draw(mascara).rectangle((60, 70, 160, 130), fill=(255, 255, 255, 255))
+        principal = rp.componer(render, mascara, "blanco_sin_sombra", lado=200)
+        self.assertEqual(principal.size, (200, 200))
+        for punto in ((0, 0), (199, 199), (100, 195), (5, 150)):
+            self.assertEqual(principal.getpixel(punto), (255, 255, 255))   # blanco puro, sin sombra
+        from PIL import ImageChops
+        caja = ImageChops.difference(principal, Image.new("RGB", (200, 200), (255, 255, 255))).convert("L") \
+            .point(lambda v: 255 if v > 30 else 0).getbbox()
+        self.assertAlmostEqual(caja[2] - caja[0], 160, delta=3)             # la pieza ocupa el 80 % del lado
+        con_sombra = rp.componer(render, mascara, "blanco", lado=200)
+        self.assertEqual(con_sombra.getpixel((0, 199)), (255, 255, 255))   # la sombra se apaga antes del borde
+        self.assertLess(con_sombra.getpixel((100, 150))[0], 220)            # pero está debajo de la pieza
+        self.assertEqual(rp.componer(render, mascara, "calido", lado=200).getpixel((0, 0)), (246, 243, 238))
+        vacia = Image.new("RGBA", (50, 50), (0, 0, 0, 0))
+        with self.assertRaises(ValueError):
+            rp.componer(vacia, vacia, "blanco", lado=100)
+
+    def test_colores_y_brillo(self):
+        import render_producto as rp
+        self.assertEqual(rp.color_de("PLA azul"), "#1F5FD6")
+        self.assertEqual(rp.color_de("#12ab34"), "#12ab34")
+        self.assertEqual(rp.rugosidad("PETG", "negro"), 0.28)
+        self.assertEqual(rp.rugosidad("PLA", "negro mate"), 0.72)
+        self.assertEqual(rp.rugosidad("PLA", "seda dorado"), 0.15)
+
+    def test_sin_blender_avisa(self):
+        try:
+            import bpy  # noqa: F401
+            self.skipTest("Blender está instalado")
+        except ImportError:
+            pass
+        tmp = Path(tempfile.mkdtemp())
+        r = subprocess.run([sys.executable, str(SCRIPTS / "render_producto.py"), "--stl", str(stl_cubo(tmp / "p.stl")),
+                            "--salida", str(tmp / "producto")], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("vista_previa.py", r.stdout)
+
+    def test_imagen_ilustrativa_sin_texto(self):
+        try:
+            import matplotlib  # noqa: F401
+        except ImportError:
+            self.skipTest("falta matplotlib")
+        from PIL import Image
+        import vista_previa
+        tmp = Path(tempfile.mkdtemp())
+        salida = vista_previa.renderizar_producto(stl_cubo(tmp / "p.stl"), tmp / "foto_producto.png", "rojo")
+        img = Image.open(salida).convert("RGB")
+        # Fondo blanco puro y nada escrito abajo (Mercado Libre no admite texto)
+        self.assertEqual(img.getpixel((0, 0)), (255, 255, 255))
+        self.assertEqual(img.crop((0, 1140, 1200, 1200)).getcolors(), [(1200 * 60, (255, 255, 255))])
 
 
 def stl_cubo(ruta: Path, x=30.0, y=20.0, z=10.0, z0=5.0) -> Path:

@@ -289,6 +289,32 @@ def siguiente(p: dict) -> str | None:
     return None
 
 
+def quien_sigue(p: dict) -> str | None:
+    """A quién le toca el paso que sigue: "claude" (se lo pedís y lo hace), "vos" (imprimirla) o None."""
+    h = hechos(p)
+    if h == {"idea"} or "laminada" not in h:
+        return "claude"
+    return "vos" if "impresa" not in h else None
+
+
+def acciones(p: dict) -> list[tuple[str, str]]:
+    """Los botones de la tarjeta: (etiqueta, pedido a Claude). El pedido nombra la pieza y su carpeta."""
+    nombre = p.get("nombre") or p["carpeta"]
+    cual = f"«{nombre}» ({p['carpeta']})"
+    h = hechos(p)
+    if h == {"idea"}:
+        return [("Diseñala", f"Desde el panel: diseñá la idea {cual} y dejala lista para imprimir."),
+                ("Solo el modelo", f"Desde el panel: hacé solo el modelo 3D de la idea {cual}, sin laminar.")]
+    if "laminada" not in h:
+        return [("Dejala lista para imprimir", f"Desde el panel: dejá {cual} lista para imprimir en mi impresora.")]
+    if "impresa" not in h:
+        return [("Abrila en Orca", f"Desde el panel: abrí {cual} en Orca para que la vea."),
+                ("Ya la imprimí", f"Desde el panel: ya imprimí {cual}. Marcala como impresa y preguntame cómo salió.")]
+    if "en_tienda" not in h:
+        return [("Publicala", f"Desde el panel: armá la publicación de {cual} para la tienda.")]
+    return [("Revisá el precio", f"Desde el panel: revisá el precio de {cual}.")]
+
+
 def _rutas_del_listado(listado) -> list[str]:
     if isinstance(listado, dict):
         entradas = listado.get("entries") or []
@@ -325,12 +351,13 @@ def desde_listado(catalogo: dict, listado) -> list[str]:
 
 
 def imagen_de(pieza: dict) -> str | None:
-    """Una foto real si la hay; si no, la vista renderizada; si no, la imagen ilustrativa."""
+    """Una foto real si la hay; si no, la foto de producto de Blender; si no, la vista; si no, la ilustrativa."""
     if pieza.get("imagen"):
         return pieza["imagen"]
     archivos = pieza.get("archivos") or []
     imagenes = [a for a in archivos if a.lower().endswith(IMAGENES)]
     for criterio in (lambda a: a.rsplit("/", 1)[-1].lower().startswith("foto") and "producto" not in a.lower(),
+                     lambda a: a.lower().endswith("producto-1-principal.jpg"),
                      lambda a: a.lower() == "vista.png",
                      lambda a: a.lower().endswith("foto_producto.png")):
         elegida = next((a for a in imagenes if criterio(a)), None)
@@ -404,10 +431,31 @@ footer{max-width:1200px;margin:0 auto;padding:0 24px 32px;color:var(--suave);fon
 .camino li.actual{border-top-color:var(--acento);font-weight:700}
 .sigue{margin:0;font-size:14px;padding:6px 8px;border-left:4px solid var(--acento);background:var(--papel)}
 .terminada{margin:0;font-size:14px;color:var(--suave)}
+.imagen.vacia{aspect-ratio:auto;padding:18px 12px}
+.sigue.vos{border-left-color:var(--tinta)}
+.taller{margin:16px 0 0;background:#fff;border:1.5px solid var(--tinta);border-radius:14px;padding:10px 14px}
+.taller summary{cursor:pointer;font-weight:700;min-height:28px}
+.taller ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}
+.taller li{display:grid;grid-template-columns:22px 1fr;gap:4px 8px;align-items:start;font-size:14px}
+.taller li button{grid-column:2;justify-self:start;min-height:36px;padding:4px 12px;border:1.5px solid var(--tinta);border-radius:999px;background:#fff;font:inherit;font-size:13px;cursor:pointer}
+.taller .marca{font-weight:700;text-align:center}
+.taller .falta .marca{color:#B3261E}.taller .revisar .marca{color:var(--acento)}
 .idea .imagen{background:var(--papel)}
 .idea .imagen span{font-size:15px;color:var(--suave)}
+.acciones{display:flex;flex-wrap:wrap;gap:6px}
+.acciones button,form.idea button{min-height:40px;padding:6px 12px;border:1.5px solid var(--tinta);border-radius:999px;background:#fff;color:var(--tinta);font:inherit;font-size:14px;cursor:pointer}
+.acciones button:first-child,form.idea button{background:var(--tinta);color:#fff}
+.acciones button:disabled,form.idea button:disabled{opacity:.55;cursor:progress}
+.acciones .solo-claude{display:none}
+body.con-claude .acciones .solo-claude{display:inline-block}
+.aviso{margin:0;font-size:13px;color:var(--suave)}
+.aviso:empty{display:none}
+.modo{margin:12px 0 0;font-size:14px;color:var(--suave)}
+form.idea{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+form.idea input{flex:1 1 240px;min-height:44px;padding:8px 14px;border:1.5px solid var(--tinta);border-radius:10px;font:inherit;background:#fff}
+.archivos span{padding:2px 8px;border:1px solid var(--borde);border-radius:6px;font-family:ui-monospace,Consolas,monospace}
 [hidden]{display:none!important}
-@media print{.controles{display:none}article{break-inside:avoid}}
+@media print{.controles,.acciones,form.idea{display:none}article{break-inside:avoid}}
 """
 
 GUION = """
@@ -435,20 +483,73 @@ GUION = """
   document.querySelectorAll('.imagen img').forEach(function(i){i.addEventListener('error',function(){
     var s=document.createElement('span');s.className='sin';s.textContent='Sin vista';i.replaceWith(s);
   });});
+
+  // Botones: en claude.ai le mandan el pedido a Claude (despierta al chat); si no, lo copian para pegarlo.
+  var modo=document.getElementById('modo'),com=null;
+  function lugar(el){return el.closest('article')||el.closest('details')||el.closest('header');}
+  function avisar(el,texto){var a=lugar(el).querySelector('.aviso');if(a){a.textContent=texto;}}
+  function copiar(el,texto){
+    function mostrar(){avisar(el,'Copiá este pedido y pegalo en el chat con Claude: '+texto);}
+    try{navigator.clipboard.writeText(texto).then(function(){
+      avisar(el,'Pedido copiado: pegalo en el chat con Claude.');},mostrar);}catch(e){mostrar();}
+  }
+  var motivos={consent_required:'falta que permitas que el panel le escriba a Claude por vos',
+    claude_unavailable:'no hay un chat de Claude que lo reciba ahora',rate_limited:'fueron muchos seguidos; esperá un momento',
+    forbidden:'solo vos podés pedirle cosas a Claude desde tu panel'};
+  function pedir(el,texto){
+    if(!com){copiar(el,texto);return;}
+    el.disabled=true;avisar(el,'Enviando a Claude…');
+    com.canSendToClaude().then(function(estado){
+      if(estado!=='available'){el.disabled=false;copiar(el,texto);return;}
+      return com.anchorFor(lugar(el)).then(function(ancla){return com.sendToClaude({anchor:ancla,text:texto});})
+        .then(function(){avisar(el,'Enviado. Claude lo hace y te contesta en el chat.');},
+              function(err){var c=err&&err.code;
+                avisar(el,'No se envió: '+(motivos[c]||'algo falló ('+(c||'error')+')')+'. Si querés, pegalo en el chat: '+texto);});
+    }).catch(function(){copiar(el,texto);}).then(function(){el.disabled=false;});
+  }
+  document.querySelectorAll('[data-pedido]').forEach(function(b){
+    b.addEventListener('click',function(){pedir(b,b.getAttribute('data-pedido'));});
+  });
+  document.querySelectorAll('[data-comentar]').forEach(function(b){b.addEventListener('click',function(){
+    if(com){com.openComposer({element:lugar(b)}).catch(function(){});}
+  });});
+  var idea=document.getElementById('idea');
+  if(idea){idea.addEventListener('submit',function(ev){
+    ev.preventDefault();var campo=idea.querySelector('input'),t=campo.value.trim();
+    if(t){pedir(idea.querySelector('button'),'Desde el panel: anotá esta idea para más adelante: '+t);campo.value='';}
+  });}
+  function sinClaude(texto){modo.textContent=texto||'Los botones copian el pedido para que lo pegues en el chat con Claude.';}
+  if(window.claude&&typeof window.claude.use==='function'){
+    window.claude.use('comments').then(function(c){
+      if(!c){sinClaude();return;}
+      return c.canSendToClaude().then(function(estado){
+        com=c;document.body.classList.toggle('con-claude',estado==='available');
+        if(estado==='available'){sinClaude('Los botones le piden las cosas a Claude, que las hace en el chat.');}
+        else if(estado==='no_session'){sinClaude('Ahora no hay un chat de Claude escuchando: pedí /panel en el chat del taller. Mientras, los botones copian el pedido.');}
+        else{sinClaude();}
+      });
+    }).catch(function(){sinClaude();});
+  }else{sinClaude();}
 })();
 """
 
 
-def _tarjeta(p: dict) -> str:
+def _tarjeta(p: dict, modo: str = "archivo", imagenes: dict | None = None) -> str:
+    """modo archivo: panel.html en la carpeta de trabajo (vistas y archivos por ruta relativa).
+    modo claude: la página de claude.ai, sin acceso a la PC (las imágenes vienen en `imagenes`, carpeta → ruta)."""
     e = html.escape
     carpeta = p["carpeta"]
     nombre = p.get("nombre") or carpeta
     es_idea = p.get("tipo") == "idea"
-    imagen = None if es_idea else imagen_de(p)
+    if modo == "claude":
+        src = (imagenes or {}).get(carpeta)
+    else:
+        imagen = None if es_idea else imagen_de(p)
+        src = _href(carpeta, imagen) if imagen else None
     if es_idea:
         img = '<span>Idea anotada, sin diseño todavía</span>'
-    elif imagen:
-        img = (f'<img src="{e(_href(carpeta, imagen))}" alt="{e("Vista de " + nombre)}" loading="lazy">')
+    elif src:
+        img = f'<img src="{e(src)}" alt="{e("Vista de " + nombre)}" loading="lazy">'
     else:
         img = '<span class="sin">Sin vista</span>'
     chips = [f'<span class="chip">{e(TIPOS.get(p.get("tipo"), "Pieza"))}</span>']
@@ -461,7 +562,8 @@ def _tarjeta(p: dict) -> str:
                      f'{" aria-current=\"step\"" if i == ultimo else ""}>{e(etiqueta)}</li>'
                      for i, (clave, etiqueta) in enumerate(PASOS))
     sigue = siguiente(p)
-    paso = (f'<p class="sigue"><strong>Sigue:</strong> {e(sigue)}</p>' if sigue
+    quien = {"vos": "Te toca", "claude": "Le toca a Claude"}.get(quien_sigue(p) or "", "Sigue")
+    paso = (f'<p class="sigue {e(quien_sigue(p) or "")}"><strong>{quien}:</strong> {e(sigue)}</p>' if sigue
             else '<p class="terminada">Terminada.</p>')
     filas = []
     if p.get("impresora"):
@@ -481,20 +583,28 @@ def _tarjeta(p: dict) -> str:
     dl = "".join(f"<dt>{e(k)}</dt><dd>{e(str(v))}</dd>" for k, v in filas)
     archivos = [a for a in (p.get("archivos") or []) if not a.lower().endswith(IMAGENES) and "/" not in a
                 or a.lower().endswith((".gcode", ".gco", ".gcode.3mf"))]
-    enlaces = "".join(f'<a href="{e(_href(carpeta, a))}">{e(a.rsplit("/", 1)[-1])}</a>' for a in archivos[:8])
+    if modo == "claude":                                 # los archivos están en la PC: solo el nombre
+        enlaces = "".join(f'<span>{e(a.rsplit("/", 1)[-1])}</span>' for a in archivos[:8])
+    else:
+        enlaces = "".join(f'<a href="{e(_href(carpeta, a))}">{e(a.rsplit("/", 1)[-1])}</a>' for a in archivos[:8])
     if p.get("url_tienda"):
         enlaces += f'<a href="{e(p["url_tienda"])}" rel="noopener noreferrer">en la tienda</a>'
+    botones = "".join(f'<button type="button" data-pedido="{e(pedido)}">{e(etiqueta)}</button>'
+                      for etiqueta, pedido in acciones(p))
+    botones += '<button type="button" class="solo-claude" data-comentar>Otra cosa…</button>'
     fecha = p.get("fecha") or ""
     texto = " ".join(str(x) for x in (nombre, p.get("material"), p.get("color"), p.get("impresora"), p.get("nota"),
                                       carpeta) if x).lower()
     clase = ' class="idea"' if es_idea else ""
     ubicacion = f"anotada el {fecha}" if es_idea else f"{carpeta} · {fecha}"
     return f"""<article{clase} data-tipo="{e(p.get('tipo') or '')}" data-grupo="{e(grupo_de(p))}" data-texto="{e(texto)}">
-<div class="imagen">{img}</div>
+<div class="imagen{'' if src and not es_idea else ' vacia'}">{img}</div>
 <div class="cuerpo">
 <h3>{e(nombre)}</h3>
 <ol class="camino" aria-label="Recorrido">{camino}</ol>
 {paso}
+<div class="acciones">{botones}</div>
+<p class="aviso" role="status" aria-live="polite"></p>
 <div class="chips">{''.join(chips)}</div>
 {f'<dl>{dl}</dl>' if dl else ''}
 {f'<p class="nota">{e(p["nota"])}</p>' if p.get("nota") else ''}
@@ -504,15 +614,39 @@ def _tarjeta(p: dict) -> str:
 </article>"""
 
 
-def generar_html(catalogo: dict, titulo: str = "Panel del taller") -> str:
+def _taller(estado: list[dict] | None) -> str:
+    """La caja "Tu taller": qué está listo para calcular costos y precios, y lo que falta, con su botón."""
+    if not estado:
+        return ""
     e = html.escape
+    marcas = {"listo": "✓", "revisar": "!", "falta": "✗"}
+    pendientes = [i for i in estado if i.get("estado") != "listo"]
+    filas = "".join(
+        f'<li class="{e(i.get("estado") or "")}"><span class="marca" aria-hidden="true">{marcas.get(i.get("estado"), "·")}</span>'
+        f'<span><strong>{e(str(i.get("tema") or ""))}:</strong> {e(str(i.get("texto") or ""))}</span>'
+        + (f'<button type="button" data-pedido="{e(str(i["frase"]))}">Decíselo a Claude</button>' if i.get("frase") else "")
+        + "</li>" for i in estado)
+    titulo = ("Tu taller: todo listo para calcular costos y precios" if not pendientes else
+              f"Tu taller: {len(pendientes)} dato{'s' if len(pendientes) != 1 else ''} para costos y precios")
+    return (f'<details class="taller"{" open" if pendientes else ""}><summary>{e(titulo)}</summary>'
+            f'<ul>{filas}</ul><p class="aviso" role="status" aria-live="polite"></p></details>')
+
+
+def generar_html(catalogo: dict, titulo: str = "Panel del taller", modo: str = "archivo",
+                 imagenes: dict | None = None, estado_taller: list[dict] | None = None) -> str:
+    """modo archivo: panel.html para abrir desde la carpeta de trabajo; los botones copian el pedido.
+    modo claude: la página que Claude publica en claude.ai y se abre al costado del chat; los botones le mandan
+    el pedido a Claude. `imagenes`: carpeta de la pieza → ruta de su foto entre los archivos de la página."""
+    e = html.escape
+    if modo not in ("archivo", "claude"):
+        raise ValueError(f"Modo desconocido: {modo}")
     piezas = sorted(catalogo["piezas"], key=lambda p: (p.get("fecha") or "", p.get("carpeta") or ""), reverse=True)
     # Para hacer: primero lo más avanzado (listas para imprimir, después diseños, al final las ideas)
     por_hacer = sorted((p for p in piezas if grupo_de(p) != "terminada"), key=_avance, reverse=True)
     terminadas = [p for p in piezas if grupo_de(p) == "terminada"]
     secciones = []
     if por_hacer:
-        secciones.append(("hacer", "Para hacer", [_tarjeta(p) for p in por_hacer]))
+        secciones.append(("hacer", "Para hacer", [_tarjeta(p, modo, imagenes) for p in por_hacer]))
     for pieza in terminadas:
         clave = (pieza.get("fecha") or "")[:7]
         if not secciones or secciones[-1][0] != clave:
@@ -521,7 +655,7 @@ def generar_html(catalogo: dict, titulo: str = "Panel del taller") -> str:
             except (ValueError, IndexError):
                 etiqueta = "Terminadas · sin fecha"
             secciones.append((clave, etiqueta, []))
-        secciones[-1][2].append(_tarjeta(pieza))
+        secciones[-1][2].append(_tarjeta(pieza, modo, imagenes))
     cuerpo = "\n".join(
         f'<section data-seccion="{e(clave)}"><h2>{e(etiqueta)}</h2><div class="grilla">\n' + "\n".join(tarjetas)
         + "\n</div></section>" for clave, etiqueta, tarjetas in secciones)
@@ -534,13 +668,23 @@ def generar_html(catalogo: dict, titulo: str = "Panel del taller") -> str:
     filtros = [("todo", "Todo")] + list(GRUPOS.items())
     botones = "".join(f'<button type="button" data-filtro="{f}" aria-pressed="{"true" if f == "todo" else "false"}">'
                       f'{e(t)}</button>' for f, t in filtros)
+    # En claude.ai manda la política del sitio; una propia bloquearía el puente con Claude.
+    politica = "" if modo == "claude" else (
+        '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src * data: file:; '
+        'style-src \'unsafe-inline\'; script-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'">\n')
+    if modo == "claude":
+        pie = ("Lo publica Claude cada vez que cambia algo, y se actualiza solo. Los archivos siguen en tu PC, en la "
+               "carpeta de cada pieza. Es privado: lo ves solo vos, salvo que lo compartas.")
+    else:
+        pie = ("Lo arma taller-3d cada vez que Claude anota una idea o guarda una pieza. Abrilo desde tu carpeta de "
+               "trabajo: las vistas y los archivos se cargan de la carpeta de cada pieza. Los botones copian el "
+               "pedido para que lo pegues en el chat con Claude.")
     return f"""<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src * data: file:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
-<title>{e(titulo)}</title>
+{politica}<title>{e(titulo)}</title>
 <style>{ESTILO}</style>
 </head>
 <body>
@@ -553,11 +697,19 @@ def generar_html(catalogo: dict, titulo: str = "Panel del taller") -> str:
 <input id="buscar" type="search" placeholder="Buscar por nombre, impresora, material o nota" aria-label="Buscar por nombre, impresora, material o nota">
 {botones}
 </div>
+<form class="idea" id="idea" autocomplete="off">
+<label for="nueva-idea" hidden>Anotar una idea</label>
+<input id="nueva-idea" type="text" maxlength="300" placeholder="Anotá una idea: «un soporte para la tele»" aria-label="Anotar una idea">
+<button type="submit">Anotar idea</button>
+</form>
+<p class="aviso" role="status" aria-live="polite"></p>
+{_taller(estado_taller)}
+<p class="modo" id="modo">{"Buscando el chat con Claude…" if modo == "claude" else "Los botones copian el pedido para que lo pegues en el chat con Claude."}</p>
 </header>
 <main>
 {cuerpo}
 </main>
-<footer>Lo arma taller-3d cada vez que Claude anota una idea o guarda una pieza. Abrilo desde tu carpeta de trabajo: las vistas y los archivos se cargan de la carpeta de cada pieza. Para seguir con algo, pedíselo a Claude con el nombre de la pieza.</footer>
+<footer>{e(pie)}</footer>
 <script>{GUION}</script>
 </body>
 </html>
@@ -682,6 +834,10 @@ def main(argv=None) -> None:
     h.add_argument("--catalogo", required=True, type=Path)
     h.add_argument("--salida", required=True, type=Path)
     h.add_argument("--titulo", default="Panel del taller")
+    h.add_argument("--modo", choices=["archivo", "claude"], default="archivo",
+                   help="archivo: panel.html de la carpeta de trabajo; claude: la página para publicar en claude.ai")
+    h.add_argument("--imagenes", type=Path, help="(modo claude) JSON carpeta de la pieza → ruta de su foto en la página")
+    h.add_argument("--config", type=Path, help="config.json del taller: suma la caja «Tu taller» (qué falta para los costos)")
 
     rd = sub.add_parser("redireccion", help="catalogo.html que lleva al panel (para el de antes de la 0.1.13)")
     rd.add_argument("--salida", required=True, type=Path)
@@ -732,7 +888,12 @@ def main(argv=None) -> None:
         print(f"Sumé {len(nuevas)} piezas que ya estaban: {', '.join(nuevas) if nuevas else 'ninguna'}.")
     elif args.accion == "html":
         args.salida.parent.mkdir(parents=True, exist_ok=True)
-        args.salida.write_text(generar_html(catalogo, args.titulo), encoding="utf-8")
+        imagenes = _leer_json(args.imagenes) if args.imagenes else None
+        estado = None
+        if args.config and args.config.exists():
+            import costos
+            estado = costos.estado_taller(_leer_json(str(args.config)))
+        args.salida.write_text(generar_html(catalogo, args.titulo, args.modo, imagenes, estado), encoding="utf-8")
         print(f"Página: {args.salida} ({len(catalogo['piezas'])} entre ideas y piezas).")
     else:
         print(resumen_corto(catalogo) if args.corto else resumen(catalogo, args.buscar))

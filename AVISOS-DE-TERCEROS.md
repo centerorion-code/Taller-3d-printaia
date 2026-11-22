@@ -27,8 +27,9 @@ No vienen dentro del plugin: el instalador los baja de su fuente oficial o se in
 | manifold3d | CAD por código | Apache-2.0 |
 | numpy | cálculo de mallas | BSD-3-Clause |
 | matplotlib | vistas previas e imágenes de producto | licencia de Matplotlib (basada en la de la PSF) |
-| Pillow | encuadre de las imágenes de producto | MIT-CMU |
+| Pillow | encuadre de las imágenes y fotos de producto | MIT-CMU |
 | Blender (opcional) | modelado orgánico | GPL |
+| bpy, el módulo de Blender para Python (opcional) | fotos de producto (`render_producto.py`); se instala con pip en el espacio de Claude cuando hace falta | GPL-3.0 o posterior |
 
 ## Marcas
 

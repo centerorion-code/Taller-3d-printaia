@@ -3,7 +3,8 @@
 # Copyright (C) 2026 Leo y colaboradores de taller-3d
 """Arma la ficha de producto de una pieza impresa para una tienda WooCommerce.
 
-Calcula el precio sugerido (material + luz + horas de máquina + embalaje, más el margen),
+Calcula el precio sugerido con costos.py (material, luz, desgaste de la impresora, fallas, tu tiempo y
+embalaje, más el margen sobre el precio y las comisiones del canal),
 redacta la descripción con medidas, material y cuidados, y genera:
   - producto.json: datos para crear el producto por la API REST de WooCommerce (siempre como borrador);
   - producto_woocommerce.csv: para el importador de productos de WooCommerce (Publicado = -1, borrador);
@@ -18,12 +19,8 @@ Uso:
 Con --plantilla, además completa una fila en la plantilla CSV que exporta otra plataforma
 (Tiendanube, Shopify, etc.), respetando sus encabezados exactos: plantilla_completa.csv.
 
-config.json (carpeta taller-3d de la PC del usuario), secciones "costos" y "tienda":
-  {"costos": {"moneda": "ARS", "precio_kwh": 150, "consumo_w": 180,
-              "filamentos": {"PETG": {"precio_kg": 25000}}},
-   "tienda": {"plataforma": "woocommerce", "url": "https://mitienda.com", "margen_pct": 60,
-              "costo_hora_maquina": 300, "embalaje": 400, "redondeo": 100, "demora_dias": 3,
-              "peso_embalaje_g": 50}}
+config.json (carpeta taller-3d de la PC del usuario): secciones "costos", "tienda" e "impresoras"
+(formato en references/configuracion.md; cómo se calcula, en references/costos.md).
 """
 from __future__ import annotations
 
@@ -40,6 +37,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import comun  # noqa: E402
+import costos  # noqa: E402
 
 CUIDADOS = {
     "PLA": ["No dejar al sol ni dentro de un auto: se deforma desde unos 50 °C.",
@@ -66,38 +64,45 @@ def _redondear(valor: float, paso: float) -> float:
     return float(math.ceil(valor / paso) * paso) if paso else round(valor, 2)
 
 
+def canal_de_plataforma(config: dict) -> str:
+    tienda = config.get("tienda") or {}
+    canales = costos.canales_de_config(tienda)
+    if tienda.get("plataforma") == "mercadolibre" and "mercadolibre" in canales:
+        return "mercadolibre"
+    return "tienda" if "tienda" in canales else next(iter(canales))
+
+
 def calcular_precio(gramos: float | None, segundos: float | None, material: str | None, config: dict,
-                    filamento: str | None = None) -> dict:
-    tienda = config.get("tienda", {})
-    costos = config.get("costos", config)
-    precios = costos.get("filamentos", {})
-    mat = precios.get(filamento) or precios.get(material) or {}
-    faltan = []
-    precio_kg = mat.get("precio_kg")
-    if precio_kg is None:
-        faltan.append(f"precio por kg del filamento {material or ''}".strip())
-    horas = (segundos or 0) / 3600
-    material_ars = (gramos or 0) / 1000 * (precio_kg or 0)
-    luz = horas * (costos.get("consumo_w") or 0) / 1000 * (costos.get("precio_kwh") or 0)
-    if not costos.get("precio_kwh"):
-        faltan.append("precio del kWh")
-    maquina = horas * (tienda.get("costo_hora_maquina") or 0)
-    embalaje = tienda.get("embalaje") or 0
-    costo = material_ars + luz + maquina + embalaje
-    margen = tienda.get("margen_pct")
-    if margen is None:
-        faltan.append("margen de ganancia")
-    sugerido = _redondear(costo * (1 + (margen or 0) / 100), tienda.get("redondeo") or 0)
+                    filamento: str | None = None, impresora: str | None = None, canal: str | None = None,
+                    margen_pct: float | None = None, precio: float | None = None) -> dict:
+    """Costo real (costos.py) y precio por canal; el sugerido es el del canal de la tienda del usuario.
+
+    margen_pct: el margen que el usuario eligió para este producto (si no, el habitual de la tienda).
+    precio: un precio fijo que eligió; entonces cada canal muestra el margen real que le deja.
+    """
+    imp = costos.impresora_de_config(config, impresora)
+    c = costos.costo_pieza(gramos, segundos, material, config, imp, filamento)
+    p = costos.precios(c["total"], config, margen_pct=margen_pct, precio=precio)
+    canal = canal if canal in p["canales"] else canal_de_plataforma(config)
+    elegido = p["canales"].get(canal) or {}
+    partes = c["partes"]
     return {
-        "moneda": costos.get("moneda", "ARS"),
-        "material": round(material_ars, 2),
-        "luz": round(luz, 2),
-        "horas_maquina": round(maquina, 2),
-        "embalaje": round(embalaje, 2),
-        "costo_total": round(costo, 2),
-        "margen_pct": margen,
-        "precio_sugerido": sugerido,
-        "faltan_datos": faltan,
+        "moneda": c["moneda"],
+        "material": partes["material"],
+        "luz": partes["luz"],
+        "horas_maquina": partes["maquina"],
+        "fallas": partes["fallas"],
+        "mano_de_obra": partes["mano_de_obra"],
+        "embalaje": partes["embalaje"],
+        "costo_total": c["total"],
+        "margen_pct": p["margen_pct"],
+        "margen_habitual_pct": p["margen_habitual_pct"],
+        "margen_elegido": margen_pct is not None or precio is not None,
+        "precio_sugerido": elegido.get("precio"),
+        "canal": canal,
+        "canales": p["canales"],
+        "faltan_datos": c["faltan"] + p["faltan"],
+        "supuestos": c["supuestos"] + ([p["aviso_margen"]] if p["aviso_margen"] else []),
     }
 
 
@@ -109,7 +114,8 @@ def armar(args, config: dict) -> dict:
     gramos, segundos = est.get("gramos"), est.get("segundos")
     medidas = stl.get("medidas_mm") or ([float(v) for v in args.medidas.lower().split("x")] if args.medidas else None)
     filamento = (gcode.get("perfiles") or {}).get("filamento")
-    precio = calcular_precio(gramos, segundos, material, config, filamento)
+    precio = calcular_precio(gramos, segundos, material, config, filamento, gcode.get("impresora"),
+                             getattr(args, "canal", None), getattr(args, "margen", None), args.precio)
     precio_final = args.precio if args.precio is not None else precio["precio_sugerido"]
     tienda = config.get("tienda", {})
 
@@ -153,7 +159,8 @@ def armar(args, config: dict) -> dict:
         "manage_stock": False,
         "images": [],
     }
-    return {"producto": producto, "precio": precio, "puntos": puntos, "material": material, "sku": sku}
+    return {"producto": producto, "precio": precio, "puntos": puntos, "material": material, "sku": sku,
+            "precio_fijo": args.precio is not None}
 
 
 def escribir(resultado: dict, salida: Path) -> list[Path]:
@@ -198,12 +205,25 @@ def escribir(resultado: dict, salida: Path) -> list[Path]:
         "",
         f"- Material: {pr['material']} {pr['moneda']}",
         f"- Luz: {pr['luz']} {pr['moneda']}",
-        f"- Horas de máquina: {pr['horas_maquina']} {pr['moneda']}",
+        f"- Desgaste de la impresora: {pr['horas_maquina']} {pr['moneda']}",
+        f"- Fallas: {pr['fallas']} {pr['moneda']}",
+        f"- Tu tiempo: {pr['mano_de_obra']} {pr['moneda']}",
         f"- Embalaje: {pr['embalaje']} {pr['moneda']}",
         f"- Costo total: {pr['costo_total']} {pr['moneda']}",
-        f"- Margen: {pr['margen_pct'] if pr['margen_pct'] is not None else 'sin definir'} %",
-        f"- Precio sugerido: {pr['precio_sugerido']} {pr['moneda']}",
+        (f"- Precio elegido: {p.get('regular_price')} {pr['moneda']} (abajo, el margen real que deja en cada canal)"
+         if resultado.get("precio_fijo") else
+         f"- Margen sobre el precio: {pr['margen_pct'] if pr['margen_pct'] is not None else 'sin definir'} %"
+         + (" (elegido para este producto)" if pr.get("margen_elegido") else " (tu margen habitual)"
+            if pr['margen_pct'] is not None else "")),
+        f"- Precio sugerido ({pr['canal']}): {pr['precio_sugerido']} {pr['moneda']}",
     ]
+    for clave, canal in pr["canales"].items():
+        if "error" in canal:
+            lineas.append(f"- {canal.get('nombre') or clave}: {canal['error']}")
+        else:
+            lineas.append(f"- {canal.get('nombre') or clave}: precio {canal['precio']}, comisiones {canal['comisiones']}, "
+                          f"te queda {canal['te_queda']}, ganancia {canal['ganancia']} ({canal['margen_real_pct']} %)")
+    lineas += [f"- Supuesto: {s}" for s in pr["supuestos"]]
     if pr["faltan_datos"]:
         lineas.append(f"- Faltan datos para un precio real: {', '.join(pr['faltan_datos'])}.")
     ruta = salida / "ficha.md"
@@ -293,7 +313,10 @@ def main(argv=None) -> None:
     ap.add_argument("--informe-gcode", type=Path, help="JSON de revisar_gcode.py --json")
     ap.add_argument("--informe-stl", type=Path, help="JSON de revisar_stl.py --json")
     ap.add_argument("--config", type=Path, help="config.json con precios y datos de la tienda")
-    ap.add_argument("--precio", type=float, help="precio final elegido (si no, el sugerido)")
+    elegir = ap.add_mutually_exclusive_group()
+    elegir.add_argument("--precio", type=float, help="precio final elegido (si no, el sugerido)")
+    elegir.add_argument("--margen", type=float, help="margen sobre el precio elegido para este producto, en %%")
+    ap.add_argument("--canal", help="canal del precio sugerido (tienda, mercadolibre…); si no, el de la plataforma")
     ap.add_argument("--sku")
     ap.add_argument("--plantilla", type=Path, help="CSV exportado de otra plataforma para completar")
     ap.add_argument("--salida", type=Path, default=Path("."))
@@ -305,7 +328,12 @@ def main(argv=None) -> None:
     if a.plantilla:
         print(f"Escrito: {completar_plantilla(a.plantilla, r, a.salida)}")
     pr = r["precio"]
-    print(f"Costo: {pr['costo_total']} {pr['moneda']} | Precio sugerido: {pr['precio_sugerido']} {pr['moneda']}")
+    print(f"Costo: {pr['costo_total']} {pr['moneda']} | Precio sugerido ({pr['canal']}): {pr['precio_sugerido']} "
+          f"{pr['moneda']}")
+    for clave, canal in pr["canales"].items():
+        if "error" not in canal:
+            print(f"  {canal.get('nombre') or clave}: {canal['precio']} → te queda {canal['te_queda']}, ganancia "
+                  f"{canal['ganancia']} ({canal['margen_real_pct']} % del precio)")
     if pr["faltan_datos"]:
         print(f"Faltan datos: {', '.join(pr['faltan_datos'])}")
 

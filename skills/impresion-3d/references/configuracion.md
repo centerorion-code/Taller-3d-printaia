@@ -6,7 +6,7 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
 {
   "version": 1,
   "carpeta_trabajo": "/home/usuario/Documentos/Taller 3D",
-  "aceptacion": {"fecha": "2026-11-21T10:00:00-03:00", "version_plugin": "0.1.13", "texto": "ACEPTO", "medio": "instalar.sh"},
+  "aceptacion": {"fecha": "2026-11-21T10:00:00-03:00", "version_plugin": "0.1.14", "texto": "ACEPTO", "medio": "instalar.sh"},
   "orca": {"version": "2.5.1", "ejecutable": "/home/usuario/Aplicaciones/OrcaSlicer_Linux_AppImage_Ubuntu2404_V2.5.1.AppImage",
            "origen": "oficial", "carpeta_usuario": "/home/usuario/.config/OrcaSlicer/user/default"},
   "impresora_por_defecto": "marca-modelo",
@@ -20,14 +20,25 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
       "proceso_auto": "AUTO proceso @Modelo",
       "filamento_auto": "AUTO filamento @Modelo",
       "procesos": {"calidad": "…", "eficiente": "…", "estandar": "…"},
-      "filamentos": {"PETG": "…", "PLA": "…"}
+      "filamentos": {"PETG": "…", "PLA": "…"},
+      "costo": {"precio": 600000, "vida_horas": 4000, "mantenimiento_pct": 5, "consumo_w": 120,
+                "consumo_fuente": "medido", "calentamiento_min": 5}
     }
   ],
-  "costos": {"moneda": "ARS", "precio_kwh": 150, "consumo_w": 180,
+  "costos": {"moneda": "ARS",
+             "luz": {"precio_kwh": 152.9, "metodo": "marginal", "cargo_variable": 120.5, "impuestos_pct": 26.9,
+                     "kwh": 310, "total": 53072, "cargos_fijos": 4800, "periodo": "2026-10", "empresa": "EDET",
+                     "cargado": "2026-11-21"},
+             "precio_kwh": 152.9,
+             "fallas_pct": 10,
+             "mano_de_obra": {"precio_hora": 6000, "minutos_por_pieza": 10},
              "filamentos": {"PETG": {"precio_kg": 25000}}},
-  "tienda": {"plataforma": "woocommerce", "url": "https://mitienda.com", "margen_pct": 60,
-             "costo_hora_maquina": 300, "embalaje": 400, "redondeo": 100, "demora_dias": 3,
-             "peso_embalaje_g": 50, "categoria_por_defecto": "Piezas a medida"}
+  "tienda": {"plataforma": "mercadolibre", "url": "https://mitienda.com", "margen_precio_pct": 40,
+             "canales": {"tienda": {"nombre": "Tu tienda", "comision_pct": 0},
+                         "mercadolibre": {"nombre": "Mercado Libre", "comision_pct": 15, "iva_comision": true,
+                                          "cargo_fijo": 1000, "cargo_fijo_hasta": 20000}},
+             "embalaje": 400, "redondeo": 100, "demora_dias": 3, "peso_embalaje_g": 50,
+             "categoria_por_defecto": "Piezas a medida"}
 }
 ```
 
@@ -38,9 +49,15 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
 - `datos`: ruta, relativa a la carpeta de trabajo, al JSON con los datos de la impresora en `taller-3d/impresoras/`. Lo arma `/impresoras` investigando en internet (formato en `references/impresoras.md`); el plugin no trae impresoras.
 - `cama`: tipo de cama que usa, con el nombre de Orca ("Textured PEI Plate", "High Temp Plate", "Cool Plate"…). El taller copia sus temperaturas al `AUTO filamento` (ver perfiles-orca.md, tipo de cama).
 - `procesos` y `filamentos`: nombres de los perfiles de usuario de Orca (las claves son libres; las de `filamentos` conviene que sean el material).
+- `impresoras[].costo`: lo de cada impresora para el costo (precio, vida en horas, mantenimiento %, consumo promedio en W y de dónde salió, minutos de calentamiento). Detalle en `references/costos.md`.
+- `costos.luz`: los números de la tarifa de la boleta de luz, que guarda `costos.py luz` (solo números, nada personal). `costos.precio_kwh` queda igual que `luz.precio_kwh` para los scripts viejos.
 - `costos.filamentos`: precio por kg por material (PETG) o por nombre de perfil de filamento.
-- `consumo_w`: consumo promedio de la impresora mientras imprime (180 W es una estimación; medirlo con un medidor mejora el costo).
+- `costos.fallas_pct` y `costos.mano_de_obra`: el porcentaje de impresiones que salen mal y lo que vale tu hora.
+- `costos.consumo_w` (de antes de la 0.1.14): consumo general si una impresora no tiene el suyo.
 - `tienda.plataforma`: `woocommerce`, `tiendanube`, `shopify`, `mercadolibre`, `otra` o null.
+- `tienda.margen_precio_pct`: el margen habitual sobre el precio. El `margen_pct` de antes era un recargo sobre el costo: `costos.py` lo convierte y avisa.
+- `tienda.canales`: comisión, cuotas, IVA sobre la comisión y cargo fijo de cada canal de venta (`references/costos.md`).
+- `tienda.costo_hora_maquina` (de antes de la 0.1.14): se usa solo si la impresora no tiene precio.
 
 ## Reglas
 

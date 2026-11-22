@@ -1,5 +1,16 @@
 # Cambios
 
+## 0.1.14 (2026-11-21)
+
+- **Costo real de cada pieza** (`costos.py`, `references/costos.md`): material, luz, desgaste de la impresora, las que salen mal, tu tiempo y embalaje. La luz sale de tu boleta: mandale una foto o el PDF y saca el precio del kWh (el del último escalón más impuestos, o el promedio sin los cargos fijos si la boleta no lo separa). Guarda solo los números de la tarifa, nada personal. Cada impresora tiene su consumo (medido con un medidor de enchufe, o estimado con su fuente) y su precio, repartido en sus horas de vida. El tiempo es el de Orca más el calentamiento.
+- **Precio por canal, con el margen sobre el precio:** tu tienda, Mercado Libre (comisión, cuotas, IVA sobre la comisión y cargo fijo de las ventas baratas) u otros. El `margen_pct` de antes era un recargo sobre el costo: se convierte (un recargo del 50 % es un margen del 33 %) y avisa.
+- **El margen se elige en cada producto:** `/taller-3d:publicar` te pregunta con tres opciones (una más baja, tu habitual y una más alta), cada una con el precio y lo que ganás, o le decís un precio y te muestra el margen real que te deja en cada canal.
+- **Fotos de producto con Blender** (`render_producto.py`), en el espacio de Claude: plástico del color y el tipo de tu filamento, líneas de capa, luz de estudio. Salen cuadradas y sin texto: la principal con fondo blanco puro y sin sombra, como pide Mercado Libre, y otra con sombra suave para tu tienda (y, si querés, de frente y desde arriba). La imagen simple de antes (`vista_previa.py --producto`) ahora también sale con fondo blanco y sin texto (la leyenda es opcional).
+- **La guía:** al empezar sin un pedido concreto, Claude te ofrece opciones para tocar con lo que sigue; en `/taller-3d:pieza` ves las etapas en la lista de tareas; y cada vez que te toca algo, termina con "Te toca: …".
+- **El panel dice a quién le toca** ("Le toca a Claude" o "Te toca"), trae botones con el pedido para cada pieza, un campo para anotar ideas y la caja "Tu taller" con lo que falta para los costos. En el archivo, los botones copian el pedido.
+- **El panel al costado del chat:** en claude.ai, Claude puede publicar el panel como página privada en tu cuenta, al lado del chat, y lo actualiza solo. Sus botones están listos para mandarle el pedido a Claude ("Enviar a Claude"); mientras claude.ai no deje que una página despierte el chat, lo copian.
+- `revisar_gcode.py --config` calcula el costo con tu configuración; la ficha del producto muestra el costo por partes y el precio por canal.
+
 ## 0.1.13 (2026-11-21)
 
 - **El panel del taller** (`/taller-3d:panel`, reemplaza a `/taller-3d:catalogo`). `panel.html`, en la carpeta de trabajo, muestra cada idea y pieza con su recorrido (Idea → Diseño → Lista para imprimir → Impresa → En la tienda), qué sigue, para qué impresora es, su vista, datos y archivos. Arriba dice cuántas hay pendientes, en proceso y terminadas, con filtros y buscador; primero va "Para hacer" (lo más avanzado primero) y después las terminadas, por mes. Una pieza impresa ya cuenta como terminada: publicarla es opcional.
