@@ -317,6 +317,9 @@ def _en_una_linea(texto, largo: int = 80) -> str:
 ABRIR_EN_ORCA = "Abrila en Orca"
 # El botón de arriba del panel: las fotos no se pueden mandar desde la página, se adjuntan en el chat.
 PEDIDO_FOTO = "Quiero una pieza a partir de una foto: te la adjunto en el chat."
+# Los botones que arrancan una pieza: el panel les suma la impresora elegida arriba («Impresora: «X».») o, con
+# «Que me pregunte Claude», «Preguntame en qué impresora.». Con una sola impresora no suman nada.
+CON_IMPRESORA = {"Diseñala", "Dejala lista para imprimir"}
 # El servidor MCP local que abre Orca (instalador/abrir_orca.py), como lo nombra la página del panel en la app.
 SERVIDOR_ORCA = "host:taller3d-orca"
 RE_PROYECTO = re.compile(r"^(?:impresiones|disenos)/\d{4}-\d{2}-\d{2}_[^/\\]+/[^/\\]+\.3mf$")
@@ -345,7 +348,7 @@ def acciones(p: dict) -> list[tuple[str, str]]:
         return [("Diseñala", f"Desde el panel: diseñá la idea {cual} y dejala lista para imprimir."),
                 ("Solo el modelo", f"Desde el panel: hacé solo el modelo 3D de la idea {cual}, sin laminar.")]
     if "laminada" not in h:
-        return [("Dejala lista para imprimir", f"Desde el panel: dejá {cual} lista para imprimir en mi impresora.")]
+        return [("Dejala lista para imprimir", f"Desde el panel: dejá {cual} lista para imprimir.")]
     if "impresa" not in h:
         return [(ABRIR_EN_ORCA, f"Desde el panel: abrí {cual} en Orca para que la vea."),
                 ("Ya la imprimí", f"Desde el panel: ya imprimí {cual}. Marcala como impresa y preguntame cómo salió.")]
@@ -504,10 +507,14 @@ body.con-claude .acciones .solo-claude{display:inline-block}
 form.idea{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
 .desde-foto{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0}
 .desde-foto span{font-size:14px;color:var(--suave)}
+.impresora{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:14px 0 0;font-size:15px}
+.impresora label{font-weight:700}
+.impresora select{min-height:40px;padding:6px 10px;border:1.5px solid var(--tinta);border-radius:10px;font:inherit;background:#fff;color:var(--tinta)}
+.impresora span{font-size:14px;color:var(--suave)}
 form.idea input{flex:1 1 240px;min-height:44px;padding:8px 14px;border:1.5px solid var(--tinta);border-radius:10px;font:inherit;background:#fff}
 .archivos span{padding:2px 8px;border:1px solid var(--borde);border-radius:6px;font-family:ui-monospace,Consolas,monospace}
 [hidden]{display:none!important}
-@media print{.controles,.acciones,form.idea,.desde-foto{display:none}article{break-inside:avoid}}
+@media print{.controles,.acciones,form.idea,.desde-foto,div.impresora{display:none}article{break-inside:avoid}}
 """
 
 GUION = """
@@ -579,10 +586,24 @@ GUION = """
       else{orca=null;pedir(el,texto);}          // nunca llegó a la PC: se lo pido a Claude
     });
   }
+  // La impresora de arriba: los botones que arrancan una pieza (data-impresora) le dicen a Claude en cuál. La
+  // elegida se recuerda en este navegador si se puede; si ya no está entre las opciones, queda la que puso Claude.
+  var selector=document.getElementById('impresora'),CLAVE='taller3d.impresora';
+  if(selector&&selector.tagName==='SELECT'){
+    try{var guardada=window.localStorage.getItem(CLAVE);
+      if(guardada!==null&&[].some.call(selector.options,function(o){return o.value===guardada;})){selector.value=guardada;}
+    }catch(e){}
+    selector.addEventListener('change',function(){try{window.localStorage.setItem(CLAVE,selector.value);}catch(e){}});
+  }else{selector=null;}
+  function conImpresora(el,texto){
+    if(!selector||!el.hasAttribute('data-impresora')){return texto;}
+    return texto+(selector.value?' Impresora: «'+selector.value+'».':' Preguntame en qué impresora.');
+  }
   document.querySelectorAll('[data-pedido]').forEach(function(b){
     b.addEventListener('click',function(){
       var ruta=b.getAttribute('data-orca');
-      if(ruta){abrirEnOrca(b,ruta,b.getAttribute('data-pedido'));}else{pedir(b,b.getAttribute('data-pedido'));}
+      if(ruta){abrirEnOrca(b,ruta,b.getAttribute('data-pedido'));}
+      else{pedir(b,conImpresora(b,b.getAttribute('data-pedido')));}
     });
   });
   if(window.claude&&typeof window.claude.use==='function'&&document.querySelector('[data-orca]')){
@@ -678,6 +699,7 @@ def _tarjeta(p: dict, modo: str = "archivo", imagenes: dict | None = None) -> st
     proyecto = proyecto_de(p) if modo == "claude" else None
     botones = "".join(f'<button type="button" data-pedido="{e(pedido)}"'
                       + (f' data-orca="{e(proyecto)}"' if proyecto and etiqueta == ABRIR_EN_ORCA else "")
+                      + (" data-impresora" if etiqueta in CON_IMPRESORA else "")
                       + f'>{e(etiqueta)}</button>' for etiqueta, pedido in acciones(p))
     botones += '<button type="button" class="solo-claude" data-comentar>Otra cosa…</button>'
     fecha = p.get("fecha") or ""
@@ -720,11 +742,34 @@ def _taller(estado: list[dict] | None) -> str:
             f'<ul>{filas}</ul><p class="aviso" role="status" aria-live="polite"></p></details>')
 
 
+def _selector(impresoras: list[dict] | None) -> str:
+    """Arriba del panel, la impresora para lo que se pida (de comun.impresoras_para_elegir): los botones que arrancan
+    una pieza le dicen a Claude en cuál. Con una sola no hay nada que elegir: dice cuál es."""
+    e = html.escape
+    lista = [(comun.una_linea(i.get("nombre")), i) for i in impresoras or [] if isinstance(i, dict)]
+    lista = [(n, i) for n, i in lista if n]
+    if not lista:
+        return ""
+
+    def texto(nombre, i):
+        return nombre + ("" if i.get("preparada") else " · sin preparar")
+    if len(lista) == 1:
+        return f'<p class="impresora">Imprime en: <strong>{e(texto(*lista[0]))}</strong></p>'
+    opciones = "".join(f'<option value="{e(n)}"{" selected" if i.get("defecto") else ""}>{e(texto(n, i))}</option>'
+                       for n, i in lista)
+    return ('<div class="impresora"><label for="impresora">Imprimir en</label>'
+            f'<select id="impresora">{opciones}<option value="">Que me pregunte Claude</option></select>'
+            '<span>La usan los botones que arrancan una pieza. La que elegís en la ventana de Orca no le llega a '
+            'Claude.</span></div>')
+
+
 def generar_html(catalogo: dict, titulo: str = "Panel del taller", modo: str = "archivo",
-                 imagenes: dict | None = None, estado_taller: list[dict] | None = None) -> str:
+                 imagenes: dict | None = None, estado_taller: list[dict] | None = None,
+                 impresoras: list[dict] | None = None) -> str:
     """modo archivo: panel.html para abrir desde la carpeta de trabajo; los botones copian el pedido.
     modo claude: la página que Claude publica en claude.ai y se abre al costado del chat; los botones le mandan
-    el pedido a Claude. `imagenes`: carpeta de la pieza → ruta de su foto entre los archivos de la página."""
+    el pedido a Claude. `imagenes`: carpeta de la pieza → ruta de su foto entre los archivos de la página.
+    `impresoras` (de comun.impresoras_para_elegir): el selector de impresora de arriba."""
     e = html.escape
     if modo not in ("archivo", "claude"):
         raise ValueError(f"Modo desconocido: {modo}")
@@ -791,7 +836,8 @@ def generar_html(catalogo: dict, titulo: str = "Panel del taller", modo: str = "
 <input id="nueva-idea" type="text" maxlength="300" placeholder="Anotá una idea: «un soporte para la tele»" aria-label="Anotar una idea">
 <button type="submit">Anotar idea</button>
 </form>
-<div class="desde-foto"><button type="button" data-pedido="{e(PEDIDO_FOTO)}" data-adjuntar>Pieza desde una foto</button>
+{_selector(impresoras)}
+<div class="desde-foto"><button type="button" data-pedido="{e(PEDIDO_FOTO)}" data-impresora data-adjuntar>Pieza desde una foto</button>
 <span>Para copiar algo que tenés: tocá el botón y adjuntá la foto en el chat.</span></div>
 <p class="aviso" role="status" aria-live="polite"></p>
 {_taller(estado_taller)}
@@ -929,6 +975,8 @@ def main(argv=None) -> None:
                    help="archivo: panel.html de la carpeta de trabajo; claude: la página para publicar en claude.ai")
     h.add_argument("--imagenes", type=Path, help="(modo claude) JSON carpeta de la pieza → ruta de su foto en la página")
     h.add_argument("--config", type=Path, help="config.json del taller: suma la caja «Tu taller» (qué falta para los costos)")
+    h.add_argument("--impresoras-orca", type=Path,
+                   help="salida de impresora.py detectar --json: el selector de impresora con las de Orca sin preparar")
 
     rd = sub.add_parser("redireccion", help="catalogo.html que lleva al panel (para el de antes de la 0.1.13)")
     rd.add_argument("--salida", required=True, type=Path)
@@ -980,11 +1028,20 @@ def main(argv=None) -> None:
     elif args.accion == "html":
         args.salida.parent.mkdir(parents=True, exist_ok=True)
         imagenes = _leer_json(args.imagenes) if args.imagenes else None
-        estado = None
+        detectadas = []
+        if args.impresoras_orca:
+            try:
+                detectadas = comun.leer_detectadas(args.impresoras_orca)
+            except (OSError, ValueError) as error:
+                raise SystemExit(f"No pude leer {args.impresoras_orca} ({error}).")
+        estado, config = None, {}
         if args.config and args.config.exists():
             import costos
-            estado = costos.estado_taller(_leer_json(str(args.config)))
-        args.salida.write_text(generar_html(catalogo, args.titulo, args.modo, imagenes, estado), encoding="utf-8")
+            config = _leer_json(str(args.config))
+            estado = costos.estado_taller(config, detectadas)
+        impresoras = comun.impresoras_para_elegir(config, detectadas)
+        args.salida.write_text(generar_html(catalogo, args.titulo, args.modo, imagenes, estado, impresoras),
+                               encoding="utf-8")
         print(f"Página: {args.salida} ({len(catalogo['piezas'])} entre ideas y piezas).")
     else:
         print(resumen_corto(catalogo) if args.corto else resumen(catalogo, args.buscar))

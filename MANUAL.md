@@ -93,7 +93,7 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
 ### Paso a paso
 
 1. **Pedido.** Texto, foto, medidas o un STL que ya tengas.
-2. **Preguntas rápidas,** con opciones para tocar: en qué impresora (solo si tenés más de una y no lo dijiste; la más conveniente aparece primera), para qué es, dónde va, qué material y qué priorizás (calidad, resistencia, velocidad o ahorro de material). Además, las medidas que falten. La impresora se elige antes que nada porque de ella depende todo lo demás: si entra, los ajustes, el tiempo y el costo.
+2. **Preguntas rápidas,** con opciones para tocar: en qué impresora (si en tu Orca tenés más de una y no lo dijiste, aunque en el taller haya una sola preparada; la más conveniente aparece primera, y si elegís una que todavía no está preparada, Claude la prepara antes), para qué es, dónde va, qué material y qué priorizás (calidad, resistencia, velocidad o ahorro de material). Además, las medidas que falten. La impresora se elige antes que nada porque de ella depende todo lo demás: si entra, los ajustes, el tiempo y el costo.
 3. **Diseño y vista previa.** Claude diseña la pieza con medidas exactas y te muestra una imagen con cuatro vistas y las medidas. Si es decorativa (una figura, algo con texto o con formas suaves), la hace en Blender y te muestra además una foto renderizada; si es algo conocido, antes te muestra modelos que ya existen, con su licencia. **Vos la aprobás** o pedís cambios ("más alta", "agujeros de 5 mm", "redondeá los bordes"). Si trajiste un STL, revisa que esté sano y que entre en la cama.
 4. **Configuración.** Elige los ajustes según el uso: paredes, relleno, velocidades, temperaturas, soportes y orientación. Los guarda en dos perfiles de trabajo llamados "AUTO". **Tus perfiles no se tocan.**
 5. **Laminado.** Lamina en tu Orca y mira el resultado: tiempo, gramos, voladizos y temperaturas. Si algo no cierra, ajusta y vuelve a laminar, hasta tres veces antes de consultarte.
@@ -149,6 +149,7 @@ Idea → Diseño → Lista para imprimir → Impresa → En la tienda
 - Primero va **"Para hacer"** (lo más avanzado primero) y después las terminadas, por mes.
 - Cada tarjeta dice **a quién le toca lo que sigue**: "Le toca a Claude: dejarla lista para imprimir" o "Te toca: imprimirla". Tiene botones con el pedido ("Diseñala", "Ya la imprimí", "Publicala"…), para qué impresora es, la vista (o la foto de la pieza impresa), medidas, material, tiempo, gramos, costo, precio y los archivos.
 - **Tu taller:** arriba, lo que falta para que los costos y precios sean reales (la boleta de luz, cuánto pagaste la impresora, tu hora…), con un botón para cada cosa. El consumo de cada impresora no te lo pide: Claude lo busca en internet o, si no lo encuentra, lo estima por el tamaño de la cama, y lo guarda solo (si medís el real con un medidor de enchufe, pasáselo en el chat).
+- **Imprimir en:** arriba elegís la impresora para lo que pidas: las de tu Orca, también las que todavía no están preparadas en el taller, o "Que me pregunte Claude". Los botones que arrancan una pieza ("Diseñala", "Dejala lista para imprimir", "Pieza desde una foto") se la dicen a Claude, y el navegador se acuerda de la que elegiste. La que elegís en la ventana de Orca no le llega a Claude.
 - En el archivo, los botones copian el pedido para que lo pegues en el chat.
 - **Ideas para después:** contale a Claude "anotá esta idea: un soporte para la tele, 15 × 10 cm" y queda pendiente con lo que ya se sabe. Cuando la quieras hacer, pedila por su nombre.
 - **Pieza desde una foto:** el botón de arriba manda el pedido a Claude (o lo copia) y te recuerda adjuntar la foto en el chat: la página no puede mandar fotos.
@@ -211,6 +212,8 @@ Los comandos llevan el nombre del plugin adelante (`/taller-3d:...`): si escrib�
 **¿Tengo que tener Orca abierto?** No. Si lo tenés abierto, cerralo y volvé a abrirlo para ver los perfiles nuevos; después abrí el proyecto `.3mf` de la pieza.
 
 **Abrí el proyecto de una pieza vieja y Orca marca cambios (↺) en los perfiles AUTO. ¿Está mal?** No: los AUTO se rehacen en cada pieza, y el proyecto trae los ajustes con que se hizo esa. Si la volvés a laminar desde ahí, sale igual que la primera vez.
+
+**El panel dice que tengo una impresora preparada, pero en Orca tengo otra elegida.** "Preparada" es la que el taller ya configuró en tu carpeta de trabajo (sus datos y sus perfiles AUTO). Lo que elegís en la ventana de Orca no le llega a Claude: elegí la impresora en "Imprimir en", arriba del panel, o decila en el pedido. Si todavía no está preparada, Claude la prepara la primera vez (unos minutos).
 
 **¿Por qué la carpeta y el G-code dicen el nombre de la impresora?** Porque un G-code sirve solo para la impresora para la que se laminó: así no se confunde, ni en la PC ni en la pantalla de la impresora.
 

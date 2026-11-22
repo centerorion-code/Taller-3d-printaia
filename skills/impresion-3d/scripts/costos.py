@@ -444,8 +444,9 @@ def opciones(costo: float, config: dict, margenes: list[float] | None = None) ->
 
 # ------------------------------------------------------------------ qué falta configurar
 
-def estado_taller(config: dict) -> list[dict]:
-    """Lo que está listo y lo que falta para tener costos y precios reales, con la frase para pedírselo a Claude."""
+def estado_taller(config: dict, detectadas: list[dict] | None = None) -> list[dict]:
+    """Lo que está listo y lo que falta para tener costos y precios reales, con la frase para pedírselo a Claude.
+    `detectadas` (de impresora.py detectar) suma las impresoras de Orca que no están preparadas en este taller."""
     costos = config.get("costos") or {}
     tienda = config.get("tienda") or {}
     items: list[dict] = []
@@ -455,10 +456,19 @@ def estado_taller(config: dict) -> list[dict]:
                       "texto": texto, "frase": None if listo and not aviso else frase})
 
     impresoras = [i for i in config.get("impresoras") or [] if isinstance(i, dict)]
+    nombres = [str(i.get("nombre") or i.get("id")) for i in impresoras]
+    # Preparada = con sus datos y perfiles AUTO en esta carpeta de trabajo. La que está elegida en la ventana de Orca
+    # no le llega a Claude; las otras de Orca se preparan la primera vez que se eligen para una pieza.
+    sin_preparar = [x["nombre"] for x in comun.impresoras_para_elegir(config, detectadas) if not x["preparada"]]
+    otras = ""
+    if sin_preparar:
+        otras = (f"; en Orca también: {', '.join(sin_preparar)} "
+                 + ("(se prepara la primera vez que la elijas)" if len(sin_preparar) == 1 else
+                    "(cada una se prepara la primera vez que la elijas)"))
     agregar("Impresoras", bool(impresoras),
-            f"{len(impresoras)} preparada{'s' if len(impresoras) != 1 else ''}: "
-            + ", ".join(str(i.get("nombre") or i.get("id")) for i in impresoras) if impresoras
-            else "Ninguna impresora preparada", "Prepará mi impresora")
+            f"Preparada{'s' if len(nombres) != 1 else ''} en este taller: {', '.join(nombres)}{otras}" if impresoras
+            else "Ninguna preparada en este taller" + (f"; en Orca: {', '.join(sin_preparar)}" if sin_preparar else ""),
+            "Prepará mi impresora")
     luz = luz_de_config(config)
     if luz["precio_kwh"] is None:
         agregar("Luz", False, "Falta el precio del kWh", "Te paso mi boleta de luz para el precio del kWh")
@@ -549,6 +559,8 @@ def main(argv=None) -> None:
     pz.add_argument("--json", type=Path)
     es = sub.add_parser("estado", help="qué falta configurar")
     es.add_argument("--config", type=Path, required=True)
+    es.add_argument("--impresoras-orca", type=Path,
+                    help="salida de impresora.py detectar --json: suma las impresoras de Orca sin preparar")
     es.add_argument("--json", action="store_true")
     cs = sub.add_parser("consumo", help="consumo promedio de una impresora: el encontrado o estimado por la cama")
     cs.add_argument("--config", type=Path, required=True)
@@ -690,7 +702,13 @@ def main(argv=None) -> None:
             if a.salida:
                 print(f"Guardado en {a.salida}.")
     else:
-        items = estado_taller(config)
+        detectadas = []
+        if a.impresoras_orca:
+            try:
+                detectadas = comun.leer_detectadas(a.impresoras_orca)
+            except (OSError, ValueError) as error:
+                raise SystemExit(f"No pude leer {a.impresoras_orca} ({error}).")
+        items = estado_taller(config, detectadas)
         if a.json:
             print(json.dumps(items, ensure_ascii=False, indent=2))
         else:

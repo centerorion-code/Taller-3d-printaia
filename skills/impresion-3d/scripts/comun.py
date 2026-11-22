@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-VERSION_PLUGIN = "0.1.24"
+VERSION_PLUGIN = "0.1.25"
 VERSION_ORCA = "2.5.1"
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -57,6 +57,76 @@ def plano(texto) -> str:
 def modelo_de_perfil(nombre) -> str:
     """'Creality Hi 0.4 nozzle' o 'Creality K1 (0.4 nozzle)' → el modelo, sin la boquilla."""
     return RE_BOQUILLA.sub("", re.sub(r"\s+", " ", str(nombre or "")).strip()).strip()
+
+
+# Los perfiles que arma el taller para cada impresora: "AUTO proceso @<modelo>" y "AUTO filamento @<modelo>".
+RE_AUTO = re.compile(r"^AUTO (?:proceso|filamento) @(.+)$")
+
+
+def una_linea(texto, largo: int = 60) -> str:
+    """Un nombre para un pedido o un menú: una sola línea, sin caracteres de control ni comillas «» y corto."""
+    limpio = re.sub(r"[\x00-\x1f\x7f  «»]+", " ", str(texto or ""))
+    limpio = re.sub(r"\s+", " ", limpio).strip()
+    return limpio if len(limpio) <= largo else limpio[:largo - 1].rstrip() + "…"
+
+
+def mismo_modelo(a, b) -> bool:
+    """Si dos nombres son la misma impresora: iguales, o uno termina con el otro en palabras enteras
+    ("Creality Ender-3 V3 Plus" y "Ender-3 V3 Plus", "Mi Creality Hi" y "Creality Hi"; no "Creality K1C" y "K1")."""
+    a, b = plano(a), plano(b)
+    return bool(a and b) and (a == b or a.endswith(" " + b) or b.endswith(" " + a))
+
+
+def leer_detectadas(ruta) -> list[dict]:
+    """La lista que guarda `impresora.py detectar --json`."""
+    datos = cargar_json(ruta)
+    if not isinstance(datos, list):
+        raise ValueError("no es la lista que guarda impresora.py detectar --json")
+    return [d for d in datos if isinstance(d, dict)]
+
+
+def impresoras_para_elegir(config: dict, detectadas=None) -> list[dict]:
+    """Las impresoras para elegir al arrancar una pieza (el selector del panel): las preparadas en el taller
+    (config.json) y las que se ven en Orca (impresora.py detectar) que todavía no están preparadas acá.
+
+    Cada una: `nombre` (el que va en el pedido), `preparada`, `defecto` (la última usada; si no hay, la elegida en
+    la ventana de Orca, que solo se sabe con terminal, o la primera preparada), `copia_usuario` y `seleccionada`."""
+    config = config if isinstance(config, dict) else {}
+    detectadas = [d for d in detectadas or [] if isinstance(d, dict) and isinstance(d.get("modelo"), str)]
+    usadas: set[int] = set()
+    salida: list[dict] = []
+    por_defecto = config.get("impresora_por_defecto")
+    for imp in config.get("impresoras") or []:
+        if not isinstance(imp, dict):
+            continue
+        nombre = una_linea(imp.get("nombre") or imp.get("id"))
+        if not nombre or any(plano(x["nombre"]) == plano(nombre) for x in salida):
+            continue
+        maquina = imp.get("perfil_maquina") if isinstance(imp.get("perfil_maquina"), str) else ""
+        autos = (RE_AUTO.match(imp[k].strip()) for k in ("proceso_auto", "filamento_auto") if isinstance(imp.get(k), str))
+        claves = [nombre, modelo_de_perfil(maquina)] + [m.group(1) for m in autos if m]
+        cual = next((n for n, d in enumerate(detectadas) if n not in usadas and (
+            (maquina and maquina in (d.get("copias_usuario") or []))
+            or any(mismo_modelo(d["modelo"], c) for c in claves))), None)
+        d = {}
+        if cual is not None:
+            usadas.add(cual)
+            d = detectadas[cual]
+        salida.append({"nombre": nombre, "preparada": True,
+                       "defecto": por_defecto is not None and imp.get("id") == por_defecto,
+                       "copia_usuario": bool(maquina or d.get("copias_usuario")),
+                       "seleccionada": bool(d.get("seleccionada"))})
+    for n, d in enumerate(detectadas):
+        nombre = una_linea(d["modelo"])
+        if n in usadas or not nombre or any(plano(x["nombre"]) == plano(nombre) for x in salida):
+            continue
+        salida.append({"nombre": nombre, "preparada": False, "defecto": False,
+                       "copia_usuario": bool(d.get("copias_usuario")), "seleccionada": bool(d.get("seleccionada"))})
+    if salida and not any(x["defecto"] for x in salida):
+        elegida = (next((x for x in salida if x["seleccionada"]), None)
+                   or next((x for x in salida if x["preparada"]), salida[0]))
+        elegida["defecto"] = True
+    return salida
 
 
 def _numero(v) -> bool:

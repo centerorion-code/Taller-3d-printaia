@@ -227,7 +227,8 @@ def _boquillas_de(nombre: str) -> set[str]:
 def detectar(maquinas=None, perfiles=None, orca: dict | None = None) -> list[dict]:
     """Impresoras del usuario según lo que se ve sin pedir nada nuevo. Agrupa por modelo (sin distinguir
     mayúsculas) y dice de dónde salió: copia de usuario (la única que orca-mcp puede usar para laminar), perfiles
-    del usuario (compatible_printers) o la lista de Orca (models de OrcaSlicer.conf, leída en la PC). inherits solo
+    del usuario (compatible_printers), perfiles AUTO del taller (por su nombre) o la lista de Orca (models de
+    OrcaSlicer.conf, leída en la PC). inherits solo
     se usa en las copias de usuario, siguiendo copias de copias hasta el perfil de sistema."""
     encontradas: dict[str, dict] = {}
 
@@ -267,11 +268,16 @@ def detectar(maquinas=None, perfiles=None, orca: dict | None = None) -> list[dic
             e["perfiles_sistema"].add(base)
         e["boquillas"] |= _boquillas_de(nombre) | _boquillas_de(base)
         e["fuentes"].add("copia de usuario")
+    autos: list[str] = []
     for archivo in _jsons(perfiles):
         try:
             datos = comun.cargar_json(archivo)
         except (OSError, ValueError):
             continue
+        propio = datos.get("name") if isinstance(datos, dict) and isinstance(datos.get("name"), str) else archivo.stem
+        auto = comun.RE_AUTO.match(propio.strip())
+        if auto and auto.group(1).strip():
+            autos.append(auto.group(1).strip())
         for nombre in _lista(datos.get("compatible_printers") if isinstance(datos, dict) else None):
             if nombre in copias:
                 continue
@@ -295,6 +301,11 @@ def detectar(maquinas=None, perfiles=None, orca: dict | None = None) -> list[dic
         e = entrada(modelo_de_perfil(sistema_de(elegida) if elegida in copias else elegida))
         e["seleccionada"] = True
         e["fuentes"].add("elegida en la ventana de Orca")
+    # Los AUTO del taller ("AUTO proceso @Creality Hi") dicen que esa impresora se preparó, aunque sea en otra
+    # carpeta de trabajo y aunque sus perfiles no la nombren en compatible_printers ni esté conectada machine.
+    for patron in autos:
+        e = next((x for x in encontradas.values() if comun.mismo_modelo(x["modelo"], patron)), None) or entrada(patron)
+        e["fuentes"].add("perfiles AUTO del taller")
     salida = []
     for e in encontradas.values():
         salida.append({**e, "perfiles_sistema": sorted(e["perfiles_sistema"]), "boquillas": sorted(e["boquillas"]),

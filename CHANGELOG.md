@@ -1,5 +1,12 @@
 # Cambios
 
+## 0.1.25 (2026-11-22)
+
+- **La impresora se elige al arrancar cada pieza, entre todas las de tu Orca:** antes, la pregunta solo aparecía si había dos o más impresoras preparadas en el taller; con una sola preparada, Claude seguía con esa aunque tuvieras otra en Orca. Ahora cuenta las impresoras de Orca (también las que todavía no están preparadas en esta carpeta) y pregunta en cuál siempre que haya más de una y no la hayas dicho. Si elegís una sin preparar, Claude la prepara antes, la primera vez.
+- **Selector "Imprimir en" en el panel** (en el archivo y al costado del chat): elegís la impresora de una lista con las preparadas y las de Orca sin preparar, o "Que me pregunte Claude". Los botones que arrancan una pieza ("Diseñala", "Dejala lista para imprimir", "Pieza desde una foto") se la dicen a Claude, y el navegador se acuerda de la que elegiste. Con una sola impresora, el panel dice cuál es.
+- **"Tu taller" dice "Preparada en este taller"** y nombra las otras impresoras de Orca, que se preparan al elegirlas (no quedan como pendientes). La que está elegida en la ventana de Orca no le llega a Claude: el panel lo avisa.
+- **`impresora.py detectar`** suma las impresoras de los perfiles `AUTO proceso @…` y `AUTO filamento @…`, aunque no esté conectada la carpeta `machine` ni los perfiles las nombren, y las junta con la copia de usuario del mismo modelo. Con `--json` guarda la lista para el panel (`catalogo.py html --impresoras-orca`) y para `costos.py estado --impresoras-orca`.
+
 ## 0.1.24 (2026-11-22)
 
 - **"Tu taller" ya no tiene botón para el consumo:** como Claude lo busca o lo estima y lo guarda solo, el consumo de cada impresora queda tildado con su origen ("130 W (estimado)") y no se pide. Si todavía falta, dice que Claude lo busca solo. Si medís el real con un medidor de enchufe, se lo pasás en el chat.
