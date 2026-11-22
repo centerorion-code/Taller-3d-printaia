@@ -28,7 +28,22 @@ Cargar antes la skill `impresion-3d` y seguir sus reglas. Scripts en `<raíz del
 ## 2. Fotos
 
 1. **Fotos reales**, si las hay: son la imagen principal.
-2. **Fotos de producto renderizadas** (antes de imprimir, o para sumar vistas): con Blender, en el espacio de Claude.
+2. **Fotos de producto renderizadas** (antes de imprimir, o para sumar vistas): con Blender, **en la PC si está el conector de Blender** (herramienta `execute_blender_code_for_cli`: unas 3 veces más rápido y sin instalar nada) o, si no, en el espacio de Claude.
+
+   **En la PC.** Por ese conector solo se corre `render_producto.py`, siempre con Blender en segundo plano: nunca en la ventana abierta (el script arranca con una escena vacía y borraría lo que haya), ni otro código, ni programas.
+   1. Escribir en `<trabajo>/taller-3d/blender/` el `render_producto.py` del plugin y `datos/vacio.blend` (procedimiento de escritura; se pisan en cada publicación).
+   2. Una llamada por vista, porque el conector espera 80 s: `blend_file` = `<trabajo>/taller-3d/blender/vacio.blend` y `code`:
+      ```python
+      import sys; sys.path.insert(0, "<trabajo>/taller-3d/blender")
+      import render_producto as rp
+      result = rp.renderizar_crudos("<STL de la pieza en la PC>", "<trabajo>/taller-3d/blender/crudos",
+          ["<vista>"], color="<color>", material="<m>", capa_mm=<capa>, gpu=True)
+      ```
+      Vistas: `tres_cuartos` (para `principal` y `tienda`), `atras`, `frente`, `arriba`. Si una llamada no contesta a tiempo, el render sigue en la PC: esperar y mirar `crudos/` con `device_list_dir`; no repetirla.
+   3. Traer `crudos/` (`device_stage_files`, los `<vista>.png` y `<vista>-mascara.png`) y armar acá las fotos (solo Pillow): `python3 -I render_producto.py --desde-crudos <crudos traídos> --salida <carpeta>/producto --tomas principal,atras,frente,arriba`.
+   Si el conector falla (por ejemplo, un Blender viejo que no abre `vacio.blend`, guardado con la 5.3), hacerlas en el espacio de Claude.
+
+   **En el espacio de Claude:**
    ```bash
    pip install --break-system-packages bpy pillow          # unos 400 MB, una vez por conversación
    python3 -I render_producto.py --stl pieza.stl --salida <carpeta>/producto --color "<color>" \

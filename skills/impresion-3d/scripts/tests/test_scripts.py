@@ -1304,6 +1304,35 @@ class TestFotosDeProducto(unittest.TestCase):
         self.assertEqual(len(numeros), len(set(numeros)))
         self.assertTrue(all(len(v) == 3 for v in rp.VISTAS.values()))
 
+    def test_fotos_desde_crudos_de_la_pc(self):
+        from PIL import Image, ImageDraw
+        import render_producto as rp
+        self.assertEqual(rp.vistas_de(["principal", "tienda"]), ["tres_cuartos"])
+        self.assertEqual(rp.vistas_de(list(rp.TOMAS_POR_DEFECTO)), ["tres_cuartos", "atras", "frente", "arriba"])
+        with self.assertRaises(ValueError):
+            rp.vistas_de(["costado"])
+        tmp = Path(tempfile.mkdtemp())
+        crudos = tmp / "crudos"
+        crudos.mkdir()
+        for vista in rp.vistas_de(list(rp.TOMAS_POR_DEFECTO)):
+            render = Image.new("RGBA", (220, 220), (0, 0, 0, 0))
+            ImageDraw.Draw(render).rectangle((60, 70, 160, 130), fill=(31, 95, 214, 255))
+            render.save(crudos / f"{vista}.png")
+            render.save(crudos / f"{vista}-mascara.png")
+        orden = [sys.executable, str(SCRIPTS / "render_producto.py"), "--desde-crudos", str(crudos),
+                 "--salida", str(tmp / "producto"), "--tam", "200"]
+        r = subprocess.run(orden, capture_output=True, text=True)        # sin --stl y sin Blender
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(sorted(p.name for p in (tmp / "producto").iterdir()), list(FOTOS_POR_DEFECTO))
+        self.assertEqual(Image.open(tmp / "producto" / FOTOS_POR_DEFECTO[0]).getpixel((0, 0)), (255, 255, 255))
+        (crudos / "atras-mascara.png").unlink()
+        r = subprocess.run(orden, capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("Faltan los renders de atras", r.stderr)
+        # el archivo vacío que abre el Blender de la PC en segundo plano (Blender comprimido o sin comprimir)
+        vacio = (SCRIPTS.parent / "datos" / "vacio.blend").read_bytes()
+        self.assertTrue(vacio.startswith(b"BLENDER") or vacio.startswith(b"\x28\xb5\x2f\xfd"))
+
     def test_sin_blender_avisa(self):
         try:
             import bpy  # noqa: F401

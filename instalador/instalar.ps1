@@ -49,7 +49,7 @@ param(
 Set-StrictMode -Version 1.0
 $ErrorActionPreference = 'Stop'
 
-$VersionPlugin = '0.1.27'
+$VersionPlugin = '0.1.28'
 $OrcaVersion = '2.5.1'
 $OrcaBase = "https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v$OrcaVersion"
 $OrcaArchivos = @{

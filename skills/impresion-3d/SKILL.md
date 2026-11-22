@@ -99,7 +99,7 @@ jq -rs 'map(.parametros)|add|to_entries[]|select((.value.label//"")+(.value.tool
 - `inherits` tiene que ser un perfil **de sistema**. Por eso un perfil derivado repite todas las anulaciones del perfil de usuario base (`perfil_orca.py crear --base`).
 - Orca abierto no ve perfiles nuevos hasta reiniciarlo. El proyecto `.3mf` de una pieza trae los valores igual, pero si Orca no conoce los AUTO los muestra como cambios sobre el perfil de sistema.
 - Al abrir un proyecto, Orca 2.5.1 toma del proyecto solo las claves que cada perfil cambia respecto del de sistema (`different_settings_to_system`) y el resto lo lee del perfil de sistema. Por eso las claves que Orca recalcula al laminar (`enable_prime_tower`, `has_scarf_joint_seam`) no marcan el perfil como modificado. El proyecto de una pieza vieja sí puede mostrar cambios (↺) sobre los AUTO actuales: son los ajustes de esa pieza, porque los AUTO se rehacen en cada una.
-- Blender sin la ventana abierta: usar `execute_blender_code_for_cli` con un `.blend` existente; en ese modo `bpy.ops` falla, así que armar la geometría con `bmesh` y escribir el STL a mano. Para piezas funcionales preferir `cad.py`.
+- Blender sin la ventana abierta: usar `execute_blender_code_for_cli` con un `.blend` existente (el plugin trae `datos/vacio.blend`). Ahí fallan los `bpy.ops` que necesitan la ventana: para modelar, armar la geometría con `bmesh` y escribir el STL a mano. Importar un STL, aplicar transformaciones y renderizar sí andan (las fotos de producto de `/publicar`, probado con Blender 5.3.0). El conector espera 80 s por llamada: lo que tarde más sigue corriendo en la PC. Para piezas funcionales preferir `cad.py`.
 
 ## 7. Mantenerse al día con Orca
 

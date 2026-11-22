@@ -15,6 +15,10 @@ La pieza ocupa el 80 % del cuadro. Son imágenes ilustrativas: la descripción l
 fotos reales de la pieza impresa.
 
 Requiere: pip install --break-system-packages bpy pillow   (bpy pesa unos 400 MB; una vez por conversación)
+
+En la PC, si está el conector de Blender: renderizar_crudos() corre en el Blender del usuario, en segundo plano y
+una vista por llamada (con un i5 de 6 núcleos, unas 3 veces más rápido que acá), y deja los renders en crudo;
+después, acá, --desde-crudos arma las fotos con Pillow, que el Blender de la PC no trae.
 Uso:
   python3 -I render_producto.py --stl pieza.stl --salida <carpeta de la pieza>/producto --color azul \\
       [--material PETG] [--capa 0.2] [--tomas principal,atras,frente,arriba] [--tam 1200] [--muestras 16]
@@ -148,7 +152,10 @@ def _escena(stl: Path, color_hex: str, rug: float, capa_mm: float):
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
     escena = bpy.context.scene
-    bpy.ops.wm.stl_import(filepath=str(stl))
+    try:
+        bpy.ops.wm.stl_import(filepath=str(stl))
+    except AttributeError:                              # Blender 4.0 o anterior
+        bpy.ops.import_mesh.stl(filepath=str(stl))
     pieza = bpy.context.selected_objects[0]
     bpy.context.view_layer.objects.active = pieza
     esquinas = [pieza.matrix_world @ mathutils.Vector(c) for c in pieza.bound_box]
@@ -260,53 +267,110 @@ def _apuntar(camara, centro, radio, vista: str, pieza=None, escena=None, borde: 
         colocar(dist)
 
 
-def renderizar(stl: Path, salida: Path, color: str = "", material: str | None = None, capa_mm: float = 0.2,
-               tomas: list[str] | None = None, lado: int = 1200, muestras: int = 16) -> dict:
-    import bpy
-    from PIL import Image
-
-    tomas = tomas or list(TOMAS_POR_DEFECTO)
+def vistas_de(tomas: list[str]) -> list[str]:
+    """Las vistas que hay que renderizar para esas tomas, en orden y sin repetir (principal y tienda comparten)."""
     malas = [t for t in tomas if t not in TOMAS]
     if malas:
         raise ValueError(f"Tomas desconocidas: {', '.join(malas)} (hay {', '.join(TOMAS)}).")
-    t0 = time.time()
+    return list(dict.fromkeys(TOMAS[t][0] for t in tomas))
+
+
+def _usar_gpu(escena) -> str:
+    """Si Blender encuentra una placa de video para Cycles, renderiza con ella. Devuelve qué quedó usando."""
+    import bpy
+    try:
+        prefs = bpy.context.preferences.addons["cycles"].preferences
+    except (KeyError, AttributeError):
+        return "CPU"
+    for tipo in ("OPTIX", "CUDA", "HIP", "ONEAPI", "METAL"):
+        try:
+            prefs.compute_device_type = tipo
+            prefs.get_devices()
+        except (TypeError, ValueError, RuntimeError):
+            continue
+        gpus = [d for d in prefs.devices if d.type == tipo]
+        if gpus:
+            for d in prefs.devices:
+                d.use = d.type == tipo
+            escena.cycles.device = "GPU"
+            return f"{tipo}: {', '.join(d.name for d in gpus)}"
+    return "CPU"
+
+
+def renderizar_crudos(stl, carpeta, vistas: list[str], color: str = "", material: str | None = None,
+                      capa_mm: float = 0.2, lado: int = 1200, muestras: int = 16, gpu: bool = False) -> dict:
+    """Solo Blender, sin Pillow: deja <vista>.png (con el piso que atrapa la sombra) y <vista>-mascara.png (solo
+    la pieza) en `carpeta`. Es lo que corre en el Blender de la PC por el conector de Blender, una vista por
+    llamada; después componer_tomas() arma las fotos en el espacio de Claude."""
+    import bpy
+    malas = [v for v in vistas if v not in VISTAS]
+    if malas:
+        raise ValueError(f"Vistas desconocidas: {', '.join(malas)} (hay {', '.join(VISTAS)}).")
     if capa_mm <= 0:
         raise ValueError("La altura de capa tiene que ser mayor que cero.")
-    escena, camara, piso, centro, radio = _escena(stl, color_de(color), rugosidad(material, color), capa_mm)
+    t0 = time.time()
+    escena, camara, piso, centro, radio = _escena(Path(stl), color_de(color), rugosidad(material, color), capa_mm)
+    dispositivo = _usar_gpu(escena) if gpu else "CPU"
     pieza = next(o for o in escena.objects if o.type == "MESH" and not o.is_shadow_catcher)
     escena.render.resolution_x = escena.render.resolution_y = round(lado * 1.1)
-    salida.mkdir(parents=True, exist_ok=True)
-    archivos = []
+    carpeta = Path(carpeta)
+    carpeta.mkdir(parents=True, exist_ok=True)
     contra = escena.objects.get("contra")
     energia_contra = contra.data.energy if contra else 0
+    crudos = []
+    for vista in vistas:
+        pieza.rotation_euler = (0, 0, math.radians(VISTAS[vista][2]))
+        if contra:
+            contra.data.energy = energia_contra * CONTRALUZ.get(vista, 1.0)
+        _apuntar(camara, centro, radio, vista, pieza, escena)
+        piso.hide_render = False
+        escena.cycles.samples, escena.cycles.use_denoising = muestras, True
+        escena.render.filepath = str(carpeta / f"{vista}.png")
+        bpy.ops.render.render(write_still=True)
+        piso.hide_render = True                         # la máscara: solo la pieza
+        escena.cycles.samples, escena.cycles.use_denoising = 16, False
+        escena.render.filepath = str(carpeta / f"{vista}-mascara.png")
+        bpy.ops.render.render(write_still=True)
+        crudos += [str(carpeta / f"{vista}.png"), str(carpeta / f"{vista}-mascara.png")]
+    return {"crudos": crudos, "segundos": round(time.time() - t0, 1), "dispositivo": dispositivo,
+            "blender": bpy.app.version_string}
+
+
+def componer_tomas(carpeta, salida, tomas: list[str], lado: int = 1200) -> list[str]:
+    """Solo Pillow, sin Blender: arma las fotos de las tomas con los renders crudos de `carpeta`."""
+    from PIL import Image
+
+    carpeta, salida = Path(carpeta), Path(salida)
+    faltan = [v for v in vistas_de(tomas)
+              if not (carpeta / f"{v}.png").exists() or not (carpeta / f"{v}-mascara.png").exists()]
+    if faltan:
+        raise ValueError(f"Faltan los renders de {', '.join(faltan)} en {carpeta} "
+                         "(<vista>.png y <vista>-mascara.png).")
+    salida.mkdir(parents=True, exist_ok=True)
+    archivos = []
+    for toma in tomas:
+        vista, fondo, nombre = TOMAS[toma]
+        with Image.open(carpeta / f"{vista}.png") as render, Image.open(carpeta / f"{vista}-mascara.png") as mascara:
+            componer(render, mascara, fondo, lado).save(salida / nombre, quality=92)
+        archivos.append(str(salida / nombre))
+    return archivos
+
+
+def renderizar(stl: Path, salida: Path, color: str = "", material: str | None = None, capa_mm: float = 0.2,
+               tomas: list[str] | None = None, lado: int = 1200, muestras: int = 16) -> dict:
+    """Todo en el espacio de Claude: los renders con bpy y las fotos con Pillow."""
+    tomas = tomas or list(TOMAS_POR_DEFECTO)
+    vistas = vistas_de(tomas)
     with tempfile.TemporaryDirectory() as tmp:
-        for vista in dict.fromkeys(TOMAS[t][0] for t in tomas):
-            pieza.rotation_euler = (0, 0, math.radians(VISTAS[vista][2]))
-            if contra:
-                contra.data.energy = energia_contra * CONTRALUZ.get(vista, 1.0)
-            _apuntar(camara, centro, radio, vista, pieza, escena)
-            piso.hide_render = False
-            escena.cycles.samples, escena.cycles.use_denoising = muestras, True
-            escena.render.filepath = str(Path(tmp) / f"{vista}.png")
-            bpy.ops.render.render(write_still=True)
-            piso.hide_render = True                     # la máscara: solo la pieza
-            escena.cycles.samples, escena.cycles.use_denoising = 16, False
-            escena.render.filepath = str(Path(tmp) / f"{vista}-mascara.png")
-            bpy.ops.render.render(write_still=True)
-            render = Image.open(Path(tmp) / f"{vista}.png")
-            mascara = Image.open(Path(tmp) / f"{vista}-mascara.png")
-            for toma in tomas:
-                if TOMAS[toma][0] == vista:
-                    destino = salida / TOMAS[toma][2]
-                    componer(render, mascara, TOMAS[toma][1], lado).save(destino, quality=92)
-                    archivos.append(str(destino))
-    return {"archivos": archivos, "segundos": round(time.time() - t0), "lado": lado,
+        r = renderizar_crudos(stl, tmp, vistas, color, material, capa_mm, lado, muestras)
+        archivos = componer_tomas(tmp, salida, tomas, lado)
+    return {"archivos": archivos, "segundos": round(r["segundos"]), "lado": lado,
             "color": color_de(color), "material": material}
 
 
 def main(argv=None) -> None:
     a = argparse.ArgumentParser(description="Fotos de producto con Blender (bpy), sin texto y listas para la tienda.")
-    a.add_argument("--stl", type=Path, required=True)
+    a.add_argument("--stl", type=Path, help="el STL de la pieza (no hace falta con --desde-crudos)")
     a.add_argument("--salida", type=Path, required=True, help="carpeta donde dejar las fotos (producto/ de la pieza)")
     a.add_argument("--color", default="", help="nombre (azul, negro mate, PLA seda dorado…) o #RRGGBB")
     a.add_argument("--material", help="PLA, PETG, ABS, ASA, TPU…")
@@ -315,9 +379,22 @@ def main(argv=None) -> None:
     a.add_argument("--tam", type=int, default=1200)
     a.add_argument("--muestras", type=int, default=16)
     a.add_argument("--json", type=Path)
+    a.add_argument("--desde-crudos", type=Path, metavar="CARPETA",
+                   help="solo arma las fotos (con Pillow) desde los renders crudos hechos en el Blender de la PC")
     args = a.parse_args(argv)
-    if not args.stl.exists():
-        raise SystemExit(f"No existe {args.stl}")
+    tomas = [t.strip() for t in args.tomas.split(",") if t.strip()]
+    if args.desde_crudos:
+        try:
+            archivos = componer_tomas(args.desde_crudos, args.salida, tomas, args.tam)
+        except ValueError as error:
+            raise SystemExit(str(error))
+        for archivo in archivos:
+            print(f"Foto: {archivo}")
+        if args.json:
+            args.json.write_text(json.dumps({"archivos": archivos}, ensure_ascii=False, indent=2), encoding="utf-8")
+        return
+    if not args.stl or not args.stl.exists():
+        raise SystemExit(f"No existe {args.stl}" if args.stl else "Falta --stl (o --desde-crudos).")
     try:
         import bpy  # noqa: F401
     except ImportError:
@@ -325,8 +402,7 @@ def main(argv=None) -> None:
               "puede, usar vista_previa.py pieza.stl foto_producto.png --producto.")
         sys.exit(2)
     try:
-        r = renderizar(args.stl, args.salida, args.color, args.material, args.capa,
-                       [t.strip() for t in args.tomas.split(",") if t.strip()], args.tam, args.muestras)
+        r = renderizar(args.stl, args.salida, args.color, args.material, args.capa, tomas, args.tam, args.muestras)
     except ValueError as error:
         raise SystemExit(str(error))
     pedido = (args.color or "").strip().lower()

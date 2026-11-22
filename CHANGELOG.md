@@ -1,5 +1,10 @@
 # Cambios
 
+## 0.1.28 (2026-11-22)
+
+- **Las fotos de producto se hacen en tu PC si tenés el conector de Blender:** con Blender en segundo plano (nunca en la ventana que tengas abierta), una foto por vez. En una PC con un i5 de 6 núcleos, las cuatro tardaron unos 2 minutos, contra casi 7 en el espacio de Claude, y no hay que instalar Blender en cada conversación. Las fotos salen iguales. El fondo blanco y la sombra se arman en el espacio de Claude, porque el Blender de la PC no trae Pillow. Si el conector no está o falla, se hacen como antes.
+- **`render_producto.py`:** `renderizar_crudos()` (solo Blender: renders y máscaras en crudo; usa la placa de video si Blender la encuentra) y `--desde-crudos` (solo Pillow: arma las fotos). Importa STL también en Blender 4.0 o anterior. El plugin trae `datos/vacio.blend` para abrir Blender en segundo plano.
+
 ## 0.1.27 (2026-11-22)
 
 - **La publicación trae cuatro fotos desde ángulos distintos:** a tres cuartos con fondo blanco (la primera de Mercado Libre), desde el otro lado, de frente y desde arriba, numeradas en el orden de la galería (`producto-1-principal.jpg` … `producto-4-arriba.jpg`). Antes salían dos fotos del mismo ángulo. El otro lado se hace girando la pieza, así la luz y la sombra quedan iguales. La foto con fondo cálido para redes sale si se pide (toma `tienda`), ahora como `producto-5-tienda.jpg`.
