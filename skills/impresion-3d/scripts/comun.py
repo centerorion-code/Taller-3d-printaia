@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-VERSION_PLUGIN = "0.1.29"
+VERSION_PLUGIN = "0.1.30"
 VERSION_ORCA = "2.5.1"
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -127,6 +127,28 @@ def impresoras_para_elegir(config: dict, detectadas=None) -> list[dict]:
                    or next((x for x in salida if x["preparada"]), salida[0]))
         elegida["defecto"] = True
     return salida
+
+
+def numero_es(valor) -> str:
+    """12300 → "12.300"; 12,5 → "12,5": miles con punto y, por debajo de 100, hasta dos decimales."""
+    try:
+        v = float(valor)
+    except (TypeError, ValueError):
+        return str(valor)
+    texto = f"{v:,.0f}" if abs(v) >= 100 else f"{v:,.2f}".rstrip("0").rstrip(".")
+    return texto.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def plata(valor, moneda: str | None = "ARS") -> str | None:
+    """12300 → "$ 12.300" (US$ con USD; otra moneda, su código adelante; sin moneda, solo el número). Es el formato
+    de la plata en el panel, la ficha y la vista previa: un solo lugar para que no difieran."""
+    try:
+        float(valor)
+    except (TypeError, ValueError):
+        return None
+    moneda = (moneda or "").upper()
+    simbolo = {"ARS": "$", "USD": "US$"}.get(moneda, moneda)
+    return f"{simbolo} {numero_es(valor)}".strip()
 
 
 def _numero(v) -> bool:

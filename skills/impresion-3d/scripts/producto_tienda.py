@@ -225,10 +225,16 @@ def escribir(resultado: dict, salida: Path) -> list[Path]:
     salida.mkdir(parents=True, exist_ok=True)
     p = resultado["producto"]
     archivos = []
-    ruta = salida / "producto.json"
-    ruta.write_text(json.dumps(p, ensure_ascii=False, indent=2), encoding="utf-8")
-    archivos.append(ruta)
+    # Hasta la 0.1.29 se escribía también producto.json: es publicacion.json["producto"].
+    if resultado.get("csv"):
+        archivos.append(escribir_csv(p, salida))
 
+    pr = resultado["precio"]
+    return archivos + _escribir_ficha_y_vista(resultado, salida, p, pr)
+
+
+def escribir_csv(p: dict, salida: Path) -> Path:
+    """El CSV para importar en WooCommerce a mano (Productos → Importar): solo si se pide con --csv."""
     ruta = salida / "producto_woocommerce.csv"
     columnas = ["Type", "SKU", "Name", "Published", "Is featured?", "Visibility in catalog", "Short description",
                 "Description", "Tax status", "In stock?", "Weight (kg)", "Length (cm)", "Width (cm)",
@@ -242,9 +248,11 @@ def escribir(resultado: dict, salida: Path) -> list[Path]:
         escritor = csv.writer(f)
         escritor.writerow(columnas)
         escritor.writerow(fila)
-    archivos.append(ruta)
+    return ruta
 
-    pr = resultado["precio"]
+
+def _escribir_ficha_y_vista(resultado: dict, salida: Path, p: dict, pr: dict) -> list[Path]:
+    archivos = []
     titulo_ml = resultado.get("titulo_ml") or p["name"]
     lineas = [
         f"# {p['name']}",
@@ -391,9 +399,33 @@ def completar_plantilla(plantilla: Path, resultado: dict, salida: Path) -> Path:
     return destino
 
 
+def mostrar_opciones(a, config: dict) -> None:
+    """El primer paso de /publicar en un solo comando: lo que falta configurar, el costo de la pieza y las tres
+    opciones de margen con el precio y la ganancia por canal. No escribe nada."""
+    if not a.informe_gcode or not a.config:
+        raise SystemExit("--opciones necesita --config y --informe-gcode (el tiempo y los gramos de Orca).")
+    pendientes = [i for i in costos.estado_taller(config) if i["estado"] != "listo" and i["tema"] != "Impresoras"]
+    for i in pendientes:
+        print(f"{'Falta' if i['estado'] == 'falta' else 'Revisar'} — {i['tema']}: {i['texto']}"
+              + (f" → «{i['frase']}»" if i.get("frase") else ""))
+    if pendientes:
+        print()
+    pedido = ["pieza", "--config", str(a.config), "--informe-gcode", str(a.informe_gcode), "--margenes"]
+    if a.material:
+        pedido += ["--material", a.material]
+    if a.json:
+        pedido += ["--json", str(a.json)]
+    costos.main(pedido)
+
+
 def main(argv=None) -> None:
-    ap = argparse.ArgumentParser(description="Ficha de producto para WooCommerce.")
-    ap.add_argument("--nombre", required=True)
+    ap = argparse.ArgumentParser(description="Ficha de producto para la tienda. Con --opciones, solo el costo y "
+                                             "las opciones de margen para elegir.")
+    ap.add_argument("--opciones", action="store_true",
+                    help="no arma nada: dice qué falta configurar, el costo y tres márgenes con su precio")
+    ap.add_argument("--json", type=Path, help="con --opciones, guarda el costo y las opciones")
+    ap.add_argument("--csv", action="store_true", help="deja también producto_woocommerce.csv para importar a mano")
+    ap.add_argument("--nombre")
     ap.add_argument("--material")
     ap.add_argument("--color")
     ap.add_argument("--uso", help="para qué sirve, en una frase")
@@ -416,7 +448,13 @@ def main(argv=None) -> None:
     ap.add_argument("--salida", type=Path, default=Path("."))
     a = ap.parse_args(argv)
     config = comun.cargar_json(a.config) if a.config and a.config.exists() else {}
+    if a.opciones:
+        mostrar_opciones(a, config)
+        return
+    if not a.nombre:
+        ap.error("falta --nombre")
     r = armar(a, config)
+    r["csv"] = a.csv
     for ruta in escribir(r, a.salida):
         print(f"Escrito: {ruta}")
     if a.plantilla:

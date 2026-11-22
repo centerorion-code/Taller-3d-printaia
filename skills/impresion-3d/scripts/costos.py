@@ -697,7 +697,15 @@ def estado_taller(config: dict, detectadas: list[dict] | None = None) -> list[di
 
 # ------------------------------------------------------------------ línea de comandos
 
+CLAVES_VIEJAS_TIENDA = ("margen_pct", "costo_hora_maquina")      # de antes de la 0.1.14: vacías, sobran
+
+
 def _guardar(ruta: Path, config: dict) -> None:
+    tienda = config.get("tienda")
+    if isinstance(tienda, dict):
+        for clave in CLAVES_VIEJAS_TIENDA:
+            if clave in tienda and tienda[clave] is None:
+                del tienda[clave]
     ruta.parent.mkdir(parents=True, exist_ok=True)
     ruta.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 

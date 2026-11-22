@@ -1,5 +1,13 @@
 # Cambios
 
+## 0.1.30 (2026-11-22)
+
+- **Publicar, más simple:** el primer paso de `/taller-3d:publicar` es un solo comando (`producto_tienda.py --opciones`) que dice qué falta configurar, cuánto cuesta la pieza y las tres opciones de margen. La carpeta `producto/` queda con tres archivos (`publicacion.json`, `ficha.md` y `vista-previa.html`) en vez de cinco: `producto.json` repetía lo que ya está en `publicacion.json`, y el CSV de WooCommerce sale solo si hace falta (`--csv`).
+- **Cargar en la tienda, paso a paso:** con el conector de WooCommerce, Claude busca primero si el producto ya existe (por su número o su SKU) y lo actualiza en vez de crear otro, comprueba después de cargar que quedó como borrador, y anota el número del producto en el panel (`catalogo.py agregar --id-tienda`). Un producto ya publicado no se pisa sin preguntar. Si la herramienta no acepta fotos, el borrador queda sin fotos y te dice cuáles subir. Este camino todavía no se probó con una tienda real.
+- **Instrucciones más cortas:** el panel al costado del chat y las fotos de producto con Blender pasaron a guías aparte, que Claude lee solo cuando las usa. Un pedido común al panel gasta menos.
+- **Un solo formato para la plata** en el panel, la ficha y la vista previa («$ 12.300», sin centavos desde $ 100).
+- **Configuración más limpia:** al guardar un dato de costos se van las claves viejas vacías de la tienda (`margen_pct`, `costo_hora_maquina`).
+
 ## 0.1.29 (2026-11-22)
 
 - **Impuestos de la venta:** le decís cómo facturás (monotributo, responsable inscripto, exento o sin facturar) y si pagás Ingresos Brutos, y el precio de cada canal ya los descuenta: el margen que elegís es el que te queda de verdad. Si sos responsable inscripto, el precio sale con IVA incluido, el margen es sobre el precio sin IVA, la comisión se calcula sobre el precio con IVA (y su IVA no es costo, porque lo descontás) y las compras con factura A que digas (filamento, impresora, embalaje, luz) entran sin IVA. Lo guarda `costos.py impuestos`; «Tu taller» lo pide si falta.

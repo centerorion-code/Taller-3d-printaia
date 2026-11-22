@@ -127,13 +127,7 @@ GUION = """
 
 def plata(valor, moneda: str | None = "ARS") -> str | None:
     """12300 → "$ 12.300" (US$ si la moneda es USD)."""
-    try:
-        v = float(valor)
-    except (TypeError, ValueError):
-        return None
-    entero = abs(v - round(v)) < 1e-9
-    texto = (f"{v:,.0f}" if entero else f"{v:,.2f}").replace(",", "X").replace(".", ",").replace("X", ".")
-    return ("US$ " if (moneda or "ARS").upper() == "USD" else "$ ") + texto
+    return comun.plata(valor, moneda or "ARS")
 
 
 def _numero(v) -> str:

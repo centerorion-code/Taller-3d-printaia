@@ -518,6 +518,31 @@ class TestProducto(unittest.TestCase):
         self.assertTrue(any("recargo" in s for s in p["supuestos"]))
 
 
+class TestOrden030(unittest.TestCase):
+    def test_un_solo_formato_de_plata(self):
+        import catalogo
+        import vista_publicacion
+        self.assertEqual(comun.plata(12300, "ARS"), "$ 12.300")
+        self.assertEqual(comun.plata("3300", "USD"), "US$ 3.300")
+        self.assertEqual(comun.plata(12.5, "EUR"), "EUR 12,5")
+        self.assertEqual(comun.plata(1642.3, ""), "1.642")
+        self.assertIsNone(comun.plata(None))
+        self.assertEqual(catalogo._plata({"total": 1642.3, "moneda": "ARS"}), "$ 1.642")
+        self.assertEqual(vista_publicacion.plata(3300, None), "$ 3.300")
+
+    def test_guardar_saca_las_claves_viejas_vacias(self):
+        import costos
+        with tempfile.TemporaryDirectory() as d:
+            ruta = Path(d) / "config.json"
+            config = {"tienda": {"margen_pct": None, "costo_hora_maquina": None, "margen_precio_pct": 50}}
+            costos._guardar(ruta, config)
+            guardado = json.loads(ruta.read_text(encoding="utf-8"))
+            costos._guardar(ruta, {"tienda": {"margen_pct": 80, "costo_hora_maquina": 0}})
+            con_valor = json.loads(ruta.read_text(encoding="utf-8"))
+        self.assertEqual(guardado["tienda"], {"margen_precio_pct": 50})
+        self.assertEqual(con_valor["tienda"], {"margen_pct": 80, "costo_hora_maquina": 0})
+
+
 class TestPublicacion(unittest.TestCase):
     """El texto de venta (Gemini o Claude, revisado contra los datos) y la vista previa de la publicación."""
 
@@ -620,13 +645,44 @@ class TestPublicacion(unittest.TestCase):
             pub = armar("--textos", str(d / "textos.json"))
             pagina = (producto / "vista-previa.html").read_text(encoding="utf-8")
             ficha = (producto / "ficha.md").read_text(encoding="utf-8")
-            woo = json.loads((producto / "producto.json").read_text(encoding="utf-8"))
+            woo = pub["producto"]
+            sin_csv = sorted(x.name for x in producto.iterdir() if x.suffix in (".json", ".csv", ".md", ".html"))
+            armar("--textos", str(d / "textos.json"), "--csv")
+            con_csv = (producto / "producto_woocommerce.csv").read_text(encoding="utf-8")
+            # El primer paso, en un comando: lo que falta, el costo y las opciones de margen. No escribe nada.
+            antes = sorted(x.name for x in producto.iterdir())
+            ops = subprocess.run([sys.executable, str(SCRIPTS / "producto_tienda.py"), "--opciones",
+                                  "--informe-gcode", str(d / "gcode.json"), "--config", str(d / "config.json"),
+                                  "--json", str(d / "costo.json"), "--salida", str(producto)],
+                                 capture_output=True, text=True)
+            self.assertEqual(ops.returncode, 0, ops.stderr)
+            self.assertEqual(antes, sorted(x.name for x in producto.iterdir()))
+            costo = json.loads((d / "costo.json").read_text(encoding="utf-8"))
+            sin_gcode = subprocess.run([sys.executable, str(SCRIPTS / "producto_tienda.py"), "--opciones",
+                                        "--config", str(d / "config.json")], capture_output=True, text=True)
+            # El panel lee el producto de publicacion.json y guarda el número del producto en la tienda
+            cat = subprocess.run([sys.executable, str(SCRIPTS / "catalogo.py"), "agregar", "--catalogo",
+                                  str(d / "catalogo.json"), "--carpeta", "impresiones/2026-11-21_soporte_ender",
+                                  "--producto", str(producto / "publicacion.json"), "--id-tienda", "123",
+                                  "--url-tienda", "https://mitienda.com/?p=123"], capture_output=True, text=True)
+            self.assertEqual(cat.returncode, 0, cat.stderr)
+            pieza = json.loads((d / "catalogo.json").read_text(encoding="utf-8"))["piezas"][0]
             # Sin el texto revisado, el script no lo usa
             (d / "crudo.json").write_text(json.dumps(self.BIEN), encoding="utf-8")
             crudo = subprocess.run([sys.executable, str(SCRIPTS / "producto_tienda.py"), "--nombre", "X",
                                     "--salida", str(d / "otro"), "--textos", str(d / "crudo.json")],
                                    capture_output=True, text=True)
             sin_textos = armar("--fotos-reales", "../foto.jpg")
+        self.assertEqual(sin_csv, ["ficha.md", "publicacion.json", "vista-previa.html"])
+        self.assertIn("Soporte <b>router</b>", con_csv)
+        self.assertIn(",-1,", con_csv)                                  # borrador
+        self.assertIn("Costo de la pieza", ops.stdout)
+        self.assertIn("Opciones de margen", ops.stdout)
+        self.assertEqual(len(costo["opciones"]), 3)
+        self.assertNotEqual(sin_gcode.returncode, 0)
+        self.assertEqual(pieza["id_tienda"], "123")
+        self.assertEqual(pieza["estado"], "en_tienda")
+        self.assertEqual(pieza["precio"]["valor"], woo["regular_price"])
         self.assertNotEqual(crudo.returncode, 0)
         self.assertIn("textos_ia.py revisar", crudo.stderr)
         # El texto de Gemini va antes de los datos, que salen de los informes; las palabras clave, a las etiquetas
@@ -669,7 +725,7 @@ class TestPublicacion(unittest.TestCase):
         self.assertIn("faltan el precio del filamento", pagina)
         self.assertNotIn("javascript:", pagina)
         self.assertNotIn("/etc/x.jpg", pagina)
-        self.assertEqual(vista_publicacion.plata(1452.2), "$ 1.452,20")
+        self.assertEqual(vista_publicacion.plata(1452.2), "$ 1.452")     # sin centavos desde 100 (0.1.30)
         self.assertEqual(vista_publicacion.plata(3500), "$ 3.500")
         with self.assertRaises(ValueError):
             vista_publicacion.generar(sin_textos, modo="otro")

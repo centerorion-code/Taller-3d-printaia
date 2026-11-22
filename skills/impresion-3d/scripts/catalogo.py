@@ -23,9 +23,9 @@ Uso:
   python3 catalogo.py agregar --catalogo catalogo.json \\
       --carpeta impresiones/2026-11-21_soporte-para-router_ender-3-v3-plus --impresora "Ender-3 V3 Plus" \\
       --nombre "Soporte para router" [--tipo impresion|diseno] [--material PETG] [--color negro] \\
-      [--informe-gcode informe_gcode.json] [--informe-stl informe_stl.json] [--producto producto.json] \\
+      [--informe-gcode informe_gcode.json] [--informe-stl informe_stl.json] [--producto publicacion.json] \\
       [--archivos pieza.stl pieza.py vista.png informe.md] [--imagen vista.png] \\
-      [--estado disenada|laminada|impresa|en_tienda] [--nota "..."] [--url-tienda https://...] [--moneda ARS]
+      [--estado disenada|laminada|impresa|en_tienda] [--nota "..."] [--url-tienda https://...] [--id-tienda 123] [--moneda ARS]
 
   # Anotar una idea para más adelante (y quitarla si el usuario la descarta)
   python3 catalogo.py idea --catalogo catalogo.json --nombre "Soporte para la tele" [--nota "..."] [--impresora X]
@@ -166,6 +166,8 @@ def datos_de_informes(gcode: dict, stl: dict, producto: dict) -> dict:
         if gcode.get("estado"):
             d["revision"] = gcode["estado"]
         d["estado"] = "laminada"
+    if isinstance(producto.get("producto"), dict):       # publicacion.json (0.1.30) trae el producto adentro
+        producto = producto["producto"]
     if producto:
         if producto.get("regular_price"):
             d["precio"] = {"valor": producto["regular_price"]}
@@ -423,13 +425,7 @@ def _href(carpeta: str, archivo: str) -> str:
     return "/".join(quote(p) for p in f"{carpeta}/{archivo}".split("/"))
 
 
-def _numero(valor) -> str:
-    try:
-        v = float(valor)
-    except (TypeError, ValueError):
-        return str(valor)
-    texto = f"{v:,.0f}" if v >= 100 else f"{v:,.2f}".rstrip("0").rstrip(".")
-    return texto.replace(",", "X").replace(".", ",").replace("X", ".")
+_numero = comun.numero_es
 
 
 def _plata(dato: dict | None) -> str | None:
@@ -438,9 +434,7 @@ def _plata(dato: dict | None) -> str | None:
     valor = dato.get("total", dato.get("valor"))
     if valor in (None, ""):
         return None
-    moneda = dato.get("moneda") or ""
-    return f"{moneda} {_numero(valor)}".strip() if moneda not in ("ARS", "USD") else (
-        f"$ {_numero(valor)}" if moneda == "ARS" else f"US$ {_numero(valor)}")
+    return comun.plata(valor, dato.get("moneda") or "") or f"{dato.get('moneda') or ''} {valor}".strip()
 
 
 ESTILO = """
@@ -968,12 +962,13 @@ def main(argv=None) -> None:
     a.add_argument("--de-idea", help="la idea anotada que se hizo pieza (ideas/AAAA-MM-DD_nombre): pasa a esta pieza")
     a.add_argument("--informe-gcode")
     a.add_argument("--informe-stl")
-    a.add_argument("--producto", help="producto.json de /publicar")
+    a.add_argument("--producto", help="publicacion.json de /publicar (o el producto.json de antes de la 0.1.30)")
     a.add_argument("--archivos", nargs="*", default=[], help="archivos de la carpeta de la pieza (relativos a ella)")
     a.add_argument("--imagen", help="imagen principal (relativa a la carpeta de la pieza)")
     a.add_argument("--estado", choices=sorted(ESTADOS))
     a.add_argument("--nota")
     a.add_argument("--url-tienda")
+    a.add_argument("--id-tienda", help="número del producto en la tienda, para actualizarlo en vez de crear otro")
     a.add_argument("--moneda", help="moneda del precio, si no sale del costo")
 
     i = sub.add_parser("idea", help="anota una idea para más adelante")
@@ -1038,6 +1033,7 @@ def main(argv=None) -> None:
                         material=args.material or extra.pop("material", None), color=args.color,
                         impresora=args.impresora, de_idea=args.de_idea,
                         archivos=args.archivos, imagen=args.imagen, nota=args.nota, url_tienda=args.url_tienda,
+                        id_tienda=args.id_tienda,
                         **{k: v for k, v in extra.items() if k != "material"})
         guardar(args.catalogo, catalogo)
         print(f"Catálogo: {pieza['nombre']} ({ESTADOS.get(pieza['estado'], pieza['estado'])}) — "
