@@ -27,7 +27,7 @@ Si a mitad de `/diseno` pide imprimirla, seguir con `/pieza` desde la configurac
 
 ## 2. Modelo
 
-**Con qué modelar** (`references/modelado.md`), antes de empezar y por cómo se describe la pieza: con medidas, `pieza.py` con `cad.py` (abajo); por cómo se ve (figura, forma suave, logo, texto), Blender por código (`modelo.py`, con las medidas que importan arriba) o un modelo que ya exista; si es mixta, cada parte con su herramienta, unidas en `pieza.py` con `importar_stl` y `unir`. Nunca aproximar con formas simples algo que se define por su aspecto.
+**Con qué modelar** (`references/modelado.md`), antes de empezar y por cómo se describe la pieza: con medidas, `pieza.py` con `cad.py` (abajo); por cómo se ve (figura, forma suave, logo, texto), Blender por código (`modelo.py`, con las medidas que importan arriba) o un modelo que ya exista; si es mixta, cada parte con su herramienta, unidas en `pieza.py` con `importar_stl` y `unir`; para copiar algo de una foto (o algo que Blender por código no hace bien), generarlo por IA desde la foto o desde una imagen aprobada (`references/foto-a-3d.md`). Nunca aproximar con formas simples algo que se define por su aspecto.
 
 1. Carpeta: `python3 -I catalogo.py carpeta --tipo diseno --nombre "<nombre>"` → `/mnt/user-data/outputs/taller-3d/<carpeta>/` (`disenos/AAAA-MM-DD_nombre`). Si se diseña para una impresora puntual (la nombró o se revisó contra la suya), sumar `--impresora "<nombre>"`: queda al final del nombre.
 2. `pieza.py` con `cad.py` según `references/cad.md`: **todos los parámetros arriba**, con nombre claro y un comentario con unidad y rango razonable; el modelo se calcula a partir de ellos, sin números sueltos en el cuerpo. Holguras con `holgura()` o de `aprendizajes.md`.
@@ -38,7 +38,7 @@ Si a mitad de `/diseno` pide imprimirla, seguir con `/pieza` desde la configurac
 
 ## 3. Entregar
 
-- Archivos: `pieza.py` (editable), `pieza.stl` (uno por variante), `vista.png` y `parametros.md`. Si se hizo en Blender, `modelo.py` (y el `.blend` si sirve) y la foto.
+- Archivos: `pieza.py` (editable), `pieza.stl` (uno por variante), `vista.png` y `parametros.md`. Si se hizo en Blender, `modelo.py` (y el `.blend` si sirve) y la foto. Si se generó por IA, la foto, el original en `hunyuan/` y el STL escalado y engrosado.
 - `parametros.md`: tabla de parámetros (nombre, valor, unidad, qué cambia), cómo regenerar (`python3 pieza.py`, con `cad.py` al lado) y que para cambiar algo alcanza con pedirlo ("hacelo 5 mm más alto").
 - Recomendaciones de impresión en 3 a 5 líneas: orientación, material sugerido, si lleva soportes. Sin laminar.
 - Mandar los archivos con `SendUserFile`. Si la PC está conectada y hay carpeta de trabajo, dejarlos también en `<trabajo>/<carpeta>/` con el procedimiento de escritura (y dar el enlace `computer://` a la carpeta, skill `impresion-3d`, sección 3), registrar en `historial.csv` y actualizar el panel (skill `panel`; con `--de-idea` si salió de una idea anotada) con `informe_stl.json` y los archivos.

@@ -42,8 +42,20 @@ Un buen pedido dice:
 - "Imprimime 10 separadores de 10 mm de alto para tornillos M3."
 - "Diseñame un organizador para cajón de 3 divisiones, 300 × 120 × 50 mm. Solo el STL, que lo imprimo en un servicio. Que pueda cambiar la cantidad de divisiones."
 - "Quiero hacer llaveros con nombre para vender." Si hay un plugin de Orca que lo hace, Claude te lo sugiere (y te dice de quién es y qué riesgos tiene); si preferís, lo diseña él.
+- "Te mando la foto de esta máscara: quiero una copia de 18 cm y un soporte para ponerla en la mesa." El modelo de la máscara lo genera una IA desde la foto (ver abajo) y el soporte lo diseña Claude a medida de la máscara.
 
 También podés escribir `/taller-3d:pieza` y Claude te guía.
+
+### Pieza desde una foto
+
+Para copiar algo que existe (una máscara, una figura, una escultura, un adorno), adjuntá la foto y decí de qué tamaño la querés. El modelo 3D lo genera **Hunyuan 3D** de Tencent con tu cuenta, desde tu Chrome: Claude sube la foto, espera unos minutos, baja el STL, lo lleva al tamaño que pediste, le engrosa las paredes si salió hueco y fino, y te lo muestra diciéndote qué copió bien y qué no.
+
+- **Más fotos, mejor:** si podés, mandá varias del mismo objeto (frente, costados y atrás), con fondo liso y buena luz. Si tenés una sola, el dorso lo inventa la IA; si querés, Claude puede generar las otras vistas con Nano Banana (Gemini o Flow) y te las muestra antes de usarlas.
+- **Sin foto:** si pedís algo por cómo se ve que no sale bien con Blender (una persona, un animal con detalle), Claude genera primero una imagen con tu Gemini o tu Flow, la aprobás y recién ahí la pasa a 3D.
+- **Lo que gasta:** cada modelo usa puntos de tu cuenta de Hunyuan, que tiene un cupo por día, y cada imagen usa del cupo de Gemini o Flow. Claude te avisa antes.
+- **Lo que necesitás:** tu cuenta de Hunyuan 3D con la sesión abierta en Chrome (entrar y los captchas los hacés vos) y, en Chrome, apagado "Preguntar dónde guardar cada archivo" (Configuración → Descargas), para que los modelos se bajen solos.
+- **Con algo diseñado al lado** (un soporte, una base con nombre): Claude te dice antes qué parte hace cada herramienta. La parte diseñada se mide sobre el modelo generado: por ejemplo, la base trae un hueco con la forma exacta del borde de la máscara. Por defecto van separadas, así cada una se imprime en su mejor posición.
+- **Para vender:** confirmá que podés vender lo que generó Hunyuan (sus términos de uso) y que el objeto de la foto no es de otro.
 
 ### Si no sabés algo
 
@@ -139,6 +151,7 @@ Idea → Diseño → Lista para imprimir → Impresa → En la tienda
 - **Tu taller:** arriba, lo que falta para que los costos y precios sean reales (la boleta de luz, cuánto pagaste la impresora, tu hora…), con un botón para cada cosa. El consumo de cada impresora lo busca Claude en internet; si es estimado, el botón es para medir el real.
 - En el archivo, los botones copian el pedido para que lo pegues en el chat.
 - **Ideas para después:** contale a Claude "anotá esta idea: un soporte para la tele, 15 × 10 cm" y queda pendiente con lo que ya se sabe. Cuando la quieras hacer, pedila por su nombre.
+- **Pieza desde una foto:** el botón de arriba manda el pedido a Claude (o lo copia) y te recuerda adjuntar la foto en el chat: la página no puede mandar fotos.
 - Al empezar a usar el taller, Claude te dice en una línea qué tenés pendiente.
 
 Se actualiza solo cada vez que Claude anota una idea o guarda, lamina o publica una pieza. Una pieza impresa ya está terminada: publicarla es opcional. Si tenías piezas de antes, pedí "armá el panel" y las suma.
@@ -180,7 +193,8 @@ Los comandos llevan el nombre del plugin adelante (`/taller-3d:...`): si escrib�
 
 - No arranca impresiones ni controla la impresora.
 - No garantiza piezas para uso médico, de seguridad o en contacto con alimentos.
-- Para figuras, formas orgánicas o texto en relieve necesita Blender, un plugin de Orca o un modelo existente: el diseño por código es para piezas funcionales.
+- Para figuras, formas orgánicas o texto en relieve necesita Blender, un plugin de Orca, un modelo existente o generarlo por IA desde una foto (con tu cuenta de Hunyuan 3D): el diseño por código es para piezas funcionales.
+- Lo que la IA genera desde una sola foto de frente pierde los detalles finos grabados (quedan en el color, no en el relieve) y el dorso es inventado.
 - No imprime roscas: usa tornillos pasantes, tuercas o insertos de latón.
 - Un encastre muy justo puede necesitar una prueba. Si calibrás la tolerancia con `/taller-3d:calibrar`, acierta más a la primera.
 
@@ -207,6 +221,8 @@ Los comandos llevan el nombre del plugin adelante (`/taller-3d:...`): si escrib�
 **¿Cómo calcula el costo?** Suma el material (gramos de Orca × precio del kilo), la luz (el consumo de tu impresora × las horas, con el precio del kWh de tu boleta), el desgaste de la impresora (lo que la pagaste repartido en sus horas de vida), las que salen mal (10 % si no le decís otra cosa), tu tiempo y el embalaje. Si falta un dato, te dice cuál y la frase para dárselo.
 
 **¿Cuándo usa Blender y cuándo código?** Depende de cómo se describe la pieza. Si se describe con medidas (un soporte, una caja, un adaptador), la hace por código, con medidas exactas. Si se describe por cómo se ve (una figura, un logo, texto, una forma suave), la hace en Blender o te ofrece un modelo que ya existe. Si tiene las dos cosas, hace cada parte con su herramienta y las une. No arma con esferas y cajas algo que tiene que verse bien: si el código no alcanza, te lo dice y cambia de herramienta. La revisión rechaza las partes que quedan sueltas en el aire. Personajes y marcas ajenas no los modela.
+
+**¿Por qué la máscara que generó la IA vino hueca y Claude la engrosó?** Hunyuan suele devolver figuras como una cáscara de menos de 1 mm de pared, que se rompe o no se imprime bien. Claude la engrosa a 2 mm hacia adentro, así la cara de afuera, donde está el detalle, no cambia (te dice cuánto se movió: casi nada).
 
 **¿De dónde saca cuánto consume mi impresora?** Lo busca en internet cuando preparás la impresora: el consumo promedio que publica el fabricante o una prueba medida del mismo modelo. Si la ficha solo dice la potencia ("350 W"), eso es el máximo calentando, no lo que gasta imprimiendo: lo estima por el tamaño de la cama y te avisa que es estimado. Te pregunta solo si no encuentra nada. Si tenés un medidor de enchufe, medí una impresión entera y pasale los kWh y las horas: es el mejor dato.
 

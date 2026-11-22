@@ -14,6 +14,7 @@ Cargar antes la skill `impresion-3d` y seguir sus reglas. Scripts en `<raíz del
 - **Nada que no se pueda sostener:** no afirmar aptitud para alimentos, uso médico, certificaciones ni resistencias que no se midieron. Los cuidados salen del material.
 - **Sin claves en archivos.** No pedir ni guardar contraseñas en `config.json`; si la tienda necesita iniciar sesión, la inicia el usuario en el navegador.
 - No subir el modelo (STL, 3MF) ni el G-code a la tienda.
+- **Generada por IA desde una foto:** antes de publicar, confirmar que el usuario puede vender lo que generó Hunyuan (su acuerdo de servicio; ver `references/foto-a-3d.md`, sección 6) y que el objeto de la foto no es de otro.
 - **Modelos ajenos:** si la pieza sale de un modelo bajado de internet, preguntar de dónde y revisar su licencia antes de publicar. Si es de uso no comercial (por ejemplo, CC BY-NC) o no tiene licencia clara, avisar que no se puede vender sin permiso del autor y no cargarla. Un personaje, una mascota de marca o un logo ajeno tampoco se vende, aunque la licencia del modelo diga comercial: el personaje o la marca tienen dueño.
 - **El margen lo elige el usuario en cada producto** (sección 3). No publicar con el margen habitual sin preguntarle.
 

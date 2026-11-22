@@ -401,6 +401,107 @@ class TestCadYStl(unittest.TestCase):
         self.assertEqual((r["partes"], r["partes_en_el_aire"]), (1, 0))
         self.assertFalse(any("parte" in h["mensaje"] for h in r["hallazgos"]), r["hallazgos"])
 
+    def test_cascara_fina_y_escala(self):
+        import contextlib
+        import io
+
+        from cad import caja, exportar_stl, mover, restar
+
+        import revisar_stl
+        with tempfile.TemporaryDirectory() as d:
+            def revisar(solido):
+                ruta = Path(d) / "p.stl"
+                exportar_stl(solido, ruta)
+                return revisar_stl.analizar(revisar_stl.leer_stl(ruta), {}, "PLA")
+
+            # Una caja cerrada y hueca de 1 mm de pared (como una máscara de IA): cáscara frágil, advertencia
+            r = revisar(restar(caja(50, 50, 50), mover(caja(48, 48, 48), x=1, y=1, z=1)))
+            self.assertTrue(r["cascara_fina"])
+            self.assertAlmostEqual(r["espesor_medio_mm"], 1.0, delta=0.05)
+            self.assertNotEqual(r["estado"], comun.RECHAZO)
+            self.assertTrue(any("engrosar_stl.py" in h["mensaje"] for h in r["hallazgos"]), r["hallazgos"])
+            # De 0,4 mm no sale bien: rechazo
+            r = revisar(restar(caja(50, 50, 50), mover(caja(49.2, 49.2, 49.2), x=0.4, y=0.4, z=0.4)))
+            self.assertEqual(r["estado"], comun.RECHAZO)
+            # Una placa de 1 mm y un cubo chico macizo no son cáscaras
+            self.assertFalse(revisar(caja(100, 100, 1))["cascara_fina"])
+            self.assertFalse(revisar(caja(4, 4, 4))["cascara_fina"])
+
+            # --alto escala parejo (lo de IA viene sin unidades) y la deja apoyada en la cama
+            chica, grande = Path(d) / "chica.stl", Path(d) / "grande.stl"
+            exportar_stl(mover(caja(10, 20, 5), z=3), chica, apoyar_en_cama=False)
+            with contextlib.redirect_stdout(io.StringIO()) as salida, self.assertRaises(SystemExit):
+                revisar_stl.main([str(chica), "--alto", "50", "--salida", str(grande)])
+            self.assertIn("Escalada × 10", salida.getvalue())
+            tri = revisar_stl.leer_stl(grande)
+            pts = tri.reshape(-1, 3)
+            self.assertEqual([round(float(x), 3) for x in pts.max(0) - pts.min(0)], [100.0, 200.0, 50.0])
+            self.assertAlmostEqual(float(pts[:, 2].min()), 0.0, places=6)
+            for malos in (["--alto", "0"], ["--escala", "-2"], ["--escala", "2", "--alto", "30"], ["--alto", "nan"]):
+                with self.assertRaisesRegex(SystemExit, "no se escribió nada"):
+                    revisar_stl.main([str(chica), *malos, "--salida", str(Path(d) / "mal.stl")])
+            self.assertFalse((Path(d) / "mal.stl").exists())
+
+    def test_hueco_para_otra_pieza(self):
+        from cad import caja, hueco_para, intersectar, mover, restar, rotar
+
+        # Una placa inclinada, como el borde de una máscara: entra en su hueco sin tocar la base
+        placa = rotar(caja(40, 3, 30), x=20)
+        placa = mover(placa, z=-placa.bounding_box()[2])
+        hueco = hueco_para(placa, 8, 0.3)
+        x0, y0, z0, x1, y1, z1 = hueco.bounding_box()
+        self.assertAlmostEqual(z1 - z0, 9.0, places=6)
+        base = restar(mover(caja(60, 40, 20), x=-10, y=-20), mover(hueco, z=12))
+        self.assertLess(intersectar(base, mover(placa, z=12)).volume(), 1e-3)
+        self.assertGreater(base.volume(), 0)
+        # La holgura agranda el hueco hacia los costados
+        self.assertGreater(hueco.volume(), hueco_para(placa, 8, 0).volume())
+        with self.assertRaises(ValueError):
+            hueco_para(placa, 0)
+
+    def test_engrosar_cascara(self):
+        import numpy as np
+        from cad import caja, exportar_stl, mover, restar, unir
+
+        import engrosar_stl
+        import revisar_stl
+        with tempfile.TemporaryDirectory() as d:
+            # Una isla chica suelta (lo que dejan los voxels) se saca; un hueco grande del diseño queda
+            isla = Path(d) / "isla.stl"
+            exportar_stl(unir(restar(caja(20, 20, 20), mover(caja(10, 10, 10), x=5, y=5, z=5)),
+                              mover(caja(0.5, 0.5, 0.5), x=40)), isla)
+            v, c = engrosar_stl.soldar(revisar_stl.leer_stl(isla))
+            limpias, sacadas, volumen = engrosar_stl.quitar_sobras(v, c)
+            self.assertEqual(sacadas, 1)
+            self.assertAlmostEqual(volumen, 0.125, delta=1e-3)
+            self.assertAlmostEqual(engrosar_stl.volumen_y_area(v, limpias)[0], 8000 - 1000, delta=1e-3)
+            # Caja hueca de 1 mm: el espesor sale de 2V/A y los vértices de adentro miran al hueco
+            hueca = Path(d) / "hueca.stl"
+            exportar_stl(restar(caja(50, 50, 50), mover(caja(48, 48, 48), x=1, y=1, z=1)), hueca)
+            v, c = engrosar_stl.soldar(revisar_stl.leer_stl(hueca))
+            volumen, area = engrosar_stl.volumen_y_area(v, c)
+            self.assertAlmostEqual(2 * volumen / area, 1.0, delta=0.01)
+            n = engrosar_stl.normales_de_vertice(v, c)
+            adentro = ((v - engrosar_stl.centro_de_masa(v, c)) * n).sum(1) < 0
+            self.assertEqual(int(adentro.sum()), 8)
+            self.assertTrue(np.allclose(np.abs(v[adentro] - 25), 24))
+            try:
+                import bpy  # noqa: F401
+            except ImportError:
+                self.skipTest("sin Blender para Python (bpy): no se prueba el engrosado completo")
+            info = engrosar_stl.engrosar(revisar_stl.leer_stl(hueca), pared=2.0, caras_max=200_000)
+            self.assertTrue(info["cambio"])
+            self.assertEqual(info["lados"], "adentro")
+            self.assertAlmostEqual(info["espesor_despues_mm"], 2.0, delta=0.1)
+            self.assertLess(info["cara_de_afuera_movida_mm"]["p95"], 0.2)
+            gruesa = Path(d) / "gruesa.stl"
+            revisar_stl.escribir_stl(gruesa, info["triangulos"])
+            r = revisar_stl.analizar(revisar_stl.leer_stl(gruesa), {}, "PLA")
+            self.assertTrue(r["cerrada"])
+            self.assertEqual(r["partes"], 1)
+            # Si ya tiene la pared pedida, no cambia nada
+            self.assertFalse(engrosar_stl.engrosar(revisar_stl.leer_stl(gruesa), pared=1.5)["cambio"])
+
 
 class TestProducto(unittest.TestCase):
     def test_precio_y_borrador(self):
@@ -849,6 +950,10 @@ class TestPanelEnClaude(unittest.TestCase):
         self.assertNotIn("<img", claude.split("Llavero")[1].split("</article>")[0])  # sin foto publicada: sin imagen
         self.assertIn("sendToClaude", claude)
         self.assertIn("Anotar idea", claude)
+        # La pieza desde una foto: el botón manda (o copia) el pedido y le recuerda adjuntar la foto en el chat
+        for pagina in (archivo, claude):
+            self.assertIn(f'data-pedido="{cat.PEDIDO_FOTO}" data-adjuntar>Pieza desde una foto</button>', pagina)
+            self.assertIn("adjuntá la foto", pagina)
         with self.assertRaises(ValueError):
             cat.generar_html(c, modo="otro")
         # Datos raros en el índice: el enlace a la tienda y las imágenes se revisan al armar la página, los

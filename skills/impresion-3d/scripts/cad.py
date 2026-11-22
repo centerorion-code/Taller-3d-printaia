@@ -33,7 +33,7 @@ __all__ = [
     "Manifold", "caja", "cilindro", "cono", "esfera", "tubo", "prisma", "ranura", "revolucion",
     "hexagono", "agujero", "agujero_tornillo", "alojamiento_tuerca", "agujero_inserto",
     "chaflan_inferior", "unir", "restar", "intersectar", "mover", "rotar", "espejar", "escalar",
-    "apoyar", "centrar", "medidas", "exportar_stl", "importar_stl", "holgura", "TORNILLOS", "HOLGURAS",
+    "apoyar", "centrar", "medidas", "exportar_stl", "importar_stl", "hueco_para", "holgura", "TORNILLOS", "HOLGURAS",
 ]
 
 EPS = 0.01  # sobrante para que las restas no dejen caras coincidentes
@@ -293,6 +293,28 @@ def importar_stl(ruta) -> Manifold:
         raise ValueError(f"{ruta.name} no es una malla cerrada: no se puede unir ni restar. En Blender, aplicar "
                          "Remesh (Voxel) o Make Manifold (3D Print Toolbox) y exportar de nuevo.")
     return solido
+
+
+def hueco_para(pieza: Manifold, profundidad: float, holgura_mm: float = 0.3) -> Manifold:
+    """Hueco para que `pieza` entre de arriba hacia abajo en otra (una máscara en su base, una figura en su peana).
+
+    Es la sombra vista desde arriba de los últimos `profundidad` mm de la pieza (contados desde su punto más bajo),
+    agrandada `holgura_mm` por lado, sin islas adentro (serían astillas imposibles de imprimir) y extruida hacia
+    arriba, así no tiene trabas aunque la pieza esté inclinada. Sale con el piso en Z = 0 y 1 mm más alto que la
+    profundidad: subirlo hasta el piso del hueco y restarlo de la base; la pieza va con su punto más bajo en ese
+    piso, en la misma posición en X e Y que tenía al calcular el hueco.
+    """
+    if profundidad <= 0:
+        raise ValueError("La profundidad del hueco tiene que ser mayor que 0.")
+    x0, y0, z0, x1, y1, _ = pieza.bounding_box()
+    franja = pieza ^ Manifold.cube((x1 - x0 + 2, y1 - y0 + 2, profundidad + 0.5)).translate((x0 - 1, y0 - 1, z0))
+    if franja.is_empty():
+        raise ValueError("La pieza no tiene nada en esa franja de abajo.")
+    sombra = franja.project().offset(holgura_mm, JoinType.Round, circular_segments=24) if holgura_mm > 0 \
+        else franja.project()
+    contornos = [np.asarray(c) for c in sombra.to_polygons()]
+    afuera = [c for c in contornos if 0.5 * np.sum(c[:, 0] * np.roll(c[:, 1], -1) - np.roll(c[:, 0], -1) * c[:, 1]) > 0]
+    return Manifold.extrude(CrossSection(afuera), profundidad + 1)
 
 
 # --- Exportar ----------------------------------------------------------------------------

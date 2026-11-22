@@ -9,6 +9,7 @@ La herramienta se elige antes de modelar, por cómo se describe la pieza, no por
 | Con medidas: largos, diámetros, ángulos, agujeros, tornillos, encastres | Código: `cad.py` (`references/cad.md`) | soporte, caja, tapa, adaptador, gancho, separador, plantilla, bisagra |
 | Por cómo se ve: una figura, un animal, una cara, un mango que siga la mano, una forma suave o esculpida, un logo, texto | Blender por código (abajo) o un modelo que ya exista | figura, maceta con forma, llavero con un personaje propio, cartel con letras |
 | Las dos cosas | Cada parte con su herramienta, y se unen con `importar_stl` y `unir` de `cad.py` | soporte de celular con una figura arriba, caja con la tapa decorada, base con un nombre |
+| Con la foto de algo que existe y hay que copiar, o algo que se pide por cómo se ve y Blender por código no hace bien | Un generador de modelos por IA (Hunyuan 3D, con la cuenta del usuario): `references/foto-a-3d.md`. Sin cuenta, Blender por código o un modelo que ya exista | una máscara, una figura, una escultura, un animal con detalle |
 | Un objeto que resuelve un plugin de Orca | Ofrecer el plugin (`references/plugins-orca.md`) | llavero o cartel con nombre, florero, Gridfinity, litofanía |
 
 Señales de que no es para código: lleva texto; tiene curvas libres que no son arcos ni piezas de revolución; pasa suave de una sección a otra; tiene todas las aristas redondeadas; tiene relieve o textura; el usuario lo describe con adjetivos ("redondito", "orgánico", "como un dinosaurio") o con la foto de algo que no es una pieza mecánica.
@@ -46,7 +47,9 @@ Claude modela escribiendo código, no a mano. Sale bien lo que se arma con:
 
 **Piezas mixtas:** la parte funcional va en `pieza.py` con `cad.py`, y la decorativa en `modelo.py`. En `pieza.py`: `figura = importar_stl("figura.stl")`, ubicarla con `mover`, hundida unos 0,5 mm en la base para que se unan, y `unir(base, figura)`.
 
-Para algo realista (una persona, un animal con detalle), ni el código ni Blender por código alcanzan: ofrecer un modelo existente o un generador de modelos 3D por IA.
+Para algo realista (una persona, un animal con detalle, una escultura), ni el código ni Blender por código alcanzan: ofrecer un modelo existente o generarlo por IA desde una foto o, si no hay foto, desde una imagen que el usuario apruebe antes (`references/foto-a-3d.md`).
+
+**Lo generado y lo diseñado juntos** (una máscara de Hunyuan con un soporte para la mesa): primero lo generado, escalado y engrosado; después lo demás, medido sobre su STL, con el encastre de `hueco_para` de `cad.py`. El estilo de lo diseñado decide la herramienta: geométrico (escalones, grecas, planos) por código; orgánico o con curvas libres, en Blender. Detalle en `references/foto-a-3d.md`, sección 5.
 
 **Plantilla de `modelo.py`** (probada con `bpy` 5.3: un pato con bolas que se funden y un texto en relieve):
 
@@ -111,7 +114,7 @@ Después, en `pieza.py`: `importar_stl("figura.stl")` e `importar_stl("texto.stl
 
 ## Revisar y mostrar
 
-1. `revisar_stl.py`: además de la malla y las medidas, mira las partes separadas. Una parte suelta en el aire es RECHAZO (pasa con bolas que no se llegaron a fundir); una que toca la pieza sin estar unida es advertencia: unirla.
+1. `revisar_stl.py`: además de la malla y las medidas, mira las partes separadas. Una parte suelta en el aire es RECHAZO (pasa con bolas que no se llegaron a fundir); una que toca la pieza sin estar unida es advertencia: unirla. También avisa si la pieza es una cáscara fina (lo típico de los modelos de IA): engrosarla con `engrosar_stl.py`.
 2. Piezas funcionales: `vista_previa.py` (cuatro vistas con medidas).
 3. Decorativas o mixtas: además, una foto renderizada, porque las cuatro vistas no alcanzan para juzgar cómo se ve:
    ```bash

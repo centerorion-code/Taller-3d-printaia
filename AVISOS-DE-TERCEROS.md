@@ -29,8 +29,18 @@ No vienen dentro del plugin: el instalador los baja de su fuente oficial o se in
 | matplotlib | vistas previas e imágenes de producto | licencia de Matplotlib (basada en la de la PSF) |
 | Pillow | encuadre de las imágenes y fotos de producto | MIT-CMU |
 | Blender (opcional) | modelado orgánico | GPL |
-| bpy, el módulo de Blender para Python (opcional) | fotos de producto (`render_producto.py`); se instala con pip en el espacio de Claude cuando hace falta | GPL-3.0 o posterior |
+| bpy, el módulo de Blender para Python (opcional) | fotos de producto (`render_producto.py`) y engrosar cáscaras (`engrosar_stl.py`); se instala con pip en el espacio de Claude cuando hace falta | GPL-3.0 o posterior |
+| OpenCV (opcional) | retocar una foto antes de generar el modelo (sacar una soga, el fondo); se instala con pip cuando hace falta | Apache-2.0 |
+
+## Servicios que el taller usa con tu cuenta
+
+No vienen con el plugin ni los paga el taller: Claude los usa en tu Chrome, con tu sesión, solo si los tenés y lo pedís. Cada uno tiene sus propios términos de uso, que valen también para lo que generan.
+
+| Servicio | Para qué |
+|---|---|
+| Hunyuan 3D (Tencent), https://3d.hunyuan.tencent.com | generar el modelo 3D de una pieza desde una o varias fotos (`references/foto-a-3d.md`) |
+| Gemini o Flow (Google), con Nano Banana | generar una imagen para aprobar antes del 3D, o las vistas que faltan de un objeto |
 
 ## Marcas
 
-OrcaSlicer, Creality, Ender, Blender, Claude, WooCommerce, Tiendanube, Shopify y Mercado Libre son marcas de sus dueños. taller-3d no está afiliado a ellos ni avalado por ellos.
+OrcaSlicer, Creality, Ender, Blender, Claude, WooCommerce, Tiendanube, Shopify, Mercado Libre, Tencent, Hunyuan, Google, Gemini, Flow y Nano Banana son marcas de sus dueños. taller-3d no está afiliado a ellos ni avalado por ellos.

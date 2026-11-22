@@ -305,6 +305,8 @@ def _en_una_linea(texto, largo: int = 80) -> str:
 
 
 ABRIR_EN_ORCA = "Abrila en Orca"
+# El botón de arriba del panel: las fotos no se pueden mandar desde la página, se adjuntan en el chat.
+PEDIDO_FOTO = "Quiero una pieza a partir de una foto: te la adjunto en el chat."
 # El servidor MCP local que abre Orca (instalador/abrir_orca.py), como lo nombra la página del panel en la app.
 SERVIDOR_ORCA = "host:taller3d-orca"
 RE_PROYECTO = re.compile(r"^(?:impresiones|disenos)/\d{4}-\d{2}-\d{2}_[^/\\]+/[^/\\]+\.3mf$")
@@ -481,19 +483,21 @@ footer{max-width:1200px;margin:0 auto;padding:0 24px 32px;color:var(--suave);fon
 .idea .imagen{background:var(--papel)}
 .idea .imagen span{font-size:15px;color:var(--suave)}
 .acciones{display:flex;flex-wrap:wrap;gap:6px}
-.acciones button,form.idea button{min-height:40px;padding:6px 12px;border:1.5px solid var(--tinta);border-radius:999px;background:#fff;color:var(--tinta);font:inherit;font-size:14px;cursor:pointer}
+.acciones button,form.idea button,.desde-foto button{min-height:40px;padding:6px 12px;border:1.5px solid var(--tinta);border-radius:999px;background:#fff;color:var(--tinta);font:inherit;font-size:14px;cursor:pointer}
 .acciones button:first-child,form.idea button{background:var(--tinta);color:#fff}
-.acciones button:disabled,form.idea button:disabled{opacity:.55;cursor:progress}
+.acciones button:disabled,form.idea button:disabled,.desde-foto button:disabled{opacity:.55;cursor:progress}
 .acciones .solo-claude{display:none}
 body.con-claude .acciones .solo-claude{display:inline-block}
 .aviso{margin:0;font-size:13px;color:var(--suave)}
 .aviso:empty{display:none}
 .modo{margin:12px 0 0;font-size:14px;color:var(--suave)}
 form.idea{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+.desde-foto{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0}
+.desde-foto span{font-size:14px;color:var(--suave)}
 form.idea input{flex:1 1 240px;min-height:44px;padding:8px 14px;border:1.5px solid var(--tinta);border-radius:10px;font:inherit;background:#fff}
 .archivos span{padding:2px 8px;border:1px solid var(--borde);border-radius:6px;font-family:ui-monospace,Consolas,monospace}
 [hidden]{display:none!important}
-@media print{.controles,.acciones,form.idea{display:none}article{break-inside:avoid}}
+@media print{.controles,.acciones,form.idea,.desde-foto{display:none}article{break-inside:avoid}}
 """
 
 GUION = """
@@ -526,10 +530,11 @@ GUION = """
   var modo=document.getElementById('modo'),com=null;
   function lugar(el){return el.closest('article')||el.closest('details')||el.closest('header');}
   function avisar(el,texto){var a=lugar(el).querySelector('.aviso');if(a){a.textContent=texto;}}
+  function foto(el){return el.hasAttribute('data-adjuntar')?' y adjuntá la foto (si tenés varias de distintos ángulos, mejor)':'';}
   function copiar(el,texto){
-    function mostrar(){avisar(el,'Copiá este pedido y pegalo en el chat con Claude: '+texto);}
+    function mostrar(){avisar(el,'Copiá este pedido y pegalo en el chat con Claude'+foto(el)+': '+texto);}
     try{navigator.clipboard.writeText(texto).then(function(){
-      avisar(el,'Pedido copiado: pegalo en el chat con Claude.');},mostrar);}catch(e){mostrar();}
+      avisar(el,'Pedido copiado: pegalo en el chat con Claude'+foto(el)+'.');},mostrar);}catch(e){mostrar();}
   }
   var motivos={consent_required:'falta que permitas que el panel le escriba a Claude por vos',
     claude_unavailable:'no hay un chat de Claude que lo reciba ahora',rate_limited:'fueron muchos seguidos; esperá un momento',
@@ -540,7 +545,9 @@ GUION = """
     com.canSendToClaude().then(function(estado){
       if(estado!=='available'){el.disabled=false;copiar(el,texto);return;}
       return com.anchorFor(lugar(el)).then(function(ancla){return com.sendToClaude({anchor:ancla,text:texto});})
-        .then(function(){avisar(el,'Enviado. Claude lo hace y te contesta en el chat.');},
+        .then(function(){avisar(el,el.hasAttribute('data-adjuntar')?
+                'Enviado. Ahora adjuntá la foto en el chat con Claude (si tenés varias de distintos ángulos, mejor).':
+                'Enviado. Claude lo hace y te contesta en el chat.');},
               function(err){var c=err&&err.code;
                 avisar(el,'No se envió: '+(motivos[c]||'algo falló ('+(c||'error')+')')+'. Si querés, pegalo en el chat: '+texto);});
     }).catch(function(){copiar(el,texto);}).then(function(){el.disabled=false;});
@@ -774,6 +781,8 @@ def generar_html(catalogo: dict, titulo: str = "Panel del taller", modo: str = "
 <input id="nueva-idea" type="text" maxlength="300" placeholder="Anotá una idea: «un soporte para la tele»" aria-label="Anotar una idea">
 <button type="submit">Anotar idea</button>
 </form>
+<div class="desde-foto"><button type="button" data-pedido="{e(PEDIDO_FOTO)}" data-adjuntar>Pieza desde una foto</button>
+<span>Para copiar algo que tenés: tocá el botón y adjuntá la foto en el chat.</span></div>
 <p class="aviso" role="status" aria-live="polite"></p>
 {_taller(estado_taller)}
 <p class="modo" id="modo">{"Buscando el chat con Claude…" if modo == "claude" else "Los botones copian el pedido para que lo pegues en el chat con Claude."}</p>

@@ -39,6 +39,7 @@ mover(s, x, y, z); rotar(s, x, y, z); espejar(s, "x"); escalar(s, f)
 apoyar(s); centrar(s, impresora=datos)  # o centrar(s, x, y); medidas(s)
 exportar_stl(s, "pieza.stl")                # valida, limpia y apoya en Z=0
 importar_stl("figura.stl")                  # un STL cerrado (de Blender o bajado), para unir o restar
+hueco_para(pieza, profundidad, holgura_mm=0.3)  # hueco para que otra pieza entre de arriba (una máscara en su base)
 holgura("presion"|"justo"|"deslizante"|"giratorio", "PETG")
 TORNILLOS["M4"]["pasante"]                  # medidas de tornillos y tuercas
 ```

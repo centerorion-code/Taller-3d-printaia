@@ -10,11 +10,15 @@ con las medidas esperadas. Opcionalmente rota, apoya y centra la pieza y la guar
 Uso:
   python3 revisar_stl.py pieza.stl [--impresora taller-3d/impresoras/<id>.json] [--material PETG]
          [--esperado 40x20x10] [--tolerancia 0.2] [--umbral-voladizo 45]
-         [--rotar 90,0,0] [--apoyar] [--centrar] [--salida pieza_orientada.stl]
+         [--rotar 90,0,0] [--escala 1.5 | --alto 180] [--apoyar] [--centrar] [--salida pieza_orientada.stl]
          [--otras <carpeta con los datos de las otras impresoras>] [--json informe.json]
 
 Si la pieza no entra en la impresora elegida y se pasa --otras, dice en cuáles de las otras
 impresoras del usuario entra (tal cual o girándola).
+
+--escala multiplica todas las medidas y --alto escala parejo hasta ese alto en Z (después de --rotar): sirve para
+los modelos generados con IA, que vienen sin unidades. Avisa si la pieza es una cáscara fina (paredes de menos
+de 1,6 mm en promedio en una pieza grande), lo típico de esos modelos: se engrosa con engrosar_stl.py.
 
 Código de salida: 0 aprobado, 1 con advertencias, 2 rechazado.
 """
@@ -191,6 +195,18 @@ def analizar(tri: np.ndarray, impresora: dict, material: str | None, esperado=No
     if volumen < 0:
         agregar(ADVERTENCIA, "Las normales apuntan hacia adentro (volumen negativo). Orca suele corregirlo.")
 
+    # Cáscara fina: 2·V/A es el espesor de pared de una cáscara pareja (una máscara hueca generada con IA). Solo
+    # cuenta si es chico al lado de la pieza: una placa de 1 mm o una pieza chica maciza no son cáscaras.
+    espesor_medio = 2 * abs(volumen) / area_total if area_total > 0 else 0.0
+    cascara = bool(not bordes_abiertos and not no_manifold and 0 < espesor_medio < ESPESOR_FINO
+                   and espesor_medio < 0.1 * float(np.min(medidas)))
+    if cascara:
+        rota = espesor_medio < ESPESOR_MINIMO
+        agregar(RECHAZO if rota else ADVERTENCIA,
+                f"Es una cáscara de unos {espesor_medio:.2f} mm de pared en promedio "
+                f"({'no se puede imprimir bien' if rota else 'frágil'}). Si viene de un generador de IA, "
+                "engrosarla a 2 mm con engrosar_stl.py; si es a propósito, revisar que aguante.")
+
     # Partes separadas: una que no apoya en la cama ni toca otra parte se imprimiría en el aire
     partes = {"partes": 1, "sin_unir": [], "en_el_aire": [], "sin_saber": []}
     if not bordes_abiertos and not no_manifold and len(caras_ok):
@@ -277,6 +293,8 @@ def analizar(tri: np.ndarray, impresora: dict, material: str | None, esperado=No
         "maximo_mm": [round(float(m), 3) for m in maximo],
         "volumen_cm3": round(abs(volumen) / 1000, 3),
         "superficie_cm2": round(area_total / 100, 2),
+        "cascara_fina": cascara,
+        "espesor_medio_mm": round(espesor_medio, 2) if cascara else None,
         "peso_macizo_g": round(gramos_macizo, 1),
         "cerrada": bordes_abiertos == 0 and no_manifold == 0,
         "partes": partes["partes"],
@@ -289,6 +307,10 @@ def analizar(tri: np.ndarray, impresora: dict, material: str | None, esperado=No
         "voladizo_z_mm": zonas,
         "hallazgos": hallazgos,
     }
+
+
+ESPESOR_FINO = 1.6     # mm de pared promedio: menos es una cáscara frágil
+ESPESOR_MINIMO = 0.6   # menos de una línea y media de una boquilla de 0,4 mm: no sale bien
 
 
 def entra_en(medidas, impresora: dict) -> str | None:
@@ -333,6 +355,9 @@ def informe_texto(r: dict, nombre: str) -> str:
             f" | Apoyo: {r['apoyo_cm2']} cm² | "
             f"Voladizos críticos: {r['voladizo_cm2']} cm²",
         ]
+    if r.get("escala_aplicada") is not None:
+        lineas.append(f"Escalada × {r['escala_aplicada']:g}: las medidas de arriba ya son las nuevas"
+                      + ("" if r.get("salida") else " (con --salida se guarda así)"))
     if r.get("entra_en_otras") is not None:
         if r["entra_en_otras"]:
             lineas.append("Entra en otra impresora tuya: " + ", ".join(
@@ -358,6 +383,8 @@ def main(argv=None) -> None:
     ap.add_argument("--tolerancia", type=float, default=0.2)
     ap.add_argument("--umbral-voladizo", type=float, default=45.0)
     ap.add_argument("--rotar", help="grados en X,Y,Z, por ejemplo 90,0,0")
+    ap.add_argument("--escala", type=float, help="multiplicar todas las medidas, por ejemplo 1.5")
+    ap.add_argument("--alto", type=float, help="escalar parejo hasta este alto en Z, en mm (después de --rotar)")
     ap.add_argument("--apoyar", action="store_true", help="bajar la pieza hasta Z=0")
     ap.add_argument("--centrar", action="store_true", help="centrar la pieza en la cama")
     ap.add_argument("--salida", type=Path, help="guardar la malla transformada")
@@ -370,10 +397,25 @@ def main(argv=None) -> None:
     impresora = None if a.impresora.lower() in ("ninguna", "none", "-") else comun.cargar_impresora(a.impresora)
     if a.centrar and not impresora:
         raise SystemExit("--centrar necesita una impresora (--impresora <datos>).")
+    if a.escala is not None and a.alto is not None:
+        raise SystemExit("Usar --escala o --alto, no los dos (no se escribió nada).")
+    for nombre, valor, tope in (("--escala", a.escala, 1000.0), ("--alto", a.alto, 5000.0)):
+        if valor is not None and not (np.isfinite(valor) and 0 < valor <= tope):
+            raise SystemExit(f"{nombre} tiene que ser un número mayor que 0 y hasta {tope:g} (no se escribió nada).")
     tri = leer_stl(a.stl)
     if a.rotar:
         tri = rotar(tri, [float(v) for v in a.rotar.split(",")])
-    if a.apoyar or a.centrar or a.rotar:
+    factor = None
+    if a.escala is not None:
+        factor = a.escala
+    elif a.alto is not None:
+        alto_actual = float(tri[:, :, 2].max() - tri[:, :, 2].min())
+        if alto_actual <= 0:
+            raise SystemExit("La pieza no tiene alto en Z: no se puede escalar con --alto (no se escribió nada).")
+        factor = a.alto / alto_actual
+    if factor is not None:
+        tri = tri * factor
+    if a.apoyar or a.centrar or a.rotar or factor is not None:
         tri = tri - np.array([0.0, 0.0, tri[:, :, 2].min()])
     if a.centrar:
         ar = impresora["area"]
@@ -383,6 +425,8 @@ def main(argv=None) -> None:
         tri = tri + np.array([*(centro - actual), 0.0])
     esperado = [float(v) for v in a.esperado.lower().replace("×", "x").split("x")] if a.esperado else None
     r = analizar(tri, impresora, a.material, esperado, a.tolerancia, a.umbral_voladizo)
+    if factor is not None:
+        r["escala_aplicada"] = round(factor, 6)
     if a.otras and r.get("entra_en_cama") is not True:
         r["entra_en_otras"] = otras_donde_entra(r["medidas_mm"], comun.impresoras_en(a.otras), impresora)
     if a.salida:

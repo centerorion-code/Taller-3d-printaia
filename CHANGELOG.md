@@ -1,5 +1,18 @@
 # Cambios
 
+## 0.1.21 (2026-11-22)
+
+- **Pieza desde una foto** (`references/foto-a-3d.md`): para copiar algo que existe (una máscara, una figura, una escultura), el modelo 3D lo genera Hunyuan 3D de Tencent con tu cuenta, desde tu Chrome. Claude sube la foto, espera, baja el STL de tu carpeta de descargas (solo ese archivo) y lo deja imprimible. Probado de punta a punta con una máscara de piedra.
+  - **Varias fotos:** Hunyuan acepta de 2 a 8 del mismo objeto (frente, costados, atrás) y el modelo sale más fiel. Si tenés una sola, las otras vistas se pueden generar con Nano Banana (Gemini o Flow) y las aprobás antes de usarlas.
+  - **Primero una imagen:** si pedís algo por cómo se ve que no sale bien con Blender por código, Claude genera una imagen con tu Gemini o tu Flow, la aprobás y recién ahí la pasa a 3D, así no gastás puntos de Hunyuan en algo que no querías.
+  - Antes de generar te dice cuántos puntos o imágenes gasta. El login y los captchas los hacés vos.
+- **Lo generado y lo diseñado juntos:** en un pedido como "la máscara y un soporte para la mesa", Claude te dice antes qué parte hace cada herramienta. La parte diseñada se mide sobre el modelo generado: `cad.hueco_para` da el hueco con la forma exacta del borde de la pieza, sin trabas. Por defecto van separadas, cada una en su mejor posición para imprimir.
+- **`engrosar_stl.py`:** los modelos de IA suelen salir como una cáscara de menos de 1 mm de pared. Este script los lleva a 2 mm moviendo solo la superficie de adentro, así el detalle de afuera no cambia (en la máscara se movió 0,08 mm como mucho). Rehace la malla con voxels, saca las sobras y respeta los huecos de una figura cerrada. Usa Blender para Python.
+- **`revisar_stl.py`** avisa si la pieza es una cáscara fina (rechazo si la pared no llega a 0,6 mm) y escala: `--alto` la lleva parejo a un alto en mm (lo de IA viene sin unidades) y `--escala` multiplica las medidas.
+- **El panel** tiene un botón "Pieza desde una foto": manda el pedido a Claude (o lo copia) y te recuerda adjuntar la foto en el chat, porque la página no puede mandar fotos.
+- **`/instalar`** pregunta, si querés, si tenés cuenta en Hunyuan 3D y si usás Gemini o Flow (`generadores_ia` en `config.json`), y te recomienda apagar en Chrome "Preguntar dónde guardar cada archivo" para que los modelos se bajen solos.
+- **Pendiente:** leer el acuerdo de servicio de Hunyuan 3D sobre el uso comercial de lo generado (la página no cargaba). Hasta entonces, `/publicar` te pide confirmarlo antes de vender una pieza generada.
+
 ## 0.1.20 (2026-11-22)
 
 - **Con qué modelar, por regla y no por comodidad** (`references/modelado.md`):

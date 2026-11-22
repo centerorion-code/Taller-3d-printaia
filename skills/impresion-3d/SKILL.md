@@ -24,7 +24,8 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
 
 - **Scripts** (Python, en `scripts/` de esta skill; correr con `python3 -I`):
   - `cad.py`: CAD por código (manifold3d) para lo que se describe con medidas; `importar_stl` trae un STL de Blender o bajado para unirlo. Ver `references/cad.md` y, para elegir entre código y Blender, `references/modelado.md`.
-  - `revisar_stl.py`: malla cerrada, medidas, partes sueltas (una en el aire es RECHAZO), entra en la cama (y, con `--otras`, en cuál de las otras impresoras del usuario entra si no), apoyo, voladizos; también rota, apoya y centra.
+  - `revisar_stl.py`: malla cerrada, medidas, partes sueltas (una en el aire es RECHAZO), cáscaras finas, entra en la cama (y, con `--otras`, en cuál de las otras impresoras del usuario entra si no), apoyo, voladizos; también rota, escala (`--escala`, `--alto`), apoya y centra.
+  - `engrosar_stl.py`: engrosa una cáscara fina (los modelos generados por IA desde una foto) moviendo solo la superficie de adentro, con `bpy`. Ver `references/foto-a-3d.md`.
   - `vista_previa.py`: PNG con 4 vistas y medidas; con `--producto`, una imagen simple para la tienda (fondo blanco, sin texto).
   - `perfil_orca.py`: `crear`, `validar` y `diff` de perfiles de usuario.
   - `revisar_gcode.py`: revisión de seguridad del G-code; con `--json` y `--config`, también el costo real de la pieza.
@@ -116,6 +117,7 @@ Los archivos del plugin no cambian solos. Lo que se aprende del Orca del usuario
 - `references/materiales.md`: comportamiento de cada material (PETG con fundamento académico).
 - `references/cad.md`: reglas de diseño para imprimir y uso de `cad.py`.
 - `references/modelado.md`: con qué modelar (código, Blender o un modelo que ya existe), Blender por código, piezas mixtas y cómo revisar y mostrar una pieza decorativa.
+- `references/foto-a-3d.md`: pieza desde una foto (o una imagen aprobada) con Hunyuan 3D en el Chrome del usuario, dejarla imprimible y combinarla con una parte diseñada.
 - `references/impresoras.md`: elegir la impresora, investigarla y configurarla; formato de sus datos.
 - `references/plugins-orca.md`: plugins de Orca 2.5 (qué son, riesgos, cómo buscarlos y los que sirven).
 - `references/configuracion.md`: formato de `config.json`.
