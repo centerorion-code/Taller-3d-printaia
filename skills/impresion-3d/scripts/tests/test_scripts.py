@@ -2378,7 +2378,7 @@ class PruebaReel(unittest.TestCase):
             pub.write_text(json.dumps({"producto": {"name": "Soporte", "regular_price": "4500"},
                                        "material": "PETG", "medidas_mm": [40, 20, 60]}), encoding="utf-8")
             r = reel_pieza.armar(fotos, d / "video" / "reel.mp4", gancho="¿Estante flojo?", segundos=1.0,
-                                 marca="mi-tienda", publicacion=pub)
+                                 marca="mi-tienda", publicacion=pub, precio="4500")
             self.assertTrue(Path(r["video"]).exists())
             self.assertTrue(Path(r["portada"]).exists())
             self.assertEqual(r["guion"][-1]["texto"], "$ 4.500 · mi-tienda")
@@ -2389,6 +2389,8 @@ class PruebaReel(unittest.TestCase):
         import reel_pieza
         with self.assertRaises(ValueError):
             reel_pieza.armar([], Path("x.mp4"))
+        with self.assertRaises(ValueError):
+            reel_pieza.armar([Path("x.jpg")], Path("x.mp4"), estilo="otro")
         with tempfile.TemporaryDirectory() as t:
             from PIL import Image
             f = Path(t) / "f.jpg"
@@ -2399,6 +2401,26 @@ class PruebaReel(unittest.TestCase):
     def test_plata(self):
         import reel_pieza
         self.assertEqual(reel_pieza.plata("12300"), "$ 12.300")
+        self.assertEqual(reel_pieza.plata("4.5", "€"), "4,50 €")
+        self.assertEqual(reel_pieza.plata("1234,5", "€"), "1.234,50 €")
+
+    def test_estilo_marca_con_logo_clip_y_cierre(self):
+        import reel_pieza
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as t:
+            d = Path(t)
+            foto = d / "f.jpg"
+            Image.new("RGB", (900, 1200), "#2E8B57").save(foto)
+            logo = d / "logo.png"
+            Image.new("RGBA", (300, 300), (255, 120, 0, 255)).save(logo)
+            clip = d / "clip.mp4"
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=red:s=720x1280:d=2",
+                            str(clip)], check=True)
+            r = reel_pieza.armar([clip, foto], d / "reel.mp4", gancho="Hola", cierre="Cómpralo en la web.",
+                                 segundos=1.0, estilo="marca", logo=logo)
+            self.assertEqual([g["texto"] for g in r["guion"]], ["Hola", "Cómpralo en la web."])
+            self.assertTrue(Path(r["portada"]).exists())
+            self.assertNotIn("$", json.dumps(r))
 
 
 if __name__ == "__main__":

@@ -35,16 +35,28 @@ Cada rótulo, de 60 caracteres como mucho (se lee en un segundo y medio). Mostra
 
 ## 3. Armar el video
 
+**Primero la plantilla del usuario.** Si ya tiene un estilo de video (otro bot, una plantilla, videos que ya publicó), el reel tiene que verse igual: mirar dos o tres de sus videos (`ffmpeg -ss <s> -i video.mp4 -frames:v 1 cuadro.jpg`) y anotar el estilo en `config.json`, clave `video`, con respaldo:
+
+```json
+"video": {"estilo": "marca", "logo": "<ruta del PNG del logo>", "cierre": "Cómpralo en <tienda> o pídelo por WhatsApp.",
+          "moneda": "€", "precio": "nunca | si_lo_pide | siempre", "carpeta_clips": "<carpeta>", "carpeta_videos": "<carpeta>"}
+```
+
+- **Estilo `marca`:** foto o clip a pantalla completa, el logo chico arriba a la izquierda y subtítulos blancos con borde negro abajo, como un video con voz. La última toma lleva el `cierre`. Es el de casi todas las cuentas de producto.
+- **Estilo `tarjetas`:** la foto entera sobre fondo desenfocado, rótulos en franjas arriba y una placa final con precio y tienda. Solo si el usuario no tiene estilo propio.
+- **El precio** va solo si el usuario lo quiere (`video.precio`), y siempre el de su tienda, en su moneda, nunca uno calculado o inventado.
+- **Fotos y clips:** primero los clips y fotos reales (de `carpeta_clips` si la hay: los sueltos sirven para cualquier pieza, los de una subcarpeta con el número del producto son de esa pieza), después las imágenes de uso y las de producto. Las vistas grises del STL, solo si no hay otra cosa.
+
 ```bash
-python3 -I reel_pieza.py --fotos <foto gancho> <foto 2> <foto 3> \
-  --gancho "<gancho>" --rotulos "<texto 2>|<texto 3>" --cierre "<precio>" --marca "<tienda o @cuenta>" \
-  --publicacion <carpeta>/producto/publicacion.json [--timelapse <video>] [--musica <audio con licencia>] \
+python3 -I reel_pieza.py --estilo marca --logo "<logo>" --fotos <clip o foto 1> <foto 2> <foto 3> <foto 4> <foto 5> \
+  --gancho "<gancho>" --rotulos "<texto 2>|<texto 3>|<texto 4>" --cierre "<cierre>" --segundos 3.6 \
+  [--precio <precio de la tienda> --moneda €] [--timelapse <video>] [--musica <audio con licencia>] \
   --salida <carpeta>/video/reel.mp4 --json <carpeta>/video/reel.json
 ```
 
-Deja `reel.mp4` (1080x1920, 30 fps, H.264, entre 10 y 20 s), `reel-portada.jpg` y `reel.json` con el guion. Mirar dos o tres cuadros (`ffmpeg -ss <s> -i reel.mp4 -frames:v 1 cuadro.jpg`) antes de mostrarlo: que los rótulos se lean y no tapen la pieza.
+Deja `reel.mp4` (1080x1920, 30 fps, H.264, unos 17 a 20 s con cinco tomas), `reel-portada.jpg` y `reel.json` con el guion (que sirve también como texto para la voz en off). Mirar dos o tres cuadros antes de mostrarlo: que los textos se lean, no tapen la pieza y el logo no quede sobre algo importante.
 
-Para algo más trabajado (cortes al ritmo de la música, subtítulos animados, voz en off), entregar el guion y las tomas para CapCut (`capcut`, `captions-and-clipping`) en vez de forzar el script.
+**Si el usuario tiene un bot de video** (que agrega voz, música y lo manda a aprobar), el taller no lo reemplaza: le pasa el guion (`reel.json`), las fotos y los clips en la forma que ese bot los lee, y el reel de `reel_pieza.py` queda como vista previa. Para algo más trabajado (cortes al ritmo de la música, subtítulos animados), entregar el guion y las tomas para CapCut (`capcut`, `captions-and-clipping`).
 
 ## 4. Texto de la publicación
 

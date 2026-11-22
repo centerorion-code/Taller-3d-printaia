@@ -3,6 +3,7 @@
 ## 0.1.34 (2026-11-22)
 
 - **Reels de cada pieza:** `/taller-3d:video` arma un video vertical (1080x1920) para Instagram Reels, TikTok o YouTube Shorts con las fotos de la pieza, el timelapse si hay, un gancho, los datos y el precio, más el guion, el texto de la publicación y los hashtags por red. Lo hace `reel_pieza.py` (Pillow y ffmpeg): acercamiento lento sobre cada foto, rótulos en zona segura (lejos de los botones de las apps), fundidos y música opcional con licencia. Nunca publica en redes.
+- **Con tu estilo:** `--estilo marca` pone la foto o el clip a pantalla completa, tu logo arriba a la izquierda y subtítulos abajo, como los videos con voz; mezcla fotos y clips del celular. El precio va solo si lo pedís, en tu moneda (`--moneda €`: «4,50 €»). El estilo queda en `config.json`, clave `video`.
 - **`/taller-3d:publicar` ofrece el reel** al terminar la publicación.
 - **Skills de redes incluidas:** 15 skills de social-media-skills (MIT, Frank Heijdenrijk) para guion, ganchos, textos, hashtags, música, CapCut y publicación en Reels, TikTok y Shorts. Detalle en `AVISOS-DE-TERCEROS.md`.
 

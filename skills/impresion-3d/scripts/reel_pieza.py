@@ -106,6 +106,43 @@ def placa(foto: Path, texto: str = "", abajo: str = "") -> "Image.Image":
     return fondo.convert("RGB")
 
 
+def subtitulo(lienzo, texto: str, tam: int = 64) -> None:
+    """Subtítulo blanco con borde negro en el tercio de abajo, como los vídeos con voz (estilo «marca»)."""
+    from PIL import Image, ImageDraw
+    if not texto:
+        return
+    capa = Image.new("RGBA", lienzo.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(capa)
+    letra = fuente(tam)
+    renglones = partir(texto, letra, ANCHO - 2 * 160, d)
+    alto_renglon = int(tam * 1.18)
+    y = ALTO - ZONA_ABAJO - alto_renglon * len(renglones) + 60
+    for i, r in enumerate(renglones):
+        d.text((ANCHO / 2, y + i * alto_renglon), r, font=letra, fill=(255, 255, 255, 255), anchor="ma",
+               stroke_width=max(3, tam // 14), stroke_fill=(0, 0, 0, 255))
+    lienzo.alpha_composite(capa)
+
+
+def poner_logo(lienzo, logo: Path | None, lado: int = 150) -> None:
+    """El logo chico arriba a la izquierda, en todas las tomas."""
+    from PIL import Image
+    if not logo:
+        return
+    marca = Image.open(logo).convert("RGBA")
+    marca.thumbnail((lado, lado))
+    lienzo.alpha_composite(marca, (45, 60))
+
+
+def placa_marca(foto: Path, texto: str = "", logo: Path | None = None) -> "Image.Image":
+    """Estilo «marca»: la foto a pantalla completa (recortada a 9:16), el logo arriba y el subtítulo abajo."""
+    from PIL import Image, ImageOps
+    img = ImageOps.exif_transpose(Image.open(foto)).convert("RGB")
+    base = ImageOps.fit(img, (ANCHO, ALTO), centering=(0.5, 0.45)).convert("RGBA")
+    poner_logo(base, logo)
+    subtitulo(base, texto)
+    return base.convert("RGB")
+
+
 def placa_cierre(foto: Path | None, precio: str, marca: str) -> "Image.Image":
     from PIL import Image
     base = placa(foto) if foto else Image.new("RGB", (ANCHO, ALTO), (24, 24, 24))
@@ -143,18 +180,14 @@ def tramo_foto(png: Path, salida: Path, segundos: float, entrando: bool) -> None
              "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", str(salida)])
 
 
-def tramo_video(video: Path, salida: Path, segundos: float, texto: str, tmp: Path) -> None:
-    """El timelapse, acelerado para que dure `segundos`, recortado a 9:16 y con su rótulo."""
+def tramo_video(video: Path, salida: Path, segundos: float, capa_png: Path, acelerar: bool = True) -> None:
+    """Un clip (timelapse o grabado con el celular) recortado a 9:16, con la capa de texto/logo encima.
+    Con `acelerar`, se acelera para que entre entero en `segundos`; si no, se usa el principio."""
     dur = _duracion(video)
-    velocidad = max(1.0, dur / segundos) if dur else 1.0
-    from PIL import Image
-    capa = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
-    rotulo(capa, texto, ZONA_ARRIBA)
-    png = tmp / "rotulo-timelapse.png"
-    capa.save(png)
+    velocidad = max(1.0, dur / segundos) if (dur and acelerar) else 1.0
     filtro = (f"[0:v]setpts=PTS/{velocidad:.4f},scale={ANCHO}:{ALTO}:force_original_aspect_ratio=increase,"
               f"crop={ANCHO}:{ALTO},fps={FPS}[v];[v][1:v]overlay=0:0,format=yuv420p")
-    _correr([_ffmpeg(), "-y", "-loglevel", "error", "-i", str(video), "-i", str(png), "-filter_complex", filtro,
+    _correr([_ffmpeg(), "-y", "-loglevel", "error", "-i", str(video), "-i", str(capa_png), "-filter_complex", filtro,
              "-t", f"{segundos:.2f}", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", str(salida)])
 
 
@@ -212,86 +245,127 @@ def _de_publicacion(ruta: Path | None) -> dict:
     return datos
 
 
-def plata(valor) -> str:
-    """Mismo formato que el resto del taller: «$ 12.300»."""
+def plata(valor, moneda: str = "$") -> str:
+    """El precio como lo escribe el taller: «$ 12.300» (pesos) o «4,50 €» (euros)."""
+    texto = str(valor).replace("$", "").replace("€", "").strip()
+    if moneda == "€":
+        try:
+            n = float(texto.replace(",", "."))
+        except ValueError:
+            return str(valor)
+        return f"{n:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") + " €"
     try:
-        n = float(str(valor).replace("$", "").replace(".", "").replace(",", ".").strip())
+        n = float(texto.replace(".", "").replace(",", "."))
     except ValueError:
         return str(valor)
     return "$ " + f"{round(n):,}".replace(",", ".")
 
 
+VIDEOS = {".mp4", ".mov", ".m4v", ".webm"}
+
+
+def _capa(texto: str, estilo: str, logo: Path | None, tmp: Path, n: int) -> Path:
+    """Capa transparente con el texto (y el logo) para poner encima de un clip."""
+    from PIL import Image
+    capa = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
+    if estilo == "marca":
+        poner_logo(capa, logo)
+        subtitulo(capa, texto)
+    else:
+        rotulo(capa, texto, ZONA_ARRIBA)
+    ruta = tmp / f"capa-{n}.png"
+    capa.save(ruta)
+    return ruta
+
+
 def armar(fotos: list[Path], salida: Path, gancho: str = "", rotulos: list[str] | None = None,
           cierre: str = "", marca: str = "", segundos: float = 2.6, timelapse: Path | None = None,
-          musica: Path | None = None, publicacion: Path | None = None) -> dict:
+          musica: Path | None = None, publicacion: Path | None = None, estilo: str = "tarjetas",
+          logo: Path | None = None, precio: str = "", moneda: str = "$") -> dict:
+    """Arma el reel. `fotos` puede mezclar fotos y clips de video, en el orden en que van.
+    Estilo «tarjetas»: foto entera sobre fondo desenfocado, rótulos arriba y una placa final con precio y tienda.
+    Estilo «marca»: foto o clip a pantalla completa, logo arriba a la izquierda y subtítulos abajo (como un
+    vídeo con voz); el último texto es la llamada final (`cierre`). El precio sale solo si se pasa `precio`."""
+    if estilo not in ("tarjetas", "marca"):
+        raise ValueError("Estilo desconocido: tarjetas o marca.")
     pub = _de_publicacion(publicacion)
     if not fotos and pub.get("fotos"):
         fotos = [Path(f) for f in pub["fotos"] if Path(f).exists()]
     if not fotos:
-        raise ValueError("Hace falta al menos una foto de la pieza (--fotos).")
-    faltan = [str(f) for f in fotos if not Path(f).exists()]
+        raise ValueError("Hace falta al menos una foto o un clip de la pieza (--fotos).")
+    faltan = [str(f) for f in [*fotos, *( [logo] if logo else [])] if not Path(f).exists()]
     if faltan:
         raise ValueError("No existen: " + ", ".join(faltan))
     rotulos = list(rotulos or [])
-    if not rotulos and pub:
+    if not rotulos and pub and estilo == "tarjetas":
         rotulos = [t for t in (pub.get("nombre"), pub.get("material"), pub.get("medidas")) if t]
-    largos = [r for r in [gancho, *rotulos] if len(r) > MAX_ROTULO]
+    largos = [r for r in [gancho, *rotulos, cierre] if len(r) > (MAX_ROTULO if estilo == "tarjetas" else 110)]
     if largos:
-        raise ValueError(f"Rótulo de más de {MAX_ROTULO} caracteres (no se llega a leer): «{largos[0]}»")
-    if not cierre and pub.get("precio"):
-        cierre = plata(pub["precio"])
-    elif cierre and cierre.replace(".", "").replace(",", "").replace("$", "").strip().isdigit():
-        cierre = plata(cierre)
+        raise ValueError(f"Texto demasiado largo para leerlo en pantalla: «{largos[0]}»")
+    precio_txt = plata(precio, moneda) if str(precio).strip() else ""
     salida = Path(salida)
     salida.parent.mkdir(parents=True, exist_ok=True)
+    portada = salida.with_name(salida.stem + "-portada.jpg")
+    textos = [gancho] + rotulos
+    if estilo == "marca" and cierre:
+        textos = textos[:len(fotos) - 1] + [""] * max(0, len(fotos) - 1 - len(textos)) + [cierre]
     guion, tramos, tiempos = [], [], []
     with tempfile.TemporaryDirectory() as t:
         tmp = Path(t)
-        textos = [gancho] + rotulos
-        for i, foto in enumerate(fotos):
-            texto = textos[i] if i < len(textos) else ""
-            png = tmp / f"placa-{i}.png"
-            placa(Path(foto), texto).save(png)
-            if i == 0:
-                placa(Path(foto), texto).save(salida.with_name(salida.stem + "-portada.jpg"), quality=90)
-            dur = segundos + (0.6 if i == 0 else 0)          # el gancho necesita un poco más
+
+        def agregar(fuente_: Path, texto: str, dur: float, entrando: bool, acelerar: bool = False):
             mp4 = tmp / f"tramo-{len(tramos)}.mp4"
-            tramo_foto(png, mp4, dur, entrando=i % 2 == 0)
+            if Path(fuente_).suffix.lower() in VIDEOS:
+                tramo_video(Path(fuente_), mp4, dur, _capa(texto, estilo, logo, tmp, len(tramos)), acelerar)
+            else:
+                png = tmp / f"placa-{len(tramos)}.png"
+                imagen = placa_marca(Path(fuente_), texto, logo) if estilo == "marca" else placa(Path(fuente_), texto)
+                imagen.save(png)
+                if not tramos:
+                    imagen.save(portada, quality=90)
+                tramo_foto(png, mp4, dur, entrando)
             tramos.append(mp4)
             tiempos.append(dur)
-            guion.append({"toma": len(guion) + 1, "imagen": str(foto), "texto": texto, "segundos": dur})
+            guion.append({"toma": len(guion) + 1, "imagen": str(fuente_), "texto": texto, "segundos": dur})
+
+        for i, foto in enumerate(fotos):
+            texto = textos[i] if i < len(textos) else ""
+            agregar(foto, texto, segundos + (0.6 if i == 0 else 0), entrando=i % 2 == 0)
             if timelapse and i == 0:
-                mp4 = tmp / f"tramo-{len(tramos)}.mp4"
-                tramo_video(Path(timelapse), mp4, 3.0, "Así se imprimió", tmp)
-                tramos.append(mp4)
-                tiempos.append(3.0)
-                guion.append({"toma": len(guion) + 1, "imagen": str(timelapse), "texto": "Así se imprimió",
-                              "segundos": 3.0})
-        if cierre or marca:
+                agregar(timelapse, "Así se imprimió", 3.0, True, acelerar=True)
+        if estilo == "tarjetas" and (cierre or precio_txt or marca):
             png = tmp / "cierre.png"
-            placa_cierre(Path(fotos[0]), cierre, marca).save(png)
+            placa_cierre(Path(fotos[0]) if Path(fotos[0]).suffix.lower() not in VIDEOS else None,
+                         precio_txt or cierre, marca).save(png)
             mp4 = tmp / f"tramo-{len(tramos)}.mp4"
             tramo_foto(png, mp4, 2.4, entrando=True)
             tramos.append(mp4)
             tiempos.append(2.4)
-            guion.append({"toma": len(guion) + 1, "imagen": "cierre", "texto": " · ".join(x for x in (cierre, marca) if x),
-                          "segundos": 2.4})
+            guion.append({"toma": len(guion) + 1, "imagen": "cierre",
+                          "texto": " · ".join(x for x in (precio_txt or cierre, marca) if x), "segundos": 2.4})
+        if not portada.exists():                  # empezó con un clip: la portada es su primer cuadro
+            _correr([_ffmpeg(), "-y", "-loglevel", "error", "-i", str(tramos[0]), "-frames:v", "1", str(portada)])
         unir(tramos, salida, tiempos, Path(musica) if musica else None)
     total = round(sum(tiempos) - 0.35 * (len(tiempos) - 1), 1)
-    return {"video": str(salida), "portada": str(salida.with_name(salida.stem + "-portada.jpg")),
-            "segundos": total, "formato": f"{ANCHO}x{ALTO} 9:16, {FPS} fps, H.264",
-            "musica": str(musica) if musica else None, "guion": guion}
+    return {"video": str(salida), "portada": str(portada), "segundos": total, "estilo": estilo,
+            "formato": f"{ANCHO}x{ALTO} 9:16, {FPS} fps, H.264", "musica": str(musica) if musica else None,
+            "guion": guion}
 
 
 def main(argv=None) -> None:
     a = argparse.ArgumentParser(description="Reel vertical 9:16 de una pieza (Reels, TikTok, Shorts). No publica nada.")
-    a.add_argument("--fotos", type=Path, nargs="*", default=[], help="en orden; la primera lleva el gancho")
+    a.add_argument("--fotos", type=Path, nargs="*", default=[],
+                   help="fotos y clips (mp4, mov…) en orden; el primero lleva el gancho")
     a.add_argument("--gancho", default="", help="texto de los primeros segundos (que se entienda sin sonido)")
     a.add_argument("--rotulos", default="", help="un texto por foto siguiente, separados por |")
-    a.add_argument("--cierre", default="", help="el precio o una llamada corta para el final")
-    a.add_argument("--marca", default="", help="la tienda o la cuenta, para el final (york3d.es, @cuenta)")
-    a.add_argument("--segundos", type=float, default=2.6, help="cuánto dura cada foto")
-    a.add_argument("--timelapse", type=Path, help="video de la impresión, va después del gancho")
+    a.add_argument("--cierre", default="", help="la llamada final (estilo marca: subtítulo de la última toma)")
+    a.add_argument("--precio", default="", help="solo si el precio va en el video (el de la tienda, nunca inventado)")
+    a.add_argument("--moneda", default="$", choices=["$", "€"])
+    a.add_argument("--marca", default="", help="estilo tarjetas: la tienda o la cuenta, en la placa final")
+    a.add_argument("--estilo", default="tarjetas", choices=["tarjetas", "marca"])
+    a.add_argument("--logo", type=Path, help="PNG con transparencia, va arriba a la izquierda (estilo marca)")
+    a.add_argument("--segundos", type=float, default=2.6, help="cuánto dura cada toma")
+    a.add_argument("--timelapse", type=Path, help="video de la impresión, va acelerado después del gancho")
     a.add_argument("--musica", type=Path, help="audio con licencia comercial")
     a.add_argument("--publicacion", type=Path, help="producto/publicacion.json, para completar lo que falte")
     a.add_argument("--salida", type=Path, required=True)
@@ -300,10 +374,10 @@ def main(argv=None) -> None:
     rotulos = [r.strip() for r in args.rotulos.split("|") if r.strip()]
     try:
         r = armar(args.fotos, args.salida, args.gancho, rotulos, args.cierre, args.marca, args.segundos,
-                  args.timelapse, args.musica, args.publicacion)
+                  args.timelapse, args.musica, args.publicacion, args.estilo, args.logo, args.precio, args.moneda)
     except ValueError as error:
         raise SystemExit(str(error))
-    print(f"Video: {r['video']} ({r['segundos']} s, {r['formato']})")
+    print(f"Video: {r['video']} ({r['segundos']} s, {r['formato']}, estilo {r['estilo']})")
     print(f"Portada: {r['portada']}")
     if not r["musica"]:
         print("Sin música: sumale un audio con licencia, o uno en tendencia desde la app al publicar.")
