@@ -1,5 +1,16 @@
 # Cambios
 
+## 0.1.19 (2026-11-22)
+
+- **El consumo de la impresora se busca, no se pregunta.** Cuando una impresora entra al taller, o una cuenta de costo usa una que no lo tiene, Claude lo busca en internet:
+  1. el consumo promedio que publica el fabricante;
+  2. si no, una prueba publicada del mismo modelo, medida con un medidor de enchufe;
+  3. si la ficha solo da la potencia nominal (la de la fuente, que es el máximo calentando), lo estima por el tamaño de la cama y el material que más usás, y te avisa que es estimado;
+  4. te pregunta solo si no encuentra nada.
+- `costos.py consumo` guarda el consumo con su origen, la fecha y la potencia nominal. Un dato medido por vos no se pisa con un estimado.
+- En "Tu taller" del panel, el botón de una impresora sin consumo dice "Buscá el consumo de la … en internet"; si es estimado, el botón es para medir el real.
+- **La impresora se elige antes de calcular nada.** Si tenés más de una y no dijiste cuál, `/pieza` la pregunta junto con las otras preguntas del principio, con la más conveniente primero (la que mejor encaja por tamaño y material, o la última que usaste) y en cada una su cama, si es cerrada y si ya está preparada. No pregunta si tenés una sola, si la nombraste o si para la pieza sirve una sola: te dice cuál y por qué.
+
 ## 0.1.18 (2026-11-21)
 
 Correcciones del instalador de Linux, de la primera prueba en una PC real.

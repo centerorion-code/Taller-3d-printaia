@@ -5,7 +5,7 @@ Cómo pedirle una pieza a Claude y qué pasa desde que la pedís hasta que la im
 ## Antes de empezar (una sola vez)
 
 1. Sumá el plugin desde el menú de **Claude Desktop**, la app de escritorio, con la dirección de GitHub `noamix/Taller-3d-printaia` (no se hace desde el chat), e instalá lo necesario en tu PC (ver [INSTALACION.md](INSTALACION.md)).
-2. En Claude escribí `/taller-3d:instalar`: revisa que todo ande, te pregunta en qué impresora de tu Orca querés trabajar, investiga sus datos oficiales y la configura, y hace una pieza de prueba.
+2. En Claude escribí `/taller-3d:instalar`: revisa que todo ande, te pregunta en qué impresora de tu Orca querés trabajar, investiga sus datos oficiales (también cuánto consume) y la configura, y hace una pieza de prueba.
 3. La primera vez te pide que leas el [aviso de uso](DISCLAIMER.md) y escribas ACEPTO.
 
 La PC tiene que estar prendida y con la app de Claude abierta, porque ahí están tu Orca y tus carpetas. Con eso, podés pedir piezas desde la PC o desde el celular.
@@ -81,7 +81,7 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
 ### Paso a paso
 
 1. **Pedido.** Texto, foto, medidas o un STL que ya tengas.
-2. **Preguntas rápidas.** Hasta cuatro, con opciones para tocar: para qué es, dónde va, qué material y qué priorizás (calidad, resistencia, velocidad o ahorro de material). Además, las medidas que falten.
+2. **Preguntas rápidas,** con opciones para tocar: en qué impresora (solo si tenés más de una y no lo dijiste; la más conveniente aparece primera), para qué es, dónde va, qué material y qué priorizás (calidad, resistencia, velocidad o ahorro de material). Además, las medidas que falten. La impresora se elige antes que nada porque de ella depende todo lo demás: si entra, los ajustes, el tiempo y el costo.
 3. **Diseño y vista previa.** Claude diseña la pieza con medidas exactas y te muestra una imagen con cuatro vistas y las medidas. **Vos la aprobás** o pedís cambios ("más alta", "agujeros de 5 mm", "redondeá los bordes"). Si trajiste un STL, revisa que esté sano y que entre en la cama.
 4. **Configuración.** Elige los ajustes según el uso: paredes, relleno, velocidades, temperaturas, soportes y orientación. Los guarda en dos perfiles de trabajo llamados "AUTO". **Tus perfiles no se tocan.**
 5. **Laminado.** Lamina en tu Orca y mira el resultado: tiempo, gramos, voladizos y temperaturas. Si algo no cierra, ajusta y vuelve a laminar, hasta tres veces antes de consultarte.
@@ -136,7 +136,7 @@ Idea → Diseño → Lista para imprimir → Impresa → En la tienda
 - Arriba, cuántas ideas están **pendientes**, cuántas piezas **en proceso** y cuántas **terminadas**, con filtros y un buscador.
 - Primero va **"Para hacer"** (lo más avanzado primero) y después las terminadas, por mes.
 - Cada tarjeta dice **a quién le toca lo que sigue**: "Le toca a Claude: dejarla lista para imprimir" o "Te toca: imprimirla". Tiene botones con el pedido ("Diseñala", "Ya la imprimí", "Publicala"…), para qué impresora es, la vista (o la foto de la pieza impresa), medidas, material, tiempo, gramos, costo, precio y los archivos.
-- **Tu taller:** arriba, lo que falta para que los costos y precios sean reales (la boleta de luz, el consumo de tu impresora, tu hora…), con un botón para cada cosa.
+- **Tu taller:** arriba, lo que falta para que los costos y precios sean reales (la boleta de luz, cuánto pagaste la impresora, tu hora…), con un botón para cada cosa. El consumo de cada impresora lo busca Claude en internet; si es estimado, el botón es para medir el real.
 - En el archivo, los botones copian el pedido para que lo pegues en el chat.
 - **Ideas para después:** contale a Claude "anotá esta idea: un soporte para la tele, 15 × 10 cm" y queda pendiente con lo que ya se sabe. Cuando la quieras hacer, pedila por su nombre.
 - Al empezar a usar el taller, Claude te dice en una línea qué tenés pendiente.
@@ -205,6 +205,8 @@ Los comandos llevan el nombre del plugin adelante (`/taller-3d:...`): si escrib�
 **¿Gasta mi plan de Claude?** Sí: diseñar y ajustar consume uso de tu plan. Un pedido claro y con medidas ahorra vueltas.
 
 **¿Cómo calcula el costo?** Suma el material (gramos de Orca × precio del kilo), la luz (el consumo de tu impresora × las horas, con el precio del kWh de tu boleta), el desgaste de la impresora (lo que la pagaste repartido en sus horas de vida), las que salen mal (10 % si no le decís otra cosa), tu tiempo y el embalaje. Si falta un dato, te dice cuál y la frase para dárselo.
+
+**¿De dónde saca cuánto consume mi impresora?** Lo busca en internet cuando preparás la impresora: el consumo promedio que publica el fabricante o una prueba medida del mismo modelo. Si la ficha solo dice la potencia ("350 W"), eso es el máximo calentando, no lo que gasta imprimiendo: lo estima por el tamaño de la cama y te avisa que es estimado. Te pregunta solo si no encuentra nada. Si tenés un medidor de enchufe, medí una impresión entera y pasale los kWh y las horas: es el mejor dato.
 
 **¿Para qué quiere mi boleta de luz?** Para sacar lo que te cuesta de verdad cada kWh. Guarda solo los números de la tarifa (kWh, cargos, impuestos, período y empresa): nunca tu nombre, tu dirección ni tus números de cliente o de medidor.
 

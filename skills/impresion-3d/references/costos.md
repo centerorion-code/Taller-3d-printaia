@@ -7,7 +7,7 @@ El costo de una pieza sale de los datos del usuario en `config.json` y de lo que
 | Dato | Dónde va | Cómo conseguirlo |
 |---|---|---|
 | Precio del kWh | `costos.luz` | La boleta de luz del usuario (foto o PDF). Ver abajo. |
-| Consumo de cada impresora | `impresoras[].costo.consumo_w` y `consumo_fuente` | Medido con un medidor de enchufe (lo mejor) o estimado con la ficha oficial o pruebas publicadas. |
+| Consumo de cada impresora | `impresoras[].costo.consumo_w` y `consumo_fuente` | Se busca en internet, sin preguntar (abajo): el promedio oficial, una prueba publicada o, si no hay, estimado por el tamaño de la cama. Medido con un medidor de enchufe es lo mejor. |
 | Precio de cada impresora | `impresoras[].costo.precio` | Preguntar cuánto la pagó (con envío e impuestos). |
 | Vida y mantenimiento | `impresoras[].costo.vida_horas`, `mantenimiento_pct` | Por defecto 4000 h (unos 3 años a 4 h por día) y 5 % del precio en repuestos. |
 | Calentamiento | `impresoras[].costo.calentamiento_min` | Por defecto 5 minutos de cama y boquilla antes de imprimir. |
@@ -18,7 +18,7 @@ El costo de una pieza sale de los datos del usuario en `config.json` y de lo que
 | Canales de venta | `tienda.canales` | Comisión, cuotas, IVA sobre la comisión y cargo fijo de cada canal. |
 | Margen habitual | `tienda.margen_precio_pct` | Qué parte del precio quiere ganar (por ejemplo 40 %). |
 
-Pedir cada dato la primera vez que hace falta, de a uno, con la frase de `costos.py estado` ("Te paso mi boleta de luz…"). Lo que falta no frena el presupuesto: sale con la lista de lo que falta y lo que se supuso.
+Pedir cada dato la primera vez que hace falta, de a uno, con la frase de `costos.py estado` ("Te paso mi boleta de luz…"). El consumo de la impresora no se pide: se busca (abajo). Lo que falta no frena el presupuesto: sale con la lista de lo que falta y lo que se supuso.
 
 ### La boleta de luz
 
@@ -45,8 +45,24 @@ python3 -I costos.py luz --config config.json --kwh 310 --total 53072 --cargo-va
 
 ### El consumo de la impresora
 
-- **Medido:** con un medidor de enchufe, anotar los kWh de una impresión entera y dividir por sus horas. Guardar `consumo_fuente: "medido"`.
-- **Estimado:** el consumo promedio mientras imprime, de la ficha oficial o de pruebas publicadas (citar la fuente en `consumo_fuente`). La potencia de la fuente es el máximo, no el promedio: una fuente de 350 W no consume 350 W.
+Se busca en internet **sin preguntarle al usuario**, cada vez que una impresora entra al taller (`/impresoras`, `/instalar`) y cada vez que una cuenta de costo usa una impresora que no lo tiene (`/pieza`, `/publicar`, el botón "Buscá el consumo…" del panel). Lo que importa es el **promedio mientras imprime**. La potencia nominal de la ficha ("Rated power", la de la fuente) es el máximo calentando: con una fuente de 350 W se imprime con 100 a 170 W, según la cama y el material, y una Creality Hi dice 1150 W a 220 V (390 W a 110 V), que no es lo que gasta imprimiendo.
+
+En este orden, con el modelo exacto de la impresora:
+
+1. **El promedio oficial:** ficha, manual o ayuda del fabricante (Prusa y Bambu Lab lo publican, a veces por material; usar el del material que más usa). `--promedio <W> --origen oficial --fuente <enlace>`.
+2. **Una prueba publicada** del mismo modelo, medida con un medidor de enchufe mientras imprime (una reseña con mediciones o el wiki del fabricante; no un comentario suelto de un foro ni una tienda). `--promedio <W> --origen prueba --fuente <enlace>`.
+3. **Si solo está la potencia nominal, estimarlo por el tamaño de la cama:** `--datos <JSON de la impresora>` (o `--cama 300x300`), `--material <el que más usa en esa impresora>`, `--nominal <W de la ficha>` y `--fuente <enlace de la ficha>`. Si tiene calefactor de cámara activo (para ABS), decir que con la cámara prendida consume bastante más.
+4. **Preguntar** solo si no se encuentra nada de eso (por ejemplo, una impresora armada a mano sin ficha): "No encontré cuánto consume tu <impresora>. ¿Qué tamaño de cama tiene? Si tenés un medidor de enchufe, mejor: medila en una impresión."
+
+```
+python3 -I costos.py consumo --config config.json --impresora <id> --datos <impresora>.json --material PETG \
+    --nominal 350 --fuente "<enlace de la ficha>" --salida config.json
+```
+
+Guardarlo con `--salida` y escribir `config.json` con el procedimiento de escritura (respaldo). El script anota `consumo_w`, `consumo_fuente` (de dónde salió), `consumo_fecha` y `potencia_nominal_w`, y no pisa un dato mejor (un medido con un estimado) salvo con `--reemplazar`. Decirle al usuario en una línea lo que se encontró y de dónde, con el enlace; si es estimado, que con un medidor de enchufe se puede medir el real ("Quiero medir el consumo real…" en el panel).
+
+- **Medido por el usuario:** con un medidor de enchufe, los kWh de una impresión entera divididos por sus horas: `--promedio <W> --origen medido`. Es el mejor dato.
+- **Lo que diga el usuario sin medirlo:** `--origen usuario`. Si es el número de la etiqueta de la fuente, es la potencia nominal: estimarlo con `--nominal` en vez de usarlo como promedio.
 
 ### Los canales
 

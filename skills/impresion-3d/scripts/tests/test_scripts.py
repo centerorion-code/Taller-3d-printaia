@@ -515,6 +515,101 @@ class TestCostos(unittest.TestCase):
         items = {i["tema"]: i for i in costos.estado_taller(self.CONFIG)}
         self.assertTrue(all(i["estado"] == "listo" for i in items.values()), items)
 
+    def test_consumo_de_la_impresora(self):
+        import copy
+        import costos
+        # Estimado por la cama: la potencia nominal es el máximo, no el promedio
+        e = costos.consumo_estimado
+        self.assertEqual(e(300, 300)["consumo_w"], 145)
+        self.assertEqual(e(300, 300, "PETG Eficiente")["consumo_w"], 160)
+        self.assertEqual(e(180, 180)["consumo_w"], 70)
+        self.assertEqual(e(250, 210, "abs")["consumo_w"], 140)
+        hi = e(260, 260, nominal_w=1150)              # 1150 W a 220 V: el pico calentando
+        self.assertEqual((hi["consumo_w"], hi["tope_nominal"]), (120, False))
+        chica = e(120, 120, nominal_w=60)
+        self.assertEqual((chica["consumo_w"], chica["tope_nominal"]), (50, True))
+        for mal in ((0, 300), (float("nan"), 300), (300, 5000), (None, 300)):
+            with self.assertRaises(ValueError):
+                e(*mal)
+        # De dónde salió
+        o = costos.origen_consumo
+        self.assertEqual(o({"consumo_w": 120, "consumo_fuente": "medido"}), "medido")
+        self.assertEqual(o({"consumo_w": 80, "consumo_fuente": "oficial: https://help.prusa3d.com"}), "oficial")
+        self.assertEqual(o({"consumo_w": 90, "consumo_fuente": "Prueba publicada: reseña"}), "prueba")
+        self.assertEqual(o({"consumo_w": 145, "consumo_fuente": "estimado: cama de 300 × 300 mm"}), "estimado")
+        self.assertEqual(o({"consumo_w": 145}), "sin fuente")
+        self.assertEqual(o({}), "falta")
+        # Guardar: no pisa un dato mejor, y solo en una impresora preparada
+        config = copy.deepcopy(self.CONFIG)
+        with self.assertRaises(ValueError):
+            costos.fijar_consumo(config, "hi", 145, "estimado")
+        self.assertEqual(config["impresoras"][0]["costo"]["consumo_w"], 120)
+        with self.assertRaises(ValueError):
+            costos.fijar_consumo(config, "bambu", 100, "oficial")
+        entrada = costos.fijar_consumo(config, "Creality Hi", 118.6, "estimado", "cama de 260 × 260 mm", 1150,
+                                       reemplazar=True)
+        ci = entrada["costo"]
+        self.assertEqual((ci["consumo_w"], ci["potencia_nominal_w"], ci["precio"]), (119, 1150, 600000))
+        self.assertTrue(ci["consumo_fuente"].startswith("estimado: ") and ci["consumo_fecha"])
+        # El panel: lo que falta se busca; lo estimado se puede medir; lo oficial está listo
+        def consumo(ci):
+            cfg = {"impresoras": [{"id": "hi", "nombre": "Creality Hi", "costo": ci}], "costos": {}, "tienda": {}}
+            return next(i for i in costos.estado_taller(cfg) if i["tema"] == "Consumo de Creality Hi")
+        falta = consumo({})
+        self.assertEqual((falta["estado"], falta["frase"]), ("falta", "Buscá el consumo de la Creality Hi en internet"))
+        estimado = consumo({"consumo_w": 120, "consumo_fuente": "estimado: cama"})
+        self.assertEqual((estimado["estado"], estimado["texto"]), ("revisar", "120 W (estimado)"))
+        self.assertIn("medir el consumo real", estimado["frase"])
+        self.assertEqual(consumo({"consumo_w": 145})["frase"], "Buscá el consumo de la Creality Hi en internet")
+        oficial = consumo({"consumo_w": 80, "consumo_fuente": "oficial: https://help.prusa3d.com"})
+        self.assertEqual((oficial["estado"], oficial["texto"], oficial["frase"]), ("listo", "80 W (ficha oficial)", None))
+        # En el costo de la pieza, el supuesto dice de dónde salió
+        cfg = copy.deepcopy(self.CONFIG)
+        cfg["impresoras"][0]["costo"].update(consumo_w=80, consumo_fuente="oficial: https://help.prusa3d.com")
+        sup = " ".join(costos.costo_pieza(30, 3600, "PETG", cfg, cfg["impresoras"][0])["supuestos"])
+        self.assertIn("80 W (ficha oficial)", sup)
+        self.assertNotIn("más exacto", sup)
+        cfg["impresoras"][0]["costo"].update(consumo_fuente="estimado: cama de 260 × 260 mm")
+        sup = " ".join(costos.costo_pieza(30, 3600, "PETG", cfg, cfg["impresoras"][0])["supuestos"])
+        self.assertIn("80 W (estimado); medido con un medidor de enchufe es más exacto", sup)
+
+    def test_consumo_por_linea_de_comandos(self):
+        carpeta = Path(tempfile.mkdtemp())
+        cfg, datos = carpeta / "config.json", carpeta / "impresora.json"
+        cfg.write_text(json.dumps({"impresoras": [{"id": "ender", "nombre": "Ender-3 V3 Plus", "cama": "PEI"}],
+                                   "costos": {"consumo_w": 180}}), encoding="utf-8")
+        datos.write_text(json.dumps({"area": {"x_min": 0, "x_max": 300, "y_min": 0, "y_max": 300}}), encoding="utf-8")
+        script = [sys.executable, "-I", str(SCRIPTS / "costos.py"), "consumo", "--config", str(cfg)]
+        r = subprocess.run(script + ["--impresora", "ender", "--datos", str(datos), "--material", "PETG",
+                                     "--nominal", "350", "--fuente", "https://www.creality.com/products/x",
+                                     "--salida", str(cfg)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("unos 160 W imprimiendo PETG", r.stdout)
+        self.assertIn("la ficha dice 350 W, que es el máximo", r.stdout)
+        guardado = json.loads(cfg.read_text(encoding="utf-8"))
+        ci = guardado["impresoras"][0]["costo"]
+        self.assertEqual((ci["consumo_w"], ci["potencia_nominal_w"], guardado["impresoras"][0]["cama"]), (160, 350, "PEI"))
+        self.assertIn("cama de 300 × 300 mm, imprimiendo PETG", ci["consumo_fuente"])
+        self.assertIn("https://www.creality.com/products/x", ci["consumo_fuente"])
+        self.assertEqual(guardado["costos"]["consumo_w"], 180)        # lo demás queda igual
+        # El medido gana: después, un estimado no lo pisa y no se escribe nada
+        r = subprocess.run(script + ["--impresora", "Ender-3 V3 Plus", "--promedio", "150", "--origen", "medido",
+                                     "--salida", str(cfg)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        antes = cfg.read_text(encoding="utf-8")
+        r = subprocess.run(script + ["--impresora", "ender", "--cama", "300x300", "--salida", str(cfg)],
+                           capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("no lo piso", r.stderr)
+        self.assertEqual(cfg.read_text(encoding="utf-8"), antes)
+        for malo in (["--promedio", "80"], ["--cama", "30x"], ["--promedio", "nan", "--origen", "oficial"],
+                     ["--impresora", "bambu", "--promedio", "80", "--origen", "oficial", "--salida", str(cfg)],
+                     ["--cama", "300x300", "--salida", str(cfg)]):
+            r = subprocess.run(script + malo, capture_output=True, text=True)
+            self.assertNotEqual(r.returncode, 0, malo)
+            self.assertNotIn("Traceback", r.stderr, malo)
+        self.assertEqual(cfg.read_text(encoding="utf-8"), antes)
+
     def test_revision_con_costos(self):
         cfg = Path(tempfile.mkdtemp()) / "config.json"
         cfg.write_text(json.dumps({**self.CONFIG, "impresoras": [{**self.CONFIG["impresoras"][0], "id": "prueba-300"}],

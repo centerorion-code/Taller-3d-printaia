@@ -6,7 +6,7 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
 {
   "version": 1,
   "carpeta_trabajo": "/home/usuario/Documentos/Taller 3D",
-  "aceptacion": {"fecha": "2026-11-21T10:00:00-03:00", "version_plugin": "0.1.18", "texto": "ACEPTO", "medio": "instalar.sh"},
+  "aceptacion": {"fecha": "2026-11-21T10:00:00-03:00", "version_plugin": "0.1.19", "texto": "ACEPTO", "medio": "instalar.sh"},
   "orca": {"version": "2.5.1", "ejecutable": "/home/usuario/Aplicaciones/OrcaSlicer_Linux_AppImage_Ubuntu2404_V2.5.1.AppImage",
            "origen": "oficial", "carpeta_usuario": "/home/usuario/.config/OrcaSlicer/user/default"},
   "impresora_por_defecto": "marca-modelo",
@@ -21,8 +21,9 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
       "filamento_auto": "AUTO filamento @Modelo",
       "procesos": {"calidad": "…", "eficiente": "…", "estandar": "…"},
       "filamentos": {"PETG": "…", "PLA": "…"},
-      "costo": {"precio": 600000, "vida_horas": 4000, "mantenimiento_pct": 5, "consumo_w": 120,
-                "consumo_fuente": "medido", "calentamiento_min": 5}
+      "costo": {"precio": 600000, "vida_horas": 4000, "mantenimiento_pct": 5, "consumo_w": 145,
+                "consumo_fuente": "estimado: cama de 300 × 300 mm, imprimiendo PLA; potencia nominal 350 W (https://…)",
+                "consumo_fecha": "2026-11-22", "potencia_nominal_w": 350, "calentamiento_min": 5}
     }
   ],
   "costos": {"moneda": "ARS",
@@ -49,7 +50,7 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
 - `datos`: ruta, relativa a la carpeta de trabajo, al JSON con los datos de la impresora en `taller-3d/impresoras/`. Lo arma `/impresoras` investigando en internet (formato en `references/impresoras.md`); el plugin no trae impresoras.
 - `cama`: tipo de cama que usa, con el nombre de Orca ("Textured PEI Plate", "High Temp Plate", "Cool Plate"…). El taller copia sus temperaturas al `AUTO filamento` (ver perfiles-orca.md, tipo de cama).
 - `procesos` y `filamentos`: nombres de los perfiles de usuario de Orca (las claves son libres; las de `filamentos` conviene que sean el material).
-- `impresoras[].costo`: lo de cada impresora para el costo (precio, vida en horas, mantenimiento %, consumo promedio en W y de dónde salió, minutos de calentamiento). Detalle en `references/costos.md`.
+- `impresoras[].costo`: lo de cada impresora para el costo (precio, vida en horas, mantenimiento %, consumo promedio en W, minutos de calentamiento). El consumo lo guarda `costos.py consumo`: `consumo_fuente` empieza con de dónde salió (`medido`, `oficial`, `prueba publicada`, `usuario` o `estimado`) y sigue con el enlace o el detalle; `consumo_fecha` y `potencia_nominal_w` (la de la ficha, que es el máximo) son para referencia. Detalle en `references/costos.md`.
 - `costos.luz`: los números de la tarifa de la boleta de luz, que guarda `costos.py luz` (solo números, nada personal). `costos.precio_kwh` queda igual que `luz.precio_kwh` para los scripts viejos.
 - `costos.filamentos`: precio por kg por material (PETG) o por nombre de perfil de filamento.
 - `costos.fallas_pct` y `costos.mano_de_obra`: el porcentaje de impresiones que salen mal y lo que vale tu hora.

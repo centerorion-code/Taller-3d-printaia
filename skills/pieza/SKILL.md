@@ -16,7 +16,7 @@ Usar siempre una lista de tareas con las etapas (Entender la pieza, Modelo, Conf
 1. `get_device_info`: verificar que `orca-mcp` esté `announced` y que estén conectadas la carpeta de trabajo y la de perfiles de usuario de Orca (`user/<id>`, que tiene `process`, `filament` y `machine`; o esas carpetas por separado). Si faltan, pedir acceso **una sola vez** con `device_request_folder_access` listando solo esas carpetas (si la carpeta de trabajo no existe, `/instalar`, sección 3). Si el permiso se rechaza, pedir que conecte esas carpetas desde la app de Claude (menú + → Agregar carpeta). Si `orca-mcp` no está, derivar a `/instalar`.
 2. Traer `taller-3d/config.json` de la carpeta de trabajo (y `taller-3d/novedades-orca.json` si existe). Si no hay configuración, derivar a `/instalar`.
 3. Si `config.json` no tiene `aceptacion`, mostrar el resumen del aviso de uso y pedir ACEPTO (skill `impresion-3d`, regla 8).
-4. Elegir la impresora (`references/impresoras.md`, sección 1, que ve también las impresoras sin copia de usuario): la que diga el usuario; si no dice y en Orca hay varias, preguntar en cuál quiere trabajar (primero la elegida en Orca o la última usada), avisando que elegirla en la ventana de Orca no le llega a Claude. Si la elegida no tiene copia de usuario, ofrecer crearla. Si esa impresora todavía no está preparada en el taller, prepararla con `/impresoras` (se investiga en internet y se configura óptima) antes de seguir. Traer su JSON (`datos`, en `taller-3d/impresoras/`) con `device_stage_files`: es el `--impresora` de los scripts. Si eligió una distinta de `impresora_por_defecto`, al registrar la entrega dejarla como `impresora_por_defecto` (la última usada aparece primera la próxima vez).
+4. Ver qué impresoras tiene (`references/impresoras.md`, sección 1, que ve también las impresoras sin copia de usuario). La impresora se elige en cada pieza, en la sección 1, **antes de calcular nada**: si entra, los perfiles, el tiempo y el costo dependen de ella. No se pregunta si el usuario la nombró, si tiene una sola o si para lo que pide sirve una sola (no entra en las otras, o el material pide cerramiento y es la única cerrada): decir en una línea cuál y por qué.
 5. Preparar Python: `pip install --break-system-packages -q manifold3d numpy matplotlib`.
 
 ## 1. Entender la pieza (cuestionario corto)
@@ -25,16 +25,19 @@ Si el pedido no lo dice, preguntar con AskUserQuestion (hasta 4 preguntas juntas
 
 | Pregunta | Opciones |
 |---|---|
+| ¿En qué impresora? (solo si hay que preguntarla, paso 0.4) | Una por impresora, la recomendada primero con "(Recomendada)": la que mejor encaja por tamaño y material; si da igual, la última usada (`impresora_por_defecto`). En la descripción: tamaño de la cama, si es cerrada y "ya preparada" o "hay que prepararla (unos minutos, solo la primera vez)" |
 | ¿Para qué es? | Funcional (soporta esfuerzo) · Se ve (estética) · Encastre o mecanismo · Prototipo rápido |
 | ¿Dónde va a estar? | Interior · Al sol o al aire libre · Cerca de calor (auto, motor, más de 50 °C) · Con agua o humedad |
 | ¿Material? | Los filamentos de la configuración del usuario + "Otro" |
 | ¿Qué priorizás? | Calidad · Resistencia · Velocidad · Ahorro de material |
 
-Además, en texto: medidas críticas (con calibre si es un encastre), cantidad, color y fecha si la hay. **No inventar medidas:** si falta una que importa, preguntarla. Si manda una foto, usarla para la forma y pedir las medidas que la foto no da.
+Si con la impresora son más de 4 preguntas, la impresora va en la primera tanda. Además, en texto: medidas críticas (con calibre si es un encastre), cantidad, color y fecha si la hay. **No inventar medidas:** si falta una que importa, preguntarla. Si manda una foto, usarla para la forma y pedir las medidas que la foto no da.
 
 Si el pedido es una idea anotada en el panel, partir de su nota (medidas, uso, material) y preguntar solo lo que falte. Si el usuario lo deja para otro momento, ofrecer anotarlo como idea (skill `panel`).
 
-Con las respuestas, decidir y anotar: material (si va al sol o al calor, nunca PLA), receta (`references/recetas.md`), orientación y si es un uso crítico (regla 9). Si las medidas ya muestran que no entra en la impresora elegida, avisarlo antes de modelar y sugerir otra suya donde entre (Revisar, paso 1).
+**Con la impresora elegida**, antes de modelar: si se preguntó, avisar en una línea que elegirla en la ventana de Orca no le llega a Claude. Si no tiene copia de usuario, ofrecer crearla. Si todavía no está preparada en el taller, prepararla con `/impresoras` (se investiga en internet y se configura óptima). Si le falta el consumo, buscarlo y guardarlo sin preguntar (`references/costos.md`, «El consumo de la impresora»). Traer su JSON (`datos`, en `taller-3d/impresoras/`) con `device_stage_files`: es el `--impresora` de los scripts. Si eligió una distinta de `impresora_por_defecto`, al registrar la entrega dejarla como `impresora_por_defecto` (la última usada aparece primera la próxima vez).
+
+Con las respuestas, decidir y anotar: material (si va al sol o al calor, nunca PLA), receta (`references/recetas.md`), orientación y si es un uso crítico (regla 9). Si las respuestas no cierran con la impresora elegida (un ABS en una abierta, medidas que no entran), avisarlo antes de modelar y sugerir otra suya donde sí (Revisar, paso 1).
 
 ## 2. Modelo
 

@@ -31,6 +31,13 @@ Uso:
   python3 costos.py pieza ... --margen 50                # el margen elegido para este producto
   python3 costos.py pieza ... --precio 4500              # un precio fijo: el margen real que deja en cada canal
   python3 costos.py estado --config config.json          # qué falta configurar para tener costos reales
+  python3 costos.py consumo --config config.json --impresora hi --promedio 80 --origen oficial \\
+      --fuente "<enlace>" --salida config.json            # el consumo promedio que publica el fabricante
+  python3 costos.py consumo --config config.json --impresora hi --datos creality-hi.json [--material PETG] \\
+      [--nominal 350] [--fuente "<enlace de la ficha>"] --salida config.json   # estimado por el tamaño de la cama
+
+Consumo de la impresora: lo que importa es el promedio mientras imprime. La potencia nominal de la ficha (la de la
+fuente) es el máximo calentando: una impresora con fuente de 350 W imprime con 100-170 W.
 
 El margen es sobre el precio (de cada venta, qué parte te queda de ganancia), no un recargo sobre el costo:
 un recargo del 50 % es un margen del 33 %.
@@ -138,6 +145,100 @@ def impresora_de_config(config: dict, clave: str | None) -> dict:
     return {}
 
 
+# ------------------------------------------------------------------ consumo de la impresora
+
+# De dónde salió el consumo (primera palabra de consumo_fuente), cómo se muestra y cuánto vale el dato.
+ETIQUETAS_CONSUMO = {"medido": "medido", "oficial": "ficha oficial", "prueba": "prueba publicada",
+                     "usuario": "dato tuyo", "estimado": "estimado", "sin fuente": "sin fuente"}
+RANGO_CONSUMO = {"medido": 4, "oficial": 3, "prueba": 3, "usuario": 2, "estimado": 1, "sin fuente": 0, "falta": 0}
+CAMA_TIBIA = {"PETG", "PETG-CF"}                  # cama a 70-80 °C
+CAMA_CALIENTE = {"ABS", "ASA", "PC", "PA"}        # cama a 90-110 °C
+
+
+def origen_consumo(ci: dict | None) -> str:
+    """De dónde salió el consumo de una impresora: medido, oficial, prueba, usuario, estimado, sin fuente o falta."""
+    ci = ci if isinstance(ci, dict) else {}
+    if _num(ci.get("consumo_w")) is None:
+        return "falta"
+    fuente = comun.plano(ci.get("consumo_fuente"))
+    for origen in ("medido", "oficial", "prueba", "usuario", "estimado"):
+        if fuente.startswith(origen):
+            return origen
+    return "sin fuente"
+
+
+def consumo_estimado(ancho_mm: float, fondo_mm: float, material: str | None = None,
+                     nominal_w: float | None = None) -> dict:
+    """Consumo promedio imprimiendo, estimado por el tamaño de la cama, para cuando la ficha solo da la potencia
+    nominal (que es el máximo calentando, no el promedio).
+
+    Unos 30 W fijos (placa, motores, ventiladores y boquilla) más 0,13 W por cm² de cama, con PLA. Da valores
+    parecidos (dentro de un 25 %) a los promedios publicados de impresoras sin calefactor de cámara: Prusa MK
+    (80 W con PLA, 25 × 21 cm), Ender 3 (100-125 W, 22 × 22 cm), Bambu Lab H2S (180-200 W, 34 × 32 cm). PETG
+    +10 % (cama más caliente); ABS, ASA, PC y nylon +40 %. Nunca más que el 80 % de la potencia nominal.
+    """
+    ancho, fondo = _num(ancho_mm), _num(fondo_mm)
+    if not all(v is not None and math.isfinite(v) and 0 < v <= 2000 for v in (ancho, fondo)):
+        raise ValueError("La cama va en mm, como 300x300.")
+    area = ancho * fondo / 100
+    m = comun.normalizar_material(material) if material else None
+    factor = 1.1 if m in CAMA_TIBIA else 1.4 if m in CAMA_CALIENTE else 1.0
+    watts = (30 + 0.13 * area) * factor
+    nominal = _num(nominal_w)
+    tope = bool(nominal and math.isfinite(nominal) and nominal > 0 and watts > 0.8 * nominal)
+    if tope:
+        watts = 0.8 * nominal
+    return {"consumo_w": max(5, int(5 * round(watts / 5))), "cama_mm": [ancho, fondo], "area_cm2": round(area),
+            "material": m or (str(material) if material else "PLA"), "factor": factor, "tope_nominal": tope}
+
+
+def area_de_datos(datos: dict) -> tuple[float, float]:
+    """Ancho y fondo del área de impresión del JSON de una impresora del taller."""
+    a = datos.get("area") if isinstance(datos.get("area"), dict) else {}
+    try:
+        return float(a["x_max"]) - float(a.get("x_min") or 0), float(a["y_max"]) - float(a.get("y_min") or 0)
+    except (KeyError, TypeError, ValueError):
+        raise ValueError("El JSON de la impresora no tiene el área de impresión (area.x_max, area.y_max).")
+
+
+def _entrada_impresora(config: dict, clave: str | None) -> dict | None:
+    """La entrada real de config.json (para escribirla), solo si el id, el nombre o los datos coinciden."""
+    c = comun.plano(clave or config.get("impresora_por_defecto"))
+    for i in config.get("impresoras") or []:
+        if isinstance(i, dict) and c and any(n and comun.plano(n) == c for n in
+                                             (i.get("id"), i.get("nombre"), Path(str(i.get("datos") or "")).stem)):
+            return i
+    return None
+
+
+def fijar_consumo(config: dict, clave: str | None, consumo_w, origen: str, fuente: str | None = None,
+                  nominal_w=None, reemplazar: bool = False) -> dict:
+    """Guarda el consumo en impresoras[].costo (consumo_w, consumo_fuente, consumo_fecha y potencia_nominal_w).
+    No pisa un dato mejor (un medido con un estimado, por ejemplo) salvo con reemplazar. Devuelve la entrada."""
+    if origen not in ("medido", "oficial", "prueba", "usuario", "estimado"):
+        raise ValueError(f"Origen desconocido: {origen}")
+    consumo = _num(consumo_w)
+    if consumo is None or not 1 <= consumo <= 5000:
+        raise ValueError("El consumo va en W, entre 1 y 5000.")
+    entrada = _entrada_impresora(config, clave)
+    if entrada is None:
+        raise ValueError(f"«{clave}» no está preparada en config.json: primero hay que prepararla (/impresoras).")
+    ci = entrada.get("costo") if isinstance(entrada.get("costo"), dict) else {}
+    antes = origen_consumo(ci)
+    if not reemplazar and RANGO_CONSUMO[antes] > RANGO_CONSUMO[origen]:
+        raise ValueError(f"Ya tiene un consumo {ETIQUETAS_CONSUMO[antes]} ({_num(ci.get('consumo_w')):g} W): "
+                         f"no lo piso con uno {ETIQUETAS_CONSUMO[origen]} (con --reemplazar, sí).")
+    texto = {"prueba": "prueba publicada"}.get(origen, origen)
+    fuente = " ".join(str(fuente or "").split())[:300]
+    ci.update({"consumo_w": int(round(consumo)), "consumo_fuente": f"{texto}: {fuente}" if fuente else texto,
+               "consumo_fecha": time.strftime("%Y-%m-%d")})
+    nominal = _num(nominal_w)
+    if nominal and math.isfinite(nominal) and nominal > 0:
+        ci["potencia_nominal_w"] = int(nominal) if float(nominal).is_integer() else nominal
+    entrada["costo"] = ci
+    return entrada
+
+
 # ------------------------------------------------------------------ costo de una pieza
 
 def costo_pieza(gramos, segundos, material: str | None, config: dict, impresora: dict | None = None,
@@ -172,10 +273,12 @@ def costo_pieza(gramos, segundos, material: str | None, config: dict, impresora:
     if consumo is None:
         faltan.append(f"consumo de {nombre_imp} (W)")
     else:
-        fuente = ci.get("consumo_fuente") or ("general del taller" if not ci.get("consumo_w") else "sin fuente")
-        if not str(fuente).startswith("medido"):
-            supuestos.append(f"consumo de {nombre_imp}: {consumo:.0f} W ({fuente}); medido con un medidor de enchufe "
-                             "es más exacto")
+        origen = origen_consumo(ci) if _num(ci.get("consumo_w")) else "general"
+        if origen != "medido":
+            texto = f"consumo de {nombre_imp}: {consumo:.0f} W ({ETIQUETAS_CONSUMO.get(origen, 'general del taller')})"
+            if origen not in ("oficial", "prueba"):
+                texto += "; medido con un medidor de enchufe es más exacto"
+            supuestos.append(texto)
     calentamiento = _num(ci.get("calentamiento_min"))
     calentamiento = CALENTAMIENTO_MIN if calentamiento is None else calentamiento
     horas_luz = horas + (calentamiento / 60 if segundos else 0)
@@ -368,11 +471,11 @@ def estado_taller(config: dict) -> list[dict]:
         ci = i.get("costo") if isinstance(i.get("costo"), dict) else {}
         nombre = i.get("nombre") or i.get("id")
         consumo = _num(ci.get("consumo_w"))
-        medido = str(ci.get("consumo_fuente") or "").startswith("medido")
+        origen = origen_consumo(ci)
         agregar(f"Consumo de {nombre}", consumo is not None,
-                f"{consumo:.0f} W ({'medido' if medido else 'estimado'})" if consumo is not None else "Falta el consumo",
-                f"Ayudame a sacar el consumo de la {nombre}" if consumo is None else
-                f"Quiero medir el consumo real de la {nombre}", aviso=consumo is not None and not medido)
+                f"{consumo:.0f} W ({ETIQUETAS_CONSUMO[origen]})" if consumo is not None else "Falta el consumo",
+                f"Buscá el consumo de la {nombre} en internet" if origen in ("falta", "sin fuente") else
+                f"Quiero medir el consumo real de la {nombre}", aviso=origen in ("estimado", "sin fuente"))
         agregar(f"Precio de {nombre}", _num(ci.get("precio")) is not None,
                 _plata(_num(ci.get("precio")), costos.get("moneda") or "ARS") if _num(ci.get("precio")) else
                 "Falta cuánto la pagaste (para el desgaste)", f"La {nombre} me costó $…")
@@ -447,9 +550,34 @@ def main(argv=None) -> None:
     es = sub.add_parser("estado", help="qué falta configurar")
     es.add_argument("--config", type=Path, required=True)
     es.add_argument("--json", action="store_true")
+    cs = sub.add_parser("consumo", help="consumo promedio de una impresora: el encontrado o estimado por la cama")
+    cs.add_argument("--config", type=Path, required=True)
+    cs.add_argument("--impresora", help="id o nombre de la impresora en config.json")
+    dato = cs.add_mutually_exclusive_group(required=True)
+    dato.add_argument("--promedio", type=float, help="W promedio imprimiendo (ficha oficial, prueba publicada o medido)")
+    dato.add_argument("--cama", help="ancho x fondo de la cama en mm, como 300x300 (para estimarlo)")
+    dato.add_argument("--datos", type=Path, help="JSON de la impresora del taller: estima con su área de impresión")
+    cs.add_argument("--origen", choices=["oficial", "prueba", "medido", "usuario"], help="de dónde salió --promedio")
+    cs.add_argument("--material", help="el material que más usa en esa impresora (cambia el estimado)")
+    cs.add_argument("--nominal", type=float, help="potencia nominal de la ficha, en W (se anota y es el tope del estimado)")
+    cs.add_argument("--fuente", help="enlace o texto de dónde salió el dato")
+    cs.add_argument("--reemplazar", action="store_true", help="pisar un consumo mejor (por ejemplo, uno medido)")
+    cs.add_argument("--salida", type=Path, help="config.json donde guardarlo (sin esto, solo lo muestra)")
+    cs.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
-    if a.accion == "luz" and not a.config.exists():
+    if a.accion in ("luz", "consumo") and not a.config.exists():
         raise SystemExit(f"No encuentro {a.config}: pasá el config.json del taller (no se escribió nada).")
+    if a.accion == "consumo":
+        if a.promedio is not None and not 1 <= a.promedio <= 5000:
+            raise SystemExit("--promedio va en W, entre 1 y 5000 (no se escribió nada).")
+        if a.nominal is not None and not 1 <= a.nominal <= 20000:
+            raise SystemExit("--nominal va en W, como dice la ficha (no se escribió nada).")
+        if a.promedio is not None and not a.origen:
+            raise SystemExit("Con --promedio va --origen: oficial, prueba (publicada), medido o usuario.")
+        if a.salida and not a.impresora:
+            raise SystemExit("Para guardarlo hace falta --impresora (el id o el nombre en config.json).")
+        if a.datos and not a.datos.exists():
+            raise SystemExit(f"No encuentro {a.datos} (no se escribió nada).")
     if a.accion == "pieza" and a.precio is not None and a.precio <= 0:
         raise SystemExit("--precio tiene que ser mayor que cero.")
     config = comun.cargar_json(a.config) if a.config.exists() else {}
@@ -522,6 +650,45 @@ def main(argv=None) -> None:
         if a.json:
             a.json.write_text(json.dumps({"costo": c, "precios": p, "opciones": ops}, ensure_ascii=False, indent=2),
                               encoding="utf-8")
+    elif a.accion == "consumo":
+        entrada = _entrada_impresora(config, a.impresora) if a.impresora else None
+        nombre = f"la {entrada.get('nombre') or entrada.get('id')}" if entrada else (
+            f"la {a.impresora}" if a.impresora else "la impresora")
+        try:
+            if a.promedio is not None:
+                r = {"consumo_w": int(round(a.promedio)), "origen": a.origen}
+                texto = (f"Consumo de {nombre}: {r['consumo_w']} W imprimiendo "
+                         f"({ETIQUETAS_CONSUMO[a.origen]}{', ' + a.fuente if a.fuente else ''}).")
+            else:
+                if a.datos:
+                    ancho, fondo = area_de_datos(comun.cargar_json(a.datos))
+                else:
+                    partes = [_num(x) for x in a.cama.lower().replace("×", "x").replace("*", "x").split("x")]
+                    if len(partes) != 2 or None in partes:
+                        raise ValueError("La cama va en mm, como 300x300.")
+                    ancho, fondo = partes
+                r = {**consumo_estimado(ancho, fondo, a.material, a.nominal), "origen": "estimado"}
+                cama = f"{_coma(ancho)} × {_coma(fondo)} mm"
+                nominal = (f"; la ficha dice {_coma(a.nominal)} W, que es el máximo calentando, no el promedio"
+                           if a.nominal else "")
+                tope = "; lo limité al 80 % de la potencia nominal" if r["tope_nominal"] else ""
+                texto = (f"Consumo de {nombre}: unos {r['consumo_w']} W imprimiendo {r['material']} (estimado por la "
+                         f"cama de {cama}{nominal}{tope}). Con un medidor de enchufe se puede medir el real.")
+                a.fuente = f"cama de {cama}, imprimiendo {r['material']}" + (
+                    f"; potencia nominal {_coma(a.nominal)} W" if a.nominal else "") + (
+                    f" ({a.fuente})" if a.fuente else "")
+            if a.salida:
+                fijar_consumo(config, a.impresora, r["consumo_w"], r["origen"], a.fuente, a.nominal, a.reemplazar)
+                _guardar(a.salida, config)
+        except ValueError as error:
+            raise SystemExit(f"{str(error).rstrip('.')} (no se escribió nada)." if a.salida else str(error))
+        if a.json:
+            print(json.dumps({**r, "fuente": a.fuente, "texto": texto, "guardado": bool(a.salida)},
+                             ensure_ascii=False, indent=2))
+        else:
+            print(texto)
+            if a.salida:
+                print(f"Guardado en {a.salida}.")
     else:
         items = estado_taller(config)
         if a.json:

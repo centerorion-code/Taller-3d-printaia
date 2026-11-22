@@ -38,7 +38,7 @@ Cargar antes la skill `impresion-3d` y seguir sus reglas. Scripts en `<raíz del
 
 ## 3. Precio
 
-1. Traer `taller-3d/config.json` y correr `costos.py estado --config config.json`. Si falta algo para el costo, pedirlo de a un dato con su frase (la boleta de luz, el consumo, el precio de la impresora, el precio del filamento, tu hora, las comisiones del canal) y guardarlo con respaldo. Si el usuario prefiere seguir sin eso, seguir: el precio sale con la lista de lo que falta.
+1. Traer `taller-3d/config.json` y correr `costos.py estado --config config.json`. Si falta el consumo de la impresora, buscarlo y guardarlo sin preguntar (`references/costos.md` de la skill `impresion-3d`, «El consumo de la impresora»). Si falta otra cosa para el costo, pedirla de a un dato con su frase (la boleta de luz, el precio de la impresora, el precio del filamento, tu hora, las comisiones del canal) y guardarla con respaldo. Si el usuario prefiere seguir sin eso, seguir: el precio sale con la lista de lo que falta.
 2. Opciones de margen:
    ```bash
    python3 -I costos.py pieza --config config.json --informe-gcode informe_gcode.json \
