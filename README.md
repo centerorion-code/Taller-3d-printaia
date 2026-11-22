@@ -74,7 +74,7 @@ Ubuntu 24.04, OrcaSlicer 2.5.1, orca-mcp 0.1.0, Creality Ender-3 V3 Plus. El ins
 
 ## Versión
 
-0.1.19. Cambios en [CHANGELOG.md](CHANGELOG.md).
+0.1.20. Cambios en [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 

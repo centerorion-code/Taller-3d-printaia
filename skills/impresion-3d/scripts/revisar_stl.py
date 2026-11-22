@@ -75,6 +75,71 @@ def rotar(tri: np.ndarray, grados_xyz) -> np.ndarray:
     return tri @ (rz @ ry @ rx).T
 
 
+def componentes(caras: np.ndarray, n_vertices: int) -> np.ndarray:
+    """Etiqueta de cada vértice según la parte de la malla a la que pertenece (partes que no se tocan)."""
+    etiqueta = np.arange(n_vertices)
+    a = np.concatenate([caras[:, 0], caras[:, 1], caras[:, 2]])
+    b = np.concatenate([caras[:, 1], caras[:, 2], caras[:, 0]])
+    while True:
+        ea, eb = etiqueta[a], etiqueta[b]
+        menor = np.minimum(ea, eb)
+        nueva = etiqueta.copy()
+        np.minimum.at(nueva, ea, menor)          # cada raíz se cuelga de la menor de su borde
+        np.minimum.at(nueva, eb, menor)
+        while True:                              # y se acortan los caminos hasta la raíz
+            salto = nueva[nueva]
+            if np.array_equal(salto, nueva):
+                break
+            nueva = salto
+        if np.array_equal(nueva, etiqueta):
+            return etiqueta
+        etiqueta = nueva
+
+
+def partes_sueltas(vert: np.ndarray, caras: np.ndarray, z_min: float, signo: float, distancia: float = 0.3) -> dict:
+    """Partes de la malla que no apoyan en la cama: las que tocan otra parte sin estar unidas y las que quedan en
+    el aire. Los huecos internos (cáscaras con volumen negativo) no cuentan. Para ver si se tocan usa manifold3d;
+    sin él, las que no apoyan quedan como "sin_saber"."""
+    etiqueta = componentes(caras, len(vert))
+    _, parte = np.unique(etiqueta[caras[:, 0]], return_inverse=True)
+    parte = parte.reshape(-1)
+    k = int(parte.max()) + 1 if len(parte) else 0
+    v0, v1, v2 = vert[caras[:, 0]], vert[caras[:, 1]], vert[caras[:, 2]]
+    volumen = np.bincount(parte, weights=np.einsum("ij,ij->i", v0, np.cross(v1, v2)) / 6.0, minlength=k) * signo
+    z_parte = np.full(k, np.inf)
+    np.minimum.at(z_parte, parte, np.minimum(np.minimum(v0[:, 2], v1[:, 2]), v2[:, 2]))
+    solidas = volumen > 1e-6
+    arriba = [int(c) for c in np.where(solidas & (z_parte > z_min + distancia))[0]]
+    r = {"partes": int(solidas.sum()), "sin_unir": [], "en_el_aire": [], "sin_saber": []}
+    if not arriba:
+        return r
+    try:
+        from manifold3d import Error, Manifold, Mesh
+    except ImportError:
+        r["sin_saber"] = [round(float(z_parte[c]), 1) for c in arriba]
+        return r
+
+    def solido(elegidos):
+        c = caras[elegidos]
+        usados, nuevos = np.unique(c, return_inverse=True)
+        m = Manifold(Mesh(vert_properties=vert[usados].astype(np.float32),
+                          tri_verts=nuevos.reshape(-1, 3).astype(np.uint32)))
+        return m if m.status() == Error.NoError else None
+
+    for c in arriba[:50]:
+        propia, resto = solido(parte == c), solido(parte != c)
+        z = round(float(z_parte[c]), 1)
+        if propia is None or resto is None:
+            r["sin_saber"].append(z)
+            continue
+        crecida = propia                         # la parte, agrandada unos décimos en las seis direcciones
+        for d in ((distancia, 0, 0), (-distancia, 0, 0), (0, distancia, 0), (0, -distancia, 0),
+                  (0, 0, distancia), (0, 0, -distancia)):
+            crecida = crecida + propia.translate(d)
+        (r["sin_unir"] if (crecida ^ resto).volume() > 1e-6 else r["en_el_aire"]).append(z)
+    return r
+
+
 def analizar(tri: np.ndarray, impresora: dict, material: str | None, esperado=None, tolerancia=0.2,
              umbral=45.0) -> dict:
     hallazgos: list[dict] = []
@@ -91,8 +156,9 @@ def analizar(tri: np.ndarray, impresora: dict, material: str | None, esperado=No
 
     # Malla cerrada y orientada
     claves = np.round(pts / 1e-4).astype(np.int64)
-    _, idx = np.unique(claves, axis=0, return_inverse=True)
+    _, primeros, idx = np.unique(claves, axis=0, return_index=True, return_inverse=True)
     caras = idx.reshape(-1, 3)
+    vertices = pts[primeros]
     degeneradas = (caras[:, 0] == caras[:, 1]) | (caras[:, 1] == caras[:, 2]) | (caras[:, 0] == caras[:, 2])
     caras_ok = caras[~degeneradas]
     dirigidas = np.concatenate([caras_ok[:, [0, 1]], caras_ok[:, [1, 2]], caras_ok[:, [2, 0]]])
@@ -124,6 +190,27 @@ def analizar(tri: np.ndarray, impresora: dict, material: str | None, esperado=No
         agregar(ADVERTENCIA, f"{int(degeneradas.sum())} triángulos degenerados (sin área): conviene reparar la malla.")
     if volumen < 0:
         agregar(ADVERTENCIA, "Las normales apuntan hacia adentro (volumen negativo). Orca suele corregirlo.")
+
+    # Partes separadas: una que no apoya en la cama ni toca otra parte se imprimiría en el aire
+    partes = {"partes": 1, "sin_unir": [], "en_el_aire": [], "sin_saber": []}
+    if not bordes_abiertos and not no_manifold and len(caras_ok):
+        partes = partes_sueltas(vertices, caras_ok, float(minimo[2]), 1.0 if volumen >= 0 else -1.0)
+    if partes["en_el_aire"]:
+        n = len(partes["en_el_aire"])
+        agregar(RECHAZO, f"{n} parte{'s' if n > 1 else ''} suelta{'s' if n > 1 else ''} en el aire: no apoya"
+                f"{'n' if n > 1 else ''} en la cama ni toca{'n' if n > 1 else ''} la pieza (Z desde "
+                f"{min(partes['en_el_aire']):g} mm). Unirla{'s' if n > 1 else ''} a la pieza o sacarla"
+                f"{'s' if n > 1 else ''}.")
+    if partes["sin_unir"]:
+        n = len(partes["sin_unir"])
+        agregar(ADVERTENCIA, f"{n} parte{'s' if n > 1 else ''} separada{'s' if n > 1 else ''} que toca"
+                f"{'n' if n > 1 else ''} la pieza sin estar unida{'s' if n > 1 else ''}: unirla"
+                f"{'s' if n > 1 else ''} (unir) para que salga como una sola pieza.")
+    if partes["sin_saber"]:
+        n = len(partes["sin_saber"])
+        agregar(ADVERTENCIA, f"{n} parte{'s' if n > 1 else ''} separada{'s' if n > 1 else ''} que no apoya"
+                f"{'n' if n > 1 else ''} en la cama: revisar que esté{'n' if n > 1 else ''} unida"
+                f"{'s' if n > 1 else ''} a la pieza (sin manifold3d no se puede ver si se tocan).")
 
     # Entra en la cama (sin impresora, por ejemplo en /diseno, no se revisa)
     entra = None
@@ -192,6 +279,9 @@ def analizar(tri: np.ndarray, impresora: dict, material: str | None, esperado=No
         "superficie_cm2": round(area_total / 100, 2),
         "peso_macizo_g": round(gramos_macizo, 1),
         "cerrada": bordes_abiertos == 0 and no_manifold == 0,
+        "partes": partes["partes"],
+        "partes_en_el_aire": len(partes["en_el_aire"]),
+        "partes_sin_unir": len(partes["sin_unir"]),
         "entra_en_cama": entra,
         "rotacion_sugerida": list(sugerencia) if sugerencia else None,
         "apoyo_cm2": round(area_apoyo / 100, 2),

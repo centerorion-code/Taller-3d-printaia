@@ -338,6 +338,69 @@ class TestCadYStl(unittest.TestCase):
         r = revisar_stl.analizar(tri, comun.cargar_impresora(IMPRESORA_PRUEBA), "PLA")
         self.assertEqual(r["estado"], comun.RECHAZO)
 
+    def test_importar_stl_de_blender(self):
+        import math
+
+        import numpy as np
+        from cad import caja, cilindro, exportar_stl, importar_stl, mover, unir
+
+        import revisar_stl
+        with tempfile.TemporaryDirectory() as d:
+            figura = Path(d) / "figura.stl"
+            exportar_stl(mover(cilindro(10, 8), x=5, y=5), figura)
+            solido = importar_stl(figura)
+            self.assertAlmostEqual(solido.volume(), math.pi * 25 * 8, delta=12)
+            # Una figura apoyada en una base hecha por código: una sola pieza cerrada
+            pieza = Path(d) / "pieza.stl"
+            info = exportar_stl(unir(caja(20, 20, 3), mover(solido, z=2.5)), pieza)
+            self.assertEqual(info["medidas_mm"], (20.0, 20.0, 10.5))
+            # Dada vuelta (normales hacia adentro) también entra, con volumen positivo
+            tri = revisar_stl.leer_stl(figura)
+            revisar_stl.escribir_stl(Path(d) / "vuelta.stl", tri[:, [0, 2, 1]])
+            self.assertGreater(importar_stl(Path(d) / "vuelta.stl").volume(), 0)
+            # Abierta: falla y dice qué hacer en Blender
+            revisar_stl.escribir_stl(Path(d) / "abierta.stl", tri[:-3])
+            with self.assertRaisesRegex(ValueError, "no es una malla cerrada.*Remesh"):
+                importar_stl(Path(d) / "abierta.stl")
+            self.assertTrue(np.isfinite(solido.volume()))
+
+    def test_partes_sueltas(self):
+        import numpy as np
+        from cad import caja, exportar_stl, mover, restar
+
+        import revisar_stl
+
+        def triangulos(*solidos):
+            with tempfile.TemporaryDirectory() as d:
+                partes = []
+                for i, s in enumerate(solidos):
+                    ruta = Path(d) / f"{i}.stl"
+                    exportar_stl(s, ruta, apoyar_en_cama=False)
+                    partes.append(revisar_stl.leer_stl(ruta))
+                return np.concatenate(partes)
+
+        def revisar(*solidos):
+            return revisar_stl.analizar(triangulos(*solidos), {}, "PLA")
+
+        base = caja(40, 40, 5)
+        # Una cabeza que no se fundió con el cuerpo: queda en el aire
+        r = revisar(base, mover(caja(10, 10, 10), x=15, y=15, z=12))
+        self.assertEqual(r["estado"], comun.RECHAZO)
+        self.assertEqual((r["partes"], r["partes_en_el_aire"]), (2, 1))
+        self.assertTrue(any("suelta en el aire" in h["mensaje"] for h in r["hallazgos"]), r["hallazgos"])
+        # Apoyada encima pero sin unir: advertencia, se imprime igual
+        r = revisar(base, mover(caja(10, 10, 10), x=15, y=15, z=5))
+        self.assertEqual((r["partes_en_el_aire"], r["partes_sin_unir"]), (0, 1))
+        self.assertNotEqual(r["estado"], comun.RECHAZO, r["hallazgos"])
+        # Varias piezas sueltas en la cama: bien
+        r = revisar(caja(10, 10, 10), mover(caja(10, 10, 10), x=20))
+        self.assertEqual((r["partes"], r["partes_en_el_aire"], r["partes_sin_unir"]), (2, 0, 0))
+        # Un hueco adentro no es una parte suelta
+        hueca = restar(caja(30, 30, 30), mover(caja(10, 10, 10), x=10, y=10, z=10))
+        r = revisar(hueca)
+        self.assertEqual((r["partes"], r["partes_en_el_aire"]), (1, 0))
+        self.assertFalse(any("parte" in h["mensaje"] for h in r["hallazgos"]), r["hallazgos"])
+
 
 class TestProducto(unittest.TestCase):
     def test_precio_y_borrador(self):

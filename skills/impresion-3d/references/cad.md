@@ -1,6 +1,6 @@
 # Diseñar piezas para imprimir con `cad.py`
 
-`cad.py` arma sólidos cerrados (manifold) con medidas exactas. Usarlo para piezas funcionales: soportes, cajas, tapas, adaptadores, plantillas, ganchos, separadores. Para formas orgánicas o decorativas usar Blender o un modelo existente.
+`cad.py` arma sólidos cerrados (manifold) con medidas exactas. Usarlo para lo que se describe con medidas: soportes, cajas, tapas, adaptadores, plantillas, ganchos, separadores. Lo que se define por su aspecto (figuras, formas suaves, texto, logos) va en Blender o sale de un modelo existente: `references/modelado.md`. No aproximarlo con esferas, conos y cajas.
 
 ## Reglas de diseño para FDM (boquilla 0,4)
 
@@ -38,6 +38,7 @@ unir(a, b, ...); restar(base, r1, r2, ...); intersectar(a, b)
 mover(s, x, y, z); rotar(s, x, y, z); espejar(s, "x"); escalar(s, f)
 apoyar(s); centrar(s, impresora=datos)  # o centrar(s, x, y); medidas(s)
 exportar_stl(s, "pieza.stl")                # valida, limpia y apoya en Z=0
+importar_stl("figura.stl")                  # un STL cerrado (de Blender o bajado), para unir o restar
 holgura("presion"|"justo"|"deslizante"|"giratorio", "PETG")
 TORNILLOS["M4"]["pasante"]                  # medidas de tornillos y tuercas
 ```

@@ -43,15 +43,18 @@ Con las respuestas, decidir y anotar: material (si va al sol o al calor, nunca P
 
 Nombre de la carpeta y de los archivos: `python3 -I catalogo.py carpeta --nombre "<nombre de la pieza>" --impresora "<nombre de la impresora en config.json>"` devuelve `carpeta` (`impresiones/AAAA-MM-DD_nombre_impresora`) y `archivo` (`nombre_impresora`, para el G-code y el proyecto de Orca). La impresora va en el nombre porque un G-code solo sirve para la impresora para la que se laminó. Crear `/mnt/user-data/outputs/taller-3d/<carpeta>/`. Si después cambia de impresora (por ejemplo, porque no entra), sacar el nombre de nuevo con la otra antes de escribir en la PC.
 
-- **Pieza funcional o geométrica:** escribir `pieza.py` con `cad.py` según la plantilla de `references/cad.md` (parámetros arriba, medidas del usuario, holguras de `holgura()` o de `aprendizajes.md` si hay calibración propia). Correrlo para generar `pieza.stl`.
-- **Forma orgánica, decorativa o con texto:** Blender (MCP) o un modelo que traiga el usuario. Si trae un STL, traerlo con `device_stage_files`.
+**Con qué modelar** (`references/modelado.md`): se decide antes de modelar, por cómo se describe la pieza y no por comodidad. Nunca aproximar con formas simples algo que se define por su aspecto.
+
+- **Se describe con medidas** (funcional o geométrica): escribir `pieza.py` con `cad.py` según la plantilla de `references/cad.md` (parámetros arriba, medidas del usuario, holguras de `holgura()` o de `aprendizajes.md` si hay calibración propia). Correrlo para generar `pieza.stl`.
+- **Se describe por cómo se ve** (figura, forma suave, logo, texto): Blender por código (`modelo.py`) o un modelo que ya exista. Si es algo conocido, antes ver si ya existe y ofrecerlo con su licencia. Personajes y marcas ajenas no se modelan. Si el usuario trae un STL, traerlo con `device_stage_files`.
+- **Las dos cosas:** cada parte con su herramienta, unidas en `pieza.py` con `importar_stl` y `unir`.
 - **Objeto que resuelve un plugin de Orca** (llavero, cartel o placa con nombre, florero, caja Gridfinity, litofanía, texturas): antes de modelar, buscar en el Plugin Hub (`references/plugins-orca.md`) y, si hay uno que sirva, ofrecerlo junto con la opción de hacerlo acá. Si lo usa, el STL que genere sigue desde la revisión de abajo.
 - **Pieza muy grande para la impresora elegida:** primero ver si entra en otra de sus impresoras (Revisar, paso 1); si no, partirla con encastres o tornillos.
 
 Revisar:
 1. `revisar_stl.py pieza.stl --impresora <json> --otras <carpeta taller-3d/impresoras traída> --material <m> --esperado <AxBxC>` (y `--rotar/--apoyar/--centrar --salida` si hay que orientarla). RECHAZADO → corregir el modelo.
    - **No entra en la impresora elegida:** el informe dice en cuál de sus otras impresoras preparadas entra (`entra_en_otras`). Si tiene otras en Orca sin preparar, buscar su volumen de impresión oficial en internet. Si alguna entra, sugerírsela ("No entra en la X, pero sí en tu Y. ¿La hacemos ahí?"); si la elige, prepararla con `/impresoras` si hace falta y seguir con esa. Si ninguna entra, ofrecer partirla con encastres o escalarla.
-2. `vista_previa.py pieza.stl vista.png --titulo "<nombre>"` y **mostrar la vista** al usuario (SendUserFile). Si es un diseño nuevo, esperar su OK antes de seguir; si es un STL que trajo, seguir.
+2. `vista_previa.py pieza.stl vista.png --titulo "<nombre>"`. Si la pieza es decorativa o mixta, sumar la foto renderizada (`references/modelado.md`, «Revisar y mostrar»). Mirarlas antes de mostrarlas: si no se reconoce lo pedido o falta algo, corregir o cambiar de herramienta. **Mostrar la vista** (y la foto) al usuario con SendUserFile y decir qué es aproximado. Si es un diseño nuevo, esperar su OK antes de seguir; si es un STL que trajo, seguir.
 
 ## 3. Configuración
 
@@ -97,7 +100,7 @@ Revisar:
      --nombre "<nombre de la pieza>" --salida /mnt/user-data/outputs/taller-3d/<carpeta>/<archivo>.3mf --json informe_3mf.json
    ```
    Lleva el modelo en el centro de la cama, los nombres y valores de los perfiles con que se laminó (la copia de la máquina, el AUTO proceso y el AUTO filamento) y la cama real (por línea de comandos Orca usa Cool Plate). Escribirlo con `device_commit_files` (`stagedPath`). Si el script avisa algo, contarlo en una línea; si no lo puede armar (sale 2), entregar sin proyecto y decir que abra `pieza.stl` en Orca y elija los perfiles AUTO.
-3. Dejar también en la carpeta: `pieza.py` (si se modeló), `pieza.stl`, `vista.png`, `config_usada.json`, `informe_gcode.json` e `informe.md`. En `laminado/` quedan las vueltas de Orca: se pueden borrar.
+3. Dejar también en la carpeta: `pieza.py` (si se modeló), `modelo.py` y las partes de Blender (si las hay), `pieza.stl`, `vista.png`, `config_usada.json`, `informe_gcode.json` e `informe.md`. En `laminado/` quedan las vueltas de Orca: se pueden borrar.
 
 `informe.md` y la respuesta al usuario (breve):
 - El G-code a imprimir (`<archivo>.gcode`) y su carpeta, con enlaces `computer://` a la carpeta y al `.3mf` (skill `impresion-3d`, sección 3).

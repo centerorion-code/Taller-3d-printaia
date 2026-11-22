@@ -23,8 +23,8 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
 ## 2. Herramientas y rutas
 
 - **Scripts** (Python, en `scripts/` de esta skill; correr con `python3 -I`):
-  - `cad.py`: CAD por código (manifold3d). Ver `references/cad.md`.
-  - `revisar_stl.py`: malla cerrada, medidas, entra en la cama (y, con `--otras`, en cuál de las otras impresoras del usuario entra si no), apoyo, voladizos; también rota, apoya y centra.
+  - `cad.py`: CAD por código (manifold3d) para lo que se describe con medidas; `importar_stl` trae un STL de Blender o bajado para unirlo. Ver `references/cad.md` y, para elegir entre código y Blender, `references/modelado.md`.
+  - `revisar_stl.py`: malla cerrada, medidas, partes sueltas (una en el aire es RECHAZO), entra en la cama (y, con `--otras`, en cuál de las otras impresoras del usuario entra si no), apoyo, voladizos; también rota, apoya y centra.
   - `vista_previa.py`: PNG con 4 vistas y medidas; con `--producto`, una imagen simple para la tienda (fondo blanco, sin texto).
   - `perfil_orca.py`: `crear`, `validar` y `diff` de perfiles de usuario.
   - `revisar_gcode.py`: revisión de seguridad del G-code; con `--json` y `--config`, también el costo real de la pieza.
@@ -39,7 +39,7 @@ Responder en el idioma del usuario (rioplatense si escribe así), directo y acci
   - Otras skills llegan a estos scripts por `<raíz del plugin>/skills/impresion-3d/scripts/`. La raíz es la carpeta que contiene `skills/`. Si no se sabe: `find / -path '*skills/impresion-3d/scripts/comun.py' -not -path '/proc/*' 2>/dev/null | head -1`.
 - **En la PC del usuario** (a través de la app de Claude):
   - `orca-mcp`: `list_profiles`, `get_profile`, `get_model_info`, `slice_model`, `get_slice_estimates`, `analyze_gcode_layers`, `check_installation`.
-  - Blender (MCP, opcional): para formas orgánicas o decorativas.
+  - Blender (MCP, opcional): para abrir o tocar en el Blender del usuario un modelo decorativo. Modelar se hace con `bpy` en el espacio de Claude (`references/modelado.md`).
   - `taller3d-orca` (MCP local que deja el instalador, opcional; por ahora en Linux): una sola herramienta, `abrir_en_orca(ruta)`, que abre en la ventana de Orca un `.3mf` de la carpeta de trabajo (ruta relativa a ella, por ejemplo `impresiones/2026-11-21_soporte_ender-3-v3-plus/soporte_ender-3-v3-plus.3mf`). No lamina, no imprime y no escribe; rechaza rutas de afuera, enlaces y proyectos con scripts. Lo usan `/pieza` y los botones del panel.
   - Archivos: `get_device_info` (carpetas conectadas y estado de los MCP), `device_list_dir`, `device_stage_files` (copia de la PC a `/mnt/user-data/uploads/<carpeta>/...`), `device_commit_files` (escribe en la PC desde `/mnt/user-data/outputs/...`; para archivos existentes pasar `expectedMtimeMs`), `device_request_folder_access`.
 - **Impresoras:** el plugin no trae ninguna. Los datos de cada una (límites, área, perfiles de sistema) los arma `/impresoras` cuando el usuario elige trabajar en ella, investigando en internet, y quedan en `taller-3d/impresoras/<id>.json` de su carpeta de trabajo (`references/impresoras.md`).
@@ -115,6 +115,7 @@ Los archivos del plugin no cambian solos. Lo que se aprende del Orca del usuario
 - `references/diagnostico.md`: problemas frecuentes y qué tocar primero.
 - `references/materiales.md`: comportamiento de cada material (PETG con fundamento académico).
 - `references/cad.md`: reglas de diseño para imprimir y uso de `cad.py`.
+- `references/modelado.md`: con qué modelar (código, Blender o un modelo que ya existe), Blender por código, piezas mixtas y cómo revisar y mostrar una pieza decorativa.
 - `references/impresoras.md`: elegir la impresora, investigarla y configurarla; formato de sus datos.
 - `references/plugins-orca.md`: plugins de Orca 2.5 (qué son, riesgos, cómo buscarlos y los que sirven).
 - `references/configuracion.md`: formato de `config.json`.

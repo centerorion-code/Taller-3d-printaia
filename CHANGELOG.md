@@ -1,5 +1,18 @@
 # Cambios
 
+## 0.1.20 (2026-11-22)
+
+- **Con qué modelar, por regla y no por comodidad** (`references/modelado.md`):
+  - lo que se describe con medidas (soporte, caja, adaptador) va por código, con `cad.py`;
+  - lo que se describe por cómo se ve (una figura, un logo, texto, formas suaves) va en Blender por código o sale de un modelo que ya existe;
+  - si tiene las dos cosas, cada parte va con su herramienta y se unen.
+
+  Claude no arma con esferas, conos y cajas algo que tiene que verse bien: si el código no alcanza, lo dice y cambia de herramienta.
+- **Antes de modelar algo conocido**, busca si ya existe en Printables, MakerWorld o Thingiverse y te lo ofrece con su licencia; si es para vender, solo sirven los de uso comercial. Personajes, mascotas de marcas y logos ajenos no se modelan ni se venden.
+- **Blender por código en el espacio de Claude** (`bpy`), con una plantilla probada: bolas que se funden, curvas, texto en relieve, malla cerrada con Remesh y STL en mm. `cad.importar_stl` trae ese STL (o uno bajado) para unirlo a una pieza hecha por código.
+- **Vista con foto para lo decorativo:** además de las cuatro vistas, una foto renderizada en unos 40 segundos. Claude la mira antes de mostrártela y te dice qué es aproximado.
+- **`revisar_stl.py` mira las partes separadas:** una parte suelta en el aire (por ejemplo, una cabeza que no se fundió con el cuerpo) es RECHAZO, y una que toca la pieza sin estar unida es advertencia. Los huecos internos no cuentan.
+
 ## 0.1.19 (2026-11-22)
 
 - **El consumo de la impresora se busca, no se pregunta.** Cuando una impresora entra al taller, o una cuenta de costo usa una que no lo tiene, Claude lo busca en internet:

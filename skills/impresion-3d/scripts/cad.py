@@ -33,7 +33,7 @@ __all__ = [
     "Manifold", "caja", "cilindro", "cono", "esfera", "tubo", "prisma", "ranura", "revolucion",
     "hexagono", "agujero", "agujero_tornillo", "alojamiento_tuerca", "agujero_inserto",
     "chaflan_inferior", "unir", "restar", "intersectar", "mover", "rotar", "espejar", "escalar",
-    "apoyar", "centrar", "medidas", "exportar_stl", "holgura", "TORNILLOS", "HOLGURAS",
+    "apoyar", "centrar", "medidas", "exportar_stl", "importar_stl", "holgura", "TORNILLOS", "HOLGURAS",
 ]
 
 EPS = 0.01  # sobrante para que las restas no dejen caras coincidentes
@@ -263,6 +263,36 @@ def centrar(solido: Manifold, x: float | None = None, y: float | None = None,
 def medidas(solido: Manifold) -> tuple[float, float, float]:
     x0, y0, z0, x1, y1, z1 = solido.bounding_box()
     return (round(x1 - x0, 3), round(y1 - y0, 3), round(z1 - z0, 3))
+
+
+# --- Importar ----------------------------------------------------------------------------
+
+def importar_stl(ruta) -> Manifold:
+    """Trae un STL (hecho en Blender o bajado) como sólido, para unirlo o restarlo con piezas de código.
+
+    Usa las mismas unidades del archivo (mm). La malla tiene que ser cerrada: si no, falla y dice qué hacer.
+    """
+    from manifold3d import Mesh
+    from revisar_stl import leer_stl
+
+    ruta = Path(ruta)
+    tri = leer_stl(ruta)
+    if not len(tri):
+        raise ValueError(f"{ruta.name} no tiene triángulos.")
+    # En un STL cada triángulo trae sus vértices: se juntan los que coinciden para que la malla se cierre.
+    vert, indices = np.unique(np.round(tri.reshape(-1, 3), 4), axis=0, return_inverse=True)
+    caras = indices.reshape(-1, 3)
+    caras = caras[(caras[:, 0] != caras[:, 1]) & (caras[:, 1] != caras[:, 2]) & (caras[:, 0] != caras[:, 2])]
+    solido = None
+    for orden in (caras, caras[:, [0, 2, 1]]):          # si vino dada vuelta, se prueba al revés
+        prueba = Manifold(Mesh(vert_properties=vert.astype(np.float32), tri_verts=orden.astype(np.uint32)))
+        if prueba.status() == Error.NoError and not prueba.is_empty() and prueba.volume() > 0:
+            solido = prueba
+            break
+    if solido is None:
+        raise ValueError(f"{ruta.name} no es una malla cerrada: no se puede unir ni restar. En Blender, aplicar "
+                         "Remesh (Voxel) o Make Manifold (3D Print Toolbox) y exportar de nuevo.")
+    return solido
 
 
 # --- Exportar ----------------------------------------------------------------------------
