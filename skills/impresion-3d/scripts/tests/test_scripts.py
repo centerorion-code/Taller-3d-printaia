@@ -685,6 +685,7 @@ class TestCostos(unittest.TestCase):
         "costos": {"moneda": "ARS", "luz": {"precio_kwh": 150, "cargado": "2026-11-21"},
                    "filamentos": {"PETG": {"precio_kg": 25000}}, "fallas_pct": 10,
                    "mano_de_obra": {"precio_hora": 6000, "minutos_por_pieza": 10}},
+        "impuestos": {"condicion": "monotributo", "ingresos_brutos_pct": 0},
         "tienda": {"plataforma": "mercadolibre", "margen_precio_pct": 40, "redondeo": 100, "embalaje": 300,
                    "canales": {"tienda": {"nombre": "Tienda", "comision_pct": 0},
                                "mercadolibre": {"nombre": "Mercado Libre", "comision_pct": 15, "iva_comision": True,
@@ -825,6 +826,120 @@ class TestCostos(unittest.TestCase):
         texto = (tmp / "producto" / "ficha.md").read_text(encoding="utf-8")
         self.assertIn("Precio elegido: 9000", texto)
         self.assertIn("precio 9000", texto)
+
+    def test_impuestos_de_la_venta(self):
+        """Ingresos Brutos resta del precio como la comisión; el responsable inscripto suma IVA a la venta, paga la
+        comisión sobre el precio con IVA y descuenta el IVA de sus compras."""
+        import copy
+        import costos
+        ml = self.CONFIG["tienda"]["canales"]["mercadolibre"]
+        mono = costos.impuestos_de_config({"impuestos": {"condicion": "monotributo", "ingresos_brutos_pct": 3.5}})
+        self.assertEqual((mono["ri"], mono["tasa"], mono["iva"]), (False, 0.035, 0.0))
+        t = costos.precio_canal(1000, {"comision_pct": 0}, 40, 0, mono)
+        self.assertEqual(t["precio"], round(1000 / (1 - 0.035 - 0.40), 2))            # 1769,91
+        self.assertEqual((t["impuestos"], t["margen_real_pct"]), (round(t["precio"] * 0.035, 2), 40.0))
+        self.assertNotIn("iva_venta", t)
+        m = costos.precio_canal(1000, ml, 40, 0, mono)                                  # IVA de la comisión: costo
+        self.assertAlmostEqual(m["precio"], (1000 + 1210) / (1 - 0.1815 - 0.035 - 0.40), places=1)
+        self.assertEqual(m["margen_real_pct"], 40.0)
+        ri = costos.impuestos_de_config({"impuestos": {"condicion": "responsable_inscripto", "ingresos_brutos_pct": 3.5,
+                                                       "iva_descontable": ["material", "maquina", "otra"]}})
+        self.assertEqual((ri["ri"], ri["iva"], ri["descontables"]), (True, 0.21, ["material", "maquina"]))
+        r = costos.precio_canal(1000, ml, 40, 0, ri)
+        neto = (1000 + 1000) / (1 - 0.15 * 1.21 - 0.035 - 0.40)                         # el cargo fijo sin IVA
+        self.assertAlmostEqual(r["precio"], neto * 1.21, places=1)
+        self.assertAlmostEqual(r["precio_sin_iva"], neto, places=1)
+        self.assertAlmostEqual(r["iva_venta"], neto * 0.21, places=1)
+        self.assertEqual(r["margen_real_pct"], 40.0)                                    # sobre el precio sin IVA
+        self.assertIn("con IVA", costos.linea_canal("mercadolibre", r, "ARS"))
+        # Costos sin el IVA que descuenta
+        cfg = copy.deepcopy(self.CONFIG)
+        cfg["impuestos"] = {"condicion": "responsable_inscripto", "ingresos_brutos_pct": 3.5,
+                            "iva_descontable": ["material", "maquina", "embalaje"]}
+        c = costos.costo_pieza(40, 7200, "PETG", cfg, costos.impresora_de_config(cfg, "hi"))
+        self.assertEqual((c["partes"]["material"], c["partes"]["maquina"]), (round(1000 / 1.21, 2), round(300 / 1.21, 2)))
+        self.assertEqual((c["partes"]["luz"], c["partes"]["embalaje"]), (37.8, round(300 / 1.21, 2)))
+        self.assertTrue(any("IVA que descontás" in s for s in c["supuestos"]))
+        p = costos.precios(c["total"], cfg)
+        self.assertTrue(p["con_iva"])
+        self.assertIn("Responsable inscripto · IVA 21 % sobre el precio · Ingresos Brutos 3,5 %", p["impuestos"])
+        # Sin condición fiscal, con tienda: falta para un precio real
+        sin = copy.deepcopy(self.CONFIG)
+        del sin["impuestos"]
+        self.assertTrue(any("cómo facturás" in f for f in costos.precios(1000, sin)["faltan"]))
+        items = {i["tema"]: i for i in costos.estado_taller(sin)}
+        self.assertEqual((items["Impuestos"]["estado"], items["Impuestos"]["frase"]),
+                         ("falta", "Facturo como … y pago …% de Ingresos Brutos"))
+        cfg["impuestos"] = {"condicion": "monotributo"}
+        items = {i["tema"]: i for i in costos.estado_taller(cfg)}
+        self.assertEqual((items["Impuestos"]["estado"], items["Impuestos"]["frase"]),
+                         ("revisar", "Pago …% de Ingresos Brutos"))
+        with self.assertRaises(ValueError):
+            costos.precio_canal(1000, {"comision_pct": 58}, 40, 0, mono)        # 58 + 3,5 + 40 > 98
+
+    def test_margen_por_escalones_y_minimo(self):
+        """Las piezas chicas pueden llevar más margen que las grandes (escalones por costo) y un precio mínimo."""
+        import copy
+        import costos
+        cfg = copy.deepcopy(self.CONFIG)
+        cfg["tienda"].update({"margen_escalones": [{"hasta": 20000, "margen_pct": 50}, {"hasta": 5000, "margen_pct": 60},
+                                                   {"margen_pct": 40}], "precio_minimo_pieza": 3000})
+        tienda = cfg["tienda"]
+        self.assertEqual([e["hasta"] for e in costos.escalones_de_config(tienda)], [5000, 20000, None])
+        self.assertEqual([costos.margen_para(tienda, c)[0] for c in (1000, 5000, 5001, 90000)], [60, 60, 50, 40])
+        self.assertEqual(costos.margen_para(tienda)[0], 40)                            # sin costo: el general
+        self.assertEqual(costos.margen_para({"margen_escalones": [{"hasta": 100, "margen_pct": 70}]}, 500)[0], 70)
+        self.assertEqual(costos.escalones_de_config({"margen_escalones": [{"margen_pct": 120}]}), [])
+        p = costos.precios(1000, cfg)
+        self.assertEqual((p["margen_pct"], p["margen_origen"]), (60, "escalón de piezas de hasta 5.000 de costo"))
+        self.assertEqual([o["margen_pct"] for o in costos.opciones(1000, cfg)], [45.0, 60.0, 75.0])
+        self.assertTrue(p["canales"]["tienda"]["por_precio_minimo"])                   # 2.500 → 3.000
+        self.assertEqual((p["canales"]["tienda"]["precio"], p["canales"]["tienda"]["ganancia"]), (3000, 2000))
+        self.assertIn("el mínimo por pieza", costos.linea_canal("tienda", p["canales"]["tienda"], "ARS"))
+        self.assertNotIn("por_precio_minimo", costos.precios(1000, cfg, precio=2000)["canales"]["tienda"])
+        self.assertEqual(costos.texto_margen(tienda), "40 % sobre el precio; según el costo: hasta 5.000 → 60 %, "
+                                                      "hasta 20.000 → 50 %, más caras → 40 %; precio mínimo por pieza 3.000")
+
+    def test_comandos_de_impuestos_y_margen(self):
+        import costos
+        tmp = Path(tempfile.mkdtemp())
+        cfg = tmp / "config.json"
+        cfg.write_text(json.dumps({"tienda": {"plataforma": "woocommerce", "margen_pct": None}}), encoding="utf-8")
+        correr = lambda *x: subprocess.run([sys.executable, str(SCRIPTS / "costos.py"), *x, "--config", str(cfg),
+                                            "--salida", str(cfg)], capture_output=True, text=True)
+        r = correr("margen", "--recargo", "100")                    # el doble del costo
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("margen de 50 % sobre el precio", r.stdout)
+        self.assertEqual(json.loads(cfg.read_text())["tienda"]["margen_precio_pct"], 50.0)
+        r = correr("margen", "--margen", "100")                     # imposible: se explica y no se escribe
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("--recargo 100", r.stderr)
+        r = correr("margen", "--escalones", "5000:60,20000:50,40", "--minimo-pieza", "3000")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        tienda = json.loads(cfg.read_text())["tienda"]
+        self.assertEqual((len(tienda["margen_escalones"]), tienda["precio_minimo_pieza"], tienda["margen_precio_pct"]),
+                         (3, 3000, 50.0))
+        for malo in ("20000:50,5000:60", "40,5000:60", "abc", "5000:99"):
+            self.assertNotEqual(correr("margen", "--escalones", malo).returncode, 0, malo)
+        r = correr("margen", "--escalones", "ninguno", "--minimo-pieza", "0")
+        tienda = json.loads(cfg.read_text())["tienda"]
+        self.assertFalse("margen_escalones" in tienda or "precio_minimo_pieza" in tienda)
+        r = correr("impuestos", "--condicion", "monotributo", "--ingresos-brutos", "3.5")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(cfg.read_text())["impuestos"], {"condicion": "monotributo", "ingresos_brutos_pct": 3.5})
+        self.assertNotEqual(correr("impuestos", "--iva-descontable", "material").returncode, 0)   # solo RI
+        r = correr("impuestos", "--condicion", "responsable_inscripto", "--iva-descontable", "Máquina,material")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(cfg.read_text())["impuestos"],
+                         {"condicion": "responsable_inscripto", "ingresos_brutos_pct": 3.5,
+                          "iva_descontable": ["material", "maquina"]})            # Ingresos Brutos queda como estaba
+        self.assertNotEqual(correr("impuestos", "--ingresos-brutos", "50").returncode, 0)
+        # La ayuda de cada comando anda (los % sueltos la rompían)
+        for accion in ("luz", "pieza", "estado", "consumo", "impuestos", "margen"):
+            ayuda = subprocess.run([sys.executable, str(SCRIPTS / "costos.py"), accion, "--help"],
+                                   capture_output=True, text=True)
+            self.assertEqual(ayuda.returncode, 0, (accion, ayuda.stderr[-300:]))
+        self.assertEqual(costos.texto_impuestos(costos.impuestos_de_config({})), "sin configurar")
 
     def test_estado_del_taller(self):
         import costos
@@ -1170,6 +1285,11 @@ class TestPanelEnClaude(unittest.TestCase):
         self.assertIn('<details class="taller" open>', con_taller)
         self.assertIn("Te paso mi boleta de luz para el precio del kWh", con_taller)
         self.assertNotIn('class="taller"', archivo)
+        # Un dato con número («me costó $…»): el panel pide el número y recién ahí lo manda
+        self.assertIn('<form class="dato"><span class="t">La Creality Hi me costó $</span><input type="text" '
+                      'inputmode="decimal"', con_taller)
+        self.assertNotIn('data-pedido="La Creality Hi me costó $…"', con_taller)
+        self.assertIn("form.dato", con_taller)
 
     def test_selector_de_impresora(self):
         """Para arrancar una pieza se elige la impresora entre las preparadas y las de Orca sin preparar en este taller:

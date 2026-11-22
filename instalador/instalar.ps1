@@ -49,7 +49,7 @@ param(
 Set-StrictMode -Version 1.0
 $ErrorActionPreference = 'Stop'
 
-$VersionPlugin = '0.1.28'
+$VersionPlugin = '0.1.29'
 $OrcaVersion = '2.5.1'
 $OrcaBase = "https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v$OrcaVersion"
 $OrcaArchivos = @{
@@ -143,6 +143,14 @@ function EntradasDesinstalar {
 
 function CarpetaDe([string]$Ruta) {
     try { return (Split-Path -Parent $Ruta) } catch { return $null }
+}
+
+function UltimaCarpetaAnotada {
+    # La última carpeta de trabajo que usó el instalador: la que creó (carpeta) o una que ya existía (carpeta-usada).
+    if (-not (Test-Path -LiteralPath $Manifiesto)) { return $null }
+    return (@(Get-Content -LiteralPath $Manifiesto -Encoding UTF8 |
+        Where-Object { $_ -like "carpeta`t*" -or $_ -like "carpeta-usada`t*" } |
+        ForEach-Object { $_.Substring($_.IndexOf("`t") + 1).Trim() }) | Select-Object -Last 1)
 }
 
 function AppDeClaudeAbierta {
@@ -505,8 +513,7 @@ try {
     # se pregunta en el paso 5 (proponiendo Documentos\Taller 3D).
     $CarpetaElegida = [bool]$CarpetaTrabajo
     if (-not $CarpetaElegida -and (Test-Path -LiteralPath $Manifiesto)) {
-        $anterior = @(Get-Content -LiteralPath $Manifiesto -Encoding UTF8 | Where-Object { $_ -like "carpeta`t*" } |
-            ForEach-Object { $_.Substring(8) }) | Select-Object -Last 1
+        $anterior = UltimaCarpetaAnotada
         if ($anterior -and (Test-Path -LiteralPath (Join-Path $anterior 'taller-3d\config.json'))) {
             $CarpetaTrabajo = $anterior; $CarpetaElegida = $true
         }
@@ -810,6 +817,8 @@ try {
     }
     if (Test-Path -LiteralPath $Config) {
         Info "Ya existe la configuración: $Config (no la toco)."
+        # Sin esto, una corrida sin -CarpetaTrabajo vuelve a proponer Documentos\Taller 3D aunque uses otra.
+        if ((UltimaCarpetaAnotada) -ne $CarpetaTrabajo) { Anotar 'carpeta-usada' $CarpetaTrabajo }
     } elseif ($Prueba) {
         EnPrueba "crearía $Config y historial.csv"
     } else {

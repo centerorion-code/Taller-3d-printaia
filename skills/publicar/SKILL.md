@@ -63,13 +63,13 @@ El título (sirve también para Mercado Libre), la descripción corta y dos pár
 
 ## 4. Precio
 
-1. Traer `taller-3d/config.json` y correr `costos.py estado --config config.json`. Si falta el consumo de la impresora, buscarlo y guardarlo sin preguntar (`references/costos.md` de la skill `impresion-3d`, «El consumo de la impresora»). Si falta otra cosa para el costo, pedirla de a un dato con su frase (la boleta de luz, el precio de la impresora, el precio del filamento, tu hora, las comisiones del canal) y guardarla con respaldo. Si el usuario prefiere seguir sin eso, seguir: el precio sale con la lista de lo que falta.
+1. Traer `taller-3d/config.json` y correr `costos.py estado --config config.json`. Si falta el consumo de la impresora, buscarlo y guardarlo sin preguntar (`references/costos.md` de la skill `impresion-3d`, «El consumo de la impresora»). Si falta otra cosa para el costo, pedirla de a un dato con su frase (la boleta de luz, el precio de la impresora, el precio del filamento, tu hora, cómo factura y su Ingresos Brutos, las comisiones del canal) y guardarla con respaldo (`costos.py impuestos` y `costos.py margen` guardan lo suyo). Si el usuario prefiere seguir sin eso, seguir: el precio sale con la lista de lo que falta.
 2. Opciones de margen:
    ```bash
    python3 -I costos.py pieza --config config.json --informe-gcode informe_gcode.json \
      --impresora "<impresora>" --margenes --json costo.json
    ```
-3. **Preguntarle al usuario qué margen quiere en este producto**, con AskUserQuestion: una opción por margen (el más bajo, su habitual marcado "(tu margen habitual)", el más alto), cada una con el precio y la ganancia en su canal principal; con la opción de escribir un precio exacto. Si no hay AskUserQuestion, preguntarlo en una línea con las tres opciones.
+3. **Preguntarle al usuario qué margen quiere en este producto**, con AskUserQuestion: una opción por margen (el más bajo, su habitual marcado "(tu margen habitual)", el más alto), cada una con el precio y la ganancia en su canal principal; con la opción de escribir un precio exacto. Si no hay AskUserQuestion, preguntarlo en una línea con las tres opciones. Con escalones, el habitual es el del escalón de esta pieza (la salida lo dice: «Margen: 60 % (escalón de piezas de hasta 3.000 de costo)»). Si el precio quedó en el mínimo por pieza, decirlo. Los impuestos de la venta (Ingresos Brutos, y el IVA si es responsable inscripto) ya van restados de la ganancia: si es responsable inscripto, el precio es con IVA incluido y el margen es sobre el precio sin IVA.
 4. Si eligió un precio exacto, mostrar el margen real que le deja en cada canal (`costos.py pieza … --precio <precio>`). Si en algún canal la ganancia da negativa, decirlo claro antes de seguir.
 5. Armar la ficha con lo elegido:
    ```bash

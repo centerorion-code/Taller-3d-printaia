@@ -11,9 +11,15 @@ Costo de una pieza buena:
   mano de obra  = minutos de preparación y terminación / 60 × precio de tu hora
   costo         = material + luz + máquina + fallas + mano de obra + embalaje
 
-Precio por canal, con el margen sobre el precio (lo que te queda de cada venta, después de comisiones):
-  precio = (costo + cargo fijo × (1 + IVA)) / (1 − (comisión % + cuotas %) × (1 + IVA) − margen %)
-  (el IVA se suma a las comisiones solo si el canal lo cobra, como Mercado Libre)
+Precio por canal, con el margen sobre el precio (lo que te queda de cada venta, después de comisiones e impuestos):
+  precio = (costo + cargo fijo × (1 + IVA)) / (1 − (comisión % + cuotas %) × (1 + IVA) − impuestos % − margen %)
+  (el IVA se suma a las comisiones solo si el canal lo cobra, como Mercado Libre; impuestos % = Ingresos Brutos y
+  otras tasas que se pagan como porcentaje de cada venta)
+Responsable inscripto: el precio de arriba es sin IVA (neto); el que paga el cliente es neto × 1,21. La comisión se
+cobra sobre el precio con IVA (por eso va × 1,21) y su IVA se descuenta, igual que el del cargo fijo; Ingresos Brutos
+va sobre el neto. Los costos con IVA que descontás (material, máquina, luz, embalaje) entran sin IVA.
+Margen por escalones (opcional): un margen distinto según el costo de la pieza. Precio mínimo por pieza (opcional):
+si el precio da menos, se cobra el mínimo.
 
 Precio del kWh, de la boleta de luz:
   marginal = cargo variable del último escalón × (1 + impuestos %)   (lo que cuesta cada kWh de más)
@@ -31,6 +37,12 @@ Uso:
   python3 costos.py pieza ... --margen 50                # el margen elegido para este producto
   python3 costos.py pieza ... --precio 4500              # un precio fijo: el margen real que deja en cada canal
   python3 costos.py estado --config config.json          # qué falta configurar para tener costos reales
+  python3 costos.py impuestos --config config.json --condicion monotributo --ingresos-brutos 3.5 --salida config.json
+  python3 costos.py impuestos --config config.json --condicion responsable_inscripto --ingresos-brutos 3.5 \\
+      --iva-descontable material,maquina --salida config.json
+  python3 costos.py margen --config config.json --recargo 100 --salida config.json     # 100 % sobre el costo = 50 %
+  python3 costos.py margen --config config.json --margen 50 --minimo-pieza 3000 \\
+      --escalones "5000:60,20000:50,40" --salida config.json   # costo hasta 5.000: 60 %; hasta 20.000: 50 %; más: 40 %
   python3 costos.py consumo --config config.json --impresora hi --promedio 80 --origen oficial \\
       --fuente "<enlace>" --salida config.json            # el consumo promedio que publica el fabricante
   python3 costos.py consumo --config config.json --impresora hi --datos creality-hi.json [--material PETG] \\
@@ -49,6 +61,7 @@ import json
 import math
 import sys
 import time
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -60,6 +73,14 @@ CALENTAMIENTO_MIN = 5      # cama y boquilla antes de empezar
 MANTENIMIENTO_PCT = 5      # repuestos y reparaciones en toda la vida de la impresora, sobre su precio
 VIDA_HORAS = 4000          # unos 3 años a 4 horas por día
 LUZ_VIEJA_DIAS = 120       # después de esto, pedir una boleta más nueva
+IVA_PCT = 21.0             # IVA general de Argentina: el de las comisiones y el de la venta (responsable inscripto)
+
+# Cómo factura el usuario. Solo el responsable inscripto le suma IVA a la venta y descuenta el de sus compras.
+CONDICIONES = {"monotributo": "Monotributo", "responsable_inscripto": "Responsable inscripto",
+               "exento": "Exento de IVA", "sin_facturar": "Sin facturar"}
+DESCONTABLES = {"material": "material", "luz": "luz", "maquina": "máquina", "embalaje": "embalaje"}
+SIN_IMPUESTOS = {"condicion": None, "ri": False, "iibb_pct": None, "otros_pct": 0.0, "iva_pct": IVA_PCT,
+                 "descontables": [], "tasa": 0.0, "iva": 0.0}
 
 
 def _num(valor) -> float | None:
@@ -239,6 +260,47 @@ def fijar_consumo(config: dict, clave: str | None, consumo_w, origen: str, fuent
     return entrada
 
 
+# ------------------------------------------------------------------ impuestos de la venta
+
+def _pct(valor, tope: float) -> float | None:
+    """Un porcentaje de la configuración entre 0 y tope (None si no hay o no tiene sentido)."""
+    v = _num(valor)
+    return v if v is not None and math.isfinite(v) and 0 <= v <= tope else None
+
+
+def impuestos_de_config(config: dict) -> dict:
+    """Cómo factura el usuario y qué impuestos paga por cada venta (config.json → impuestos).
+
+    tasa: Ingresos Brutos y otras tasas, en tanto por uno del precio sin IVA. iva: el IVA que se le suma a la venta
+    (solo responsable inscripto; si no, 0). descontables: las partes del costo con IVA que descuenta (solo RI)."""
+    d = config.get("impuestos") if isinstance(config.get("impuestos"), dict) else {}
+    condicion = d.get("condicion") if d.get("condicion") in CONDICIONES else None
+    ri = condicion == "responsable_inscripto"
+    iibb, otros = _pct(d.get("ingresos_brutos_pct"), 30), _pct(d.get("otros_pct"), 30) or 0.0
+    iva = _pct(d.get("iva_pct"), 50)
+    iva = IVA_PCT if iva is None else iva
+    lista = d.get("iva_descontable") if isinstance(d.get("iva_descontable"), list) else []
+    descontables = [x for x in DESCONTABLES if x in lista] if ri else []
+    return {"condicion": condicion, "ri": ri, "iibb_pct": iibb, "otros_pct": otros, "iva_pct": iva,
+            "descontables": descontables, "tasa": ((iibb or 0) + otros) / 100, "iva": iva / 100 if ri else 0.0}
+
+
+def texto_impuestos(imp: dict) -> str:
+    """Los impuestos de la venta en una línea, para el panel y los informes."""
+    if not imp.get("condicion"):
+        return "sin configurar"
+    partes = [CONDICIONES[imp["condicion"]]]
+    if imp["ri"]:
+        partes.append(f"IVA {_coma(imp['iva_pct'])} % sobre el precio")
+    if imp["iibb_pct"] is not None:
+        partes.append(f"Ingresos Brutos {_coma(imp['iibb_pct'])} %")
+    if imp["otros_pct"]:
+        partes.append(f"otras tasas {_coma(imp['otros_pct'])} %")
+    if imp["descontables"]:
+        partes.append("descontás el IVA de " + ", ".join(DESCONTABLES[x] for x in imp["descontables"]))
+    return " · ".join(partes)
+
+
 # ------------------------------------------------------------------ costo de una pieza
 
 def costo_pieza(gramos, segundos, material: str | None, config: dict, impresora: dict | None = None,
@@ -299,6 +361,19 @@ def costo_pieza(gramos, segundos, material: str | None, config: dict, impresora:
             hora_maquina = 0.0
     maquina_c = hora_maquina * horas
 
+    # Responsable inscripto: el IVA de lo que compra con factura se descuenta, así que esas partes van sin IVA.
+    imp_v = impuestos_de_config(config)
+    sin_iva = 1 + imp_v["iva_pct"] / 100
+    descontables = imp_v["descontables"]
+    if "material" in descontables:
+        material_c /= sin_iva
+    if "luz" in descontables:
+        luz_c /= sin_iva
+    if "maquina" in descontables:
+        maquina_c /= sin_iva
+    if descontables:
+        supuestos.append("sin el IVA que descontás: " + ", ".join(DESCONTABLES[x] for x in descontables))
+
     fallas = _num(costos.get("fallas_pct"))
     if fallas is None:
         fallas = FALLAS_PCT
@@ -315,7 +390,7 @@ def costo_pieza(gramos, segundos, material: str | None, config: dict, impresora:
     if precio_hora is None:
         faltan.append("cuánto vale tu hora (preparar, sacar soportes, embalar)")
     mano_c = (minutos or 0) / 60 * (precio_hora or 0)
-    embalaje = _num(tienda.get("embalaje")) or 0.0
+    embalaje = (_num(tienda.get("embalaje")) or 0.0) / (sin_iva if "embalaje" in descontables else 1)
 
     partes = {"material": material_c, "luz": luz_c, "maquina": maquina_c, "fallas": fallas_c,
               "mano_de_obra": mano_c, "embalaje": embalaje}
@@ -352,6 +427,51 @@ def margen_de_config(tienda: dict) -> tuple[float | None, str | None]:
     return None, None
 
 
+def escalones_de_config(tienda: dict) -> list[dict]:
+    """Los escalones de margen según el costo de la pieza (tienda.margen_escalones), ordenados: [{"hasta", "margen_pct"}].
+    El último puede no tener "hasta" (para todo lo que cueste más). Vacío si no hay o no son válidos."""
+    crudos = tienda.get("margen_escalones") if isinstance(tienda.get("margen_escalones"), list) else []
+    escalones = []
+    for e in crudos:
+        if not isinstance(e, dict):
+            return []
+        margen, hasta = _pct(e.get("margen_pct"), 95), _num(e.get("hasta"))
+        if margen is None or (hasta is not None and not (math.isfinite(hasta) and hasta > 0)):
+            return []
+        escalones.append({"hasta": hasta, "margen_pct": margen})
+    return sorted(escalones, key=lambda e: math.inf if e["hasta"] is None else e["hasta"])
+
+
+def margen_para(tienda: dict, costo: float | None = None) -> tuple[float | None, str | None, str | None]:
+    """(margen habitual para una pieza de este costo, aviso, de dónde sale). Con escalones, el del primer escalón que
+    la cubre; si el costo pasa el último "hasta", el margen general (o el del último escalón si no hay general)."""
+    general, aviso = margen_de_config(tienda)
+    escalones = escalones_de_config(tienda)
+    if escalones and costo is not None:
+        for e in escalones:
+            if e["hasta"] is None or costo <= e["hasta"]:
+                desde = "más caras" if e["hasta"] is None else f"de hasta {_plata(e['hasta'], '').strip()} de costo"
+                return e["margen_pct"], aviso, f"escalón de piezas {desde}"
+        if general is None:
+            return escalones[-1]["margen_pct"], aviso, "último escalón"
+    return general, aviso, None
+
+
+def texto_margen(tienda: dict) -> str | None:
+    """El margen habitual, los escalones y el precio mínimo por pieza, en una línea (None si no hay margen)."""
+    general, _ = margen_de_config(tienda)
+    escalones = escalones_de_config(tienda)
+    partes = [f"{_coma(general)} % sobre el precio"] if general is not None else []
+    if escalones:
+        partes.append("según el costo: " + ", ".join(
+            (f"hasta {_plata(e['hasta'], '').strip()} → " if e["hasta"] is not None else "más caras → ")
+            + f"{_coma(e['margen_pct'])} %" for e in escalones))
+    minimo = _num(tienda.get("precio_minimo_pieza"))
+    if minimo:
+        partes.append(f"precio mínimo por pieza {_plata(minimo, '').strip()}")
+    return "; ".join(partes) or None
+
+
 def canales_de_config(tienda: dict) -> dict:
     canales = tienda.get("canales") if isinstance(tienda.get("canales"), dict) else {}
     if not canales:
@@ -364,66 +484,101 @@ def _redondear(valor: float, paso: float) -> float:
     return float(math.ceil(valor / paso - 1e-9) * paso) if paso else round(valor, 2)
 
 
-def _tasas(canal: dict) -> tuple[float, float, float | None]:
-    """(comisión más cuotas, en tanto por uno y con el IVA de la comisión; cargo fijo con IVA; tope del cargo fijo)."""
-    iva = 0.21 if canal.get("iva_comision") else 0.0
-    tasa = ((_num(canal.get("comision_pct")) or 0) + (_num(canal.get("cuotas_pct")) or 0)) / 100 * (1 + iva)
-    return tasa, (_num(canal.get("cargo_fijo")) or 0) * (1 + iva), _num(canal.get("cargo_fijo_hasta"))
+def _tasas(canal: dict, imp: dict | None = None) -> tuple[float, float, float | None]:
+    """(comisión más cuotas en tanto por uno del precio sin IVA de la venta, con el IVA de la comisión si es un costo;
+    cargo fijo; tope del cargo fijo, sobre el precio que paga el cliente).
+
+    Responsable inscripto: la comisión se cobra sobre el precio con IVA (× 1,21 del neto) y el IVA de la comisión y
+    del cargo fijo se descuenta. Los demás pagan el IVA de la comisión si el canal lo cobra (iva_comision)."""
+    imp = imp or SIN_IMPUESTOS
+    comision = ((_num(canal.get("comision_pct")) or 0) + (_num(canal.get("cuotas_pct")) or 0)) / 100
+    fijo = _num(canal.get("cargo_fijo")) or 0
+    if imp["ri"]:
+        return comision * (1 + imp["iva"]), fijo, _num(canal.get("cargo_fijo_hasta"))
+    iva = IVA_PCT / 100 if canal.get("iva_comision") else 0.0
+    return comision * (1 + iva), fijo * (1 + iva), _num(canal.get("cargo_fijo_hasta"))
 
 
-def desglose(costo: float, canal: dict, precio: float) -> dict:
-    """Con un precio dado: comisiones, lo que te queda, la ganancia y el margen real en ese canal."""
-    tasa, fijo, hasta = _tasas(canal)
-    cargos = precio * tasa + (0.0 if hasta and precio >= hasta else fijo)
-    ganancia = precio - cargos - costo
+def desglose(costo: float, canal: dict, precio: float, imp: dict | None = None) -> dict:
+    """Con un precio dado (el que paga el cliente): comisiones, impuestos, lo que te queda, la ganancia y el margen
+    real en ese canal (sobre el precio sin IVA si sos responsable inscripto)."""
+    imp = imp or SIN_IMPUESTOS
+    tasa, fijo, hasta = _tasas(canal, imp)
+    neto = precio / (1 + imp["iva"])
+    cargos = neto * tasa + (0.0 if hasta and precio >= hasta else fijo)
+    impuestos = neto * imp["tasa"]
+    te_queda = neto - cargos - impuestos
+    ganancia = te_queda - costo
     minimo = None
-    if tasa < 1:                                        # el precio que apenas cubre el costo
-        minimo = (costo + fijo) / (1 - tasa)
+    resta = tasa + imp["tasa"]
+    if resta < 1:                                       # el precio que apenas cubre el costo
+        minimo = (costo + fijo) / (1 - resta) * (1 + imp["iva"])
         if hasta and minimo >= hasta:
-            minimo = max(costo / (1 - tasa), hasta)
-    return {
+            minimo = max(costo / (1 - resta) * (1 + imp["iva"]), hasta)
+    r = {
         "nombre": canal.get("nombre"),
         "precio": round(precio, 2),
         "comisiones": round(cargos, 2),
-        "te_queda": round(precio - cargos, 2),
+        "te_queda": round(te_queda, 2),
         "ganancia": round(ganancia, 2),
-        "margen_real_pct": round(ganancia / precio * 100, 1) if precio else None,
+        "margen_real_pct": round(ganancia / neto * 100, 1) if neto else None,
         "precio_minimo": round(minimo, 2) if minimo else None,
     }
+    if imp["tasa"]:
+        r["impuestos"] = round(impuestos, 2)
+    if imp["iva"]:
+        r["precio_sin_iva"], r["iva_venta"] = round(neto, 2), round(precio - neto, 2)
+    return r
 
 
-def precio_canal(costo: float, canal: dict, margen_pct: float, redondeo: float = 0) -> dict:
-    """El precio que deja margen_pct del precio después de las comisiones del canal."""
-    tasa, fijo, hasta = _tasas(canal)
-    divisor = 1 - tasa - margen_pct / 100
+def precio_canal(costo: float, canal: dict, margen_pct: float, redondeo: float = 0, imp: dict | None = None,
+                 minimo_pieza: float | None = None) -> dict:
+    """El precio (el que paga el cliente) que deja margen_pct del precio sin IVA después de las comisiones y los
+    impuestos del canal. Si da menos que minimo_pieza, se cobra el mínimo."""
+    imp = imp or SIN_IMPUESTOS
+    tasa, fijo, hasta = _tasas(canal, imp)
+    divisor = 1 - tasa - imp["tasa"] - margen_pct / 100
     if divisor <= 0.02:
-        raise ValueError(f"Comisiones ({tasa * 100:.1f} %) más margen ({margen_pct:g} %) llegan al 100 %: no hay precio "
-                         "que cierre. Bajá el margen.")
-    precio = (costo + fijo) / divisor
+        impuestos = f", impuestos ({imp['tasa'] * 100:.1f} %)" if imp["tasa"] else ""
+        raise ValueError(f"Comisiones ({tasa * 100:.1f} %){impuestos} y margen ({margen_pct:g} %) llegan al 100 %: no hay "
+                         "precio que cierre. Bajá el margen.")
+    con_iva = 1 + imp["iva"]
+    precio = (costo + fijo) / divisor * con_iva
     if hasta and precio >= hasta:                       # el cargo fijo solo va en las ventas baratas
         # Desde el tope ya no hay cargo fijo: alcanza con el precio sin cargo, o con el tope si ese da menos.
-        precio = max(costo / divisor, hasta)
-    return desglose(costo, canal, _redondear(precio, redondeo))
+        precio = max(costo / divisor * con_iva, hasta)
+    precio = _redondear(precio, redondeo)
+    minimo = _num(minimo_pieza)
+    por_minimo = bool(minimo and math.isfinite(minimo) and precio < minimo)
+    r = desglose(costo, canal, minimo if por_minimo else precio, imp)
+    if por_minimo:
+        r["por_precio_minimo"] = True
+    return r
 
 
 def precios(costo: float, config: dict, margen_pct: float | None = None, precio: float | None = None) -> dict:
-    """Precio por canal con el margen habitual de la tienda, o con el margen elegido para este producto, o con un
-    precio fijo (entonces muestra el margen real que deja en cada canal)."""
+    """Precio por canal con el margen habitual de la tienda (o el de su escalón según el costo), o con el margen
+    elegido para este producto, o con un precio fijo (entonces muestra el margen real que deja en cada canal)."""
     tienda = config.get("tienda") or {}
-    habitual, aviso = margen_de_config(tienda)
+    imp = impuestos_de_config(config)
+    habitual, aviso, origen = margen_para(tienda, costo)
     margen = margen_pct if margen_pct is not None else habitual
-    r: dict = {"margen_pct": margen, "margen_habitual_pct": habitual, "precio_fijo": precio,
-               "aviso_margen": aviso if margen_pct is None else None, "canales": {}, "faltan": []}
+    r: dict = {"margen_pct": margen, "margen_habitual_pct": habitual, "margen_origen": origen, "precio_fijo": precio,
+               "aviso_margen": aviso if margen_pct is None else None, "canales": {}, "faltan": [],
+               "impuestos": texto_impuestos(imp) if imp["condicion"] else None, "con_iva": imp["ri"]}
     if margen is None and precio is None:
         r["faltan"].append("qué margen querés ganar sobre el precio (por ejemplo 40 %)")
         margen = 0.0
+    if tienda.get("plataforma") and not imp["condicion"]:
+        r["faltan"].append("cómo facturás (monotributo o responsable inscripto) y si pagás Ingresos Brutos")
     redondeo = _num(tienda.get("redondeo")) or 0
+    minimo = None if precio is not None else _num(tienda.get("precio_minimo_pieza"))
     for clave, canal in canales_de_config(tienda).items():
         if canal.get("comision_pct") is None and clave != "tienda":
             r["faltan"].append(f"comisión de {canal.get('nombre') or clave}")
         try:
-            r["canales"][clave] = (desglose(costo, canal, precio) if precio is not None
-                                   else precio_canal(costo, canal, margen, redondeo))
+            r["canales"][clave] = (desglose(costo, canal, precio, imp) if precio is not None
+                                   else precio_canal(costo, canal, margen, redondeo, imp, minimo))
         except ValueError as error:
             r["canales"][clave] = {"nombre": canal.get("nombre"), "error": str(error)}
     return r
@@ -437,9 +592,26 @@ def margenes_sugeridos(habitual: float | None) -> list[float]:
 
 def opciones(costo: float, config: dict, margenes: list[float] | None = None) -> list[dict]:
     """Una opción por margen, con el precio y la ganancia en cada canal (para preguntarle al usuario)."""
-    habitual, _ = margen_de_config(config.get("tienda") or {})
+    habitual, _, _ = margen_para(config.get("tienda") or {}, costo)
     return [{"margen_pct": m, "habitual": m == habitual, **precios(costo, config, margen_pct=m)}
             for m in (margenes or margenes_sugeridos(habitual))]
+
+
+def linea_canal(clave: str, canal: dict, moneda: str = "", plata=None) -> str:
+    """Una línea con el precio de un canal y lo que pasa con él (para el chat, la ficha y la vista previa)."""
+    plata = plata or (lambda v, m: _plata(v, m))
+    nombre = canal.get("nombre") or clave
+    if "error" in canal:
+        return f"{nombre}: {canal['error']}"
+    precio = f"precio {plata(canal['precio'], moneda)}"
+    if canal.get("iva_venta"):
+        precio += f" con IVA ({plata(canal['precio_sin_iva'], moneda)} + IVA {plata(canal['iva_venta'], moneda)})"
+    if canal.get("por_precio_minimo"):
+        precio += " (el mínimo por pieza)"
+    impuestos = f", impuestos {plata(canal['impuestos'], moneda)}" if canal.get("impuestos") else ""
+    return (f"{nombre}: {precio} → comisiones {plata(canal['comisiones'], moneda)}{impuestos}, te queda "
+            f"{plata(canal['te_queda'], moneda)}, ganancia {plata(canal['ganancia'], moneda)} "
+            f"({_coma(canal['margen_real_pct'])} % del precio{' sin IVA' if canal.get('iva_venta') else ''})")
 
 
 # ------------------------------------------------------------------ qué falta configurar
@@ -503,9 +675,18 @@ def estado_taller(config: dict, detectadas: list[dict] | None = None) -> list[di
             if _num(mano.get("precio_hora")) is not None else "Falta cuánto vale tu hora",
             "Mi hora de trabajo vale $… y le dedico … minutos a cada pieza")
     if tienda.get("plataforma"):
+        imp = impuestos_de_config(config)
+        if not imp["condicion"]:
+            agregar("Impuestos", False, "Falta cómo facturás y si pagás Ingresos Brutos",
+                    "Facturo como … y pago …% de Ingresos Brutos")
+        else:
+            sin_iibb = imp["iibb_pct"] is None and imp["condicion"] != "sin_facturar"
+            agregar("Impuestos", True, texto_impuestos(imp) + (" (¿pagás Ingresos Brutos?)" if sin_iibb else ""),
+                    "Pago …% de Ingresos Brutos", aviso=sin_iibb)
         margen, aviso = margen_de_config(tienda)
-        agregar("Margen", margen is not None, f"{margen:g} % sobre el precio" if margen is not None else
-                "Falta el margen", "Quiero ganar …% sobre el precio", aviso=bool(aviso))
+        texto = texto_margen(tienda)
+        agregar("Margen", texto is not None and (margen is not None or bool(escalones_de_config(tienda))),
+                texto or "Falta el margen", "Quiero ganar …% sobre el precio", aviso=bool(aviso))
         for clave, canal in canales_de_config(tienda).items():
             sin = canal.get("comision_pct") is None and clave != "tienda"
             agregar(f"Comisión de {canal.get('nombre') or clave}", not sin,
@@ -529,6 +710,110 @@ def _coma(valor) -> str:
     return "—" if valor is None else f"{valor:g}".replace(".", ",")
 
 
+def _sin_tildes(texto: str) -> str:
+    return unicodedata.normalize("NFKD", str(texto)).encode("ascii", "ignore").decode().strip().casefold()
+
+
+def _accion_impuestos(a, config: dict) -> None:
+    """costos.py impuestos: guarda cómo factura y los impuestos de cada venta (lo que no se pasa queda como estaba)."""
+    anterior = config.get("impuestos") if isinstance(config.get("impuestos"), dict) else {}
+    condicion = a.condicion or anterior.get("condicion")
+    if condicion not in CONDICIONES:
+        raise SystemExit("Falta --condicion: monotributo, responsable_inscripto, exento o sin_facturar "
+                         "(no se escribió nada).")
+    for nombre, valor, tope in (("--ingresos-brutos", a.ingresos_brutos, 30), ("--otros", a.otros, 30),
+                                ("--iva", a.iva, 50)):
+        if valor is not None and not (math.isfinite(valor) and 0 <= valor <= tope):
+            raise SystemExit(f"{nombre} va en %, entre 0 y {tope:g} (no se escribió nada).")
+    descontable = None
+    if a.iva_descontable is not None:
+        lista = [_sin_tildes(x) for x in a.iva_descontable.split(",") if x.strip()]
+        lista = [] if lista in ([], ["ninguno"], ["nada"]) else lista
+        malos = [x for x in lista if x not in DESCONTABLES]
+        if malos:
+            raise SystemExit(f"--iva-descontable acepta {', '.join(DESCONTABLES)} (no entiendo: {', '.join(malos)}; "
+                             "no se escribió nada).")
+        if lista and condicion != "responsable_inscripto":
+            raise SystemExit("Solo el responsable inscripto descuenta el IVA de sus compras (no se escribió nada).")
+        descontable = [x for x in DESCONTABLES if x in lista]
+    nuevo: dict = {"condicion": condicion}
+    iibb = a.ingresos_brutos if a.ingresos_brutos is not None else anterior.get("ingresos_brutos_pct")
+    if _pct(iibb, 30) is not None:
+        nuevo["ingresos_brutos_pct"] = iibb
+    otros = a.otros if a.otros is not None else anterior.get("otros_pct")
+    if _pct(otros, 30):
+        nuevo["otros_pct"] = otros
+    if condicion == "responsable_inscripto":
+        iva = a.iva if a.iva is not None else anterior.get("iva_pct")
+        if _pct(iva, 50) is not None and iva != IVA_PCT:
+            nuevo["iva_pct"] = iva
+        lista = descontable if descontable is not None else anterior.get("iva_descontable")
+        if isinstance(lista, list) and lista:
+            nuevo["iva_descontable"] = [x for x in DESCONTABLES if x in lista]
+    config["impuestos"] = nuevo
+    _guardar(a.salida, config)
+    print(f"Impuestos de la venta: {texto_impuestos(impuestos_de_config(config))}.")
+    if nuevo.get("ingresos_brutos_pct") is None and condicion != "sin_facturar":
+        print("Falta Ingresos Brutos: si lo pagás aparte, pasá --ingresos-brutos (0 si va incluido en el monotributo).")
+    print(f"Guardado en {a.salida}.")
+
+
+def _accion_margen(a, config: dict) -> None:
+    """costos.py margen: el margen habitual (o el recargo equivalente), los escalones y el precio mínimo por pieza."""
+    if a.margen is None and a.recargo is None and a.escalones is None and a.minimo_pieza is None:
+        raise SystemExit("Pasá --margen, --recargo, --escalones o --minimo-pieza (no se escribió nada).")
+    tienda = config.setdefault("tienda", {})
+    aviso = None
+    if a.recargo is not None:
+        if not (math.isfinite(a.recargo) and 0 <= a.recargo <= 1900):
+            raise SystemExit("--recargo va en %, entre 0 y 1900 (no se escribió nada).")
+        margen = round(a.recargo / (100 + a.recargo) * 100, 1)
+        aviso = f"Un recargo de {_coma(a.recargo)} % sobre el costo es un margen de {_coma(margen)} % sobre el precio."
+    else:
+        margen = a.margen
+    if margen is not None and not (math.isfinite(margen) and 0 <= margen < 95):
+        raise SystemExit("El margen va entre 0 y 95 % del precio: con 100 % el precio daría infinito. Si querés el "
+                         "doble del costo, es --recargo 100 (no se escribió nada).")
+    escalones = None
+    if a.escalones is not None:
+        if _sin_tildes(a.escalones) in ("ninguno", "nada", ""):
+            escalones = []
+        else:
+            escalones = []
+            try:
+                for parte in a.escalones.replace(" ", "").split(","):
+                    hasta, _, m = parte.rpartition(":")
+                    escalones.append({"hasta": float(hasta), "margen_pct": float(m)} if hasta else
+                                     {"margen_pct": float(m)})
+            except ValueError:
+                raise SystemExit('--escalones va como "5000:60,20000:50,40" (no se escribió nada).')
+            limites = [e["hasta"] for e in escalones if "hasta" in e]
+            abiertos = [i for i, e in enumerate(escalones) if "hasta" not in e]
+            if (not escalones_de_config({"margen_escalones": escalones}) or limites != sorted(set(limites))
+                    or len(abiertos) > 1 or (abiertos and abiertos[0] != len(escalones) - 1)):
+                raise SystemExit('Escalones de menor a mayor costo, cada margen entre 0 y 95 %, y a lo sumo uno sin '
+                                 'tope, al final: "5000:60,20000:50,40" (no se escribió nada).')
+    if a.minimo_pieza is not None and not (math.isfinite(a.minimo_pieza) and a.minimo_pieza >= 0):
+        raise SystemExit("--minimo-pieza tiene que ser 0 o más (no se escribió nada).")
+    if margen is not None:
+        tienda["margen_precio_pct"] = margen
+    if escalones is not None:
+        if escalones:
+            tienda["margen_escalones"] = escalones
+        else:
+            tienda.pop("margen_escalones", None)
+    if a.minimo_pieza is not None:
+        if a.minimo_pieza:
+            tienda["precio_minimo_pieza"] = a.minimo_pieza
+        else:
+            tienda.pop("precio_minimo_pieza", None)
+    _guardar(a.salida, config)
+    if aviso:
+        print(aviso)
+    print(f"Margen: {texto_margen(tienda) or 'sin margen general'}.")
+    print(f"Guardado en {a.salida}.")
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="accion", required=True)
@@ -537,7 +822,7 @@ def main(argv=None) -> None:
     lz.add_argument("--kwh", type=float, help="kWh consumidos en el período")
     lz.add_argument("--total", type=float, help="total de la boleta")
     lz.add_argument("--cargo-variable", type=float, help="cargo variable por kWh del último escalón")
-    lz.add_argument("--impuestos-pct", type=float, help="IVA y tasas que van sobre la energía, en %")
+    lz.add_argument("--impuestos-pct", type=float, help="IVA y tasas que van sobre la energía, en %%")
     lz.add_argument("--cargos-fijos", type=float, help="cargos fijos del período (para el promedio)")
     lz.add_argument("--periodo", help="AAAA-MM")
     lz.add_argument("--empresa")
@@ -576,7 +861,29 @@ def main(argv=None) -> None:
     cs.add_argument("--reemplazar", action="store_true", help="pisar un consumo mejor (por ejemplo, uno medido)")
     cs.add_argument("--salida", type=Path, help="config.json donde guardarlo (sin esto, solo lo muestra)")
     cs.add_argument("--json", action="store_true")
+    im = sub.add_parser("impuestos", help="cómo facturás y los impuestos de cada venta (Ingresos Brutos, IVA)")
+    im.add_argument("--config", type=Path, required=True)
+    im.add_argument("--condicion", choices=list(CONDICIONES),
+                    help="monotributo, responsable_inscripto, exento o sin_facturar (si no, la que ya estaba)")
+    im.add_argument("--ingresos-brutos", type=float, help="Ingresos Brutos sobre la venta, en %% (0 si no pagás aparte)")
+    im.add_argument("--otros", type=float, help="otras tasas que se pagan como %% de cada venta (municipal, etc.)")
+    im.add_argument("--iva", type=float, help="IVA de la venta, en %% (por defecto 21; solo responsable inscripto)")
+    im.add_argument("--iva-descontable", help="responsable inscripto: de qué compras descontás el IVA, como "
+                                              "material,maquina,embalaje,luz (o ninguno)")
+    im.add_argument("--salida", type=Path, required=True)
+    mg = sub.add_parser("margen", help="el margen habitual, los escalones según el costo y el precio mínimo por pieza")
+    mg.add_argument("--config", type=Path, required=True)
+    cual = mg.add_mutually_exclusive_group()
+    cual.add_argument("--margen", type=float, help="margen sobre el precio, en %%")
+    cual.add_argument("--recargo", type=float, help="recargo sobre el costo, en %% (100 = el doble del costo): se "
+                                                    "guarda como el margen equivalente")
+    mg.add_argument("--escalones", help='margen según el costo de la pieza, como "5000:60,20000:50,40" (hasta 5.000 de '
+                                        'costo 60 %%, hasta 20.000 50 %%, más 40 %%), o "ninguno" para sacarlos')
+    mg.add_argument("--minimo-pieza", type=float, help="precio mínimo por pieza (0 para sacarlo)")
+    mg.add_argument("--salida", type=Path, required=True)
     a = ap.parse_args(argv)
+    if a.accion in ("impuestos", "margen") and not a.config.exists():
+        raise SystemExit(f"No encuentro {a.config}: pasá el config.json del taller (no se escribió nada).")
     if a.accion in ("luz", "consumo") and not a.config.exists():
         raise SystemExit(f"No encuentro {a.config}: pasá el config.json del taller (no se escribió nada).")
     if a.accion == "consumo":
@@ -634,13 +941,12 @@ def main(argv=None) -> None:
         sin_costo = not c["total"]
         if sin_costo:
             print("  Sin precios todavía: faltan los datos de abajo.")
+        if p["impuestos"] and not sin_costo:
+            print(f"  Impuestos de la venta: {p['impuestos']}")
+        if p["margen_origen"] and a.margen is None and a.precio is None and not sin_costo:
+            print(f"  Margen: {_coma(p['margen_pct'])} % ({p['margen_origen']})")
         for clave, canal in ({} if sin_costo else p["canales"]).items():
-            if "error" in canal:
-                print(f"  {canal.get('nombre') or clave}: {canal['error']}")
-            else:
-                print(f"  {canal.get('nombre') or clave}: precio {_plata(canal['precio'], m)} → comisiones "
-                      f"{_plata(canal['comisiones'], m)}, te queda {_plata(canal['te_queda'], m)}, ganancia "
-                      f"{_plata(canal['ganancia'], m)} ({_coma(canal['margen_real_pct'])} % del precio)")
+            print("  " + linea_canal(clave, canal, m))
         for aviso in ([p["aviso_margen"]] if p["aviso_margen"] else []) + c["supuestos"]:
             print(f"  Supuesto: {aviso}")
         for falta in c["faltan"] + p["faltan"]:
@@ -701,6 +1007,10 @@ def main(argv=None) -> None:
             print(texto)
             if a.salida:
                 print(f"Guardado en {a.salida}.")
+    elif a.accion == "impuestos":
+        _accion_impuestos(a, config)
+    elif a.accion == "margen":
+        _accion_margen(a, config)
     else:
         detectadas = []
         if a.impresoras_orca:

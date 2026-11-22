@@ -112,6 +112,7 @@ Write-Host '== Esto es lo que instaló taller-3d:'
 foreach ($l in $lineas) {
     switch ($l.Tipo) {
         'carpeta' { if ($Todo) { Write-Host "   carpeta de trabajo (con -Todo): $($l.Valor)" } else { Write-Host "   (se conserva) carpeta de trabajo: $($l.Valor)" } }
+        'carpeta-usada' { Write-Host "   (se conserva) carpeta de trabajo que ya tenías: $($l.Valor)" }
         'orca-instalado' { if ($Orca) { Write-Host "   OrcaSlicer (con -Orca): $($l.Valor)" } else { Write-Host "   (se conserva) OrcaSlicer: $($l.Valor)" } }
         'union' { Write-Host "   carpeta de datos de Orca movida (vuelve a AppData): $($l.Valor -replace '\|', ' -> ')" }
         'uv' { Write-Host "   orca-mcp (instalado con uv)" }
@@ -224,6 +225,7 @@ foreach ($l in $lineas) {
                 $r2 = [string](Read-Host "   ¿Mando también la carpeta de trabajo '$($l.Valor)' a la Papelera? Escribí SI")
                 if ($r2.Trim() -ceq 'SI') { APapelera $l.Valor; Write-Host "A la Papelera: $($l.Valor)" }
             }
+            'carpeta-usada' { }   # no la creó el instalador: se conserva
             'archivo' {
                 if (-not (DentroDe $l.Valor $Estado)) {
                     Write-Host "   No toco '$($l.Valor)': está fuera de la carpeta del instalador."; $pendientes = $true; break

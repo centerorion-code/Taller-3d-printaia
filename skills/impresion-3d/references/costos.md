@@ -16,7 +16,9 @@ El costo de una pieza sale de los datos del usuario en `config.json` y de lo que
 | Tu hora | `costos.mano_de_obra.precio_hora` y `minutos_por_pieza` | Preparar, sacar soportes, limpiar y embalar. |
 | Embalaje | `tienda.embalaje` | Bolsa, caja, etiqueta. |
 | Canales de venta | `tienda.canales` | Comisión, cuotas, IVA sobre la comisión y cargo fijo de cada canal. |
-| Margen habitual | `tienda.margen_precio_pct` | Qué parte del precio quiere ganar (por ejemplo 40 %). |
+| Margen habitual | `tienda.margen_precio_pct` | Qué parte del precio quiere ganar (por ejemplo 40 %). «El doble del costo» es un recargo del 100 %: 50 % de margen (`costos.py margen --recargo 100`). |
+| Impuestos de la venta | `impuestos` | Cómo factura (monotributo, responsable inscripto, exento o sin facturar) e Ingresos Brutos. Ver abajo. |
+| Margen por escalones y mínimo (opcional) | `tienda.margen_escalones`, `tienda.precio_minimo_pieza` | Un margen según el costo de la pieza y un precio mínimo por pieza. Ver «El margen». |
 
 Pedir cada dato la primera vez que hace falta, de a uno, con la frase de `costos.py estado` ("Te paso mi boleta de luz…"). El consumo de la impresora no se pide: se busca (abajo). Lo que falta no frena el presupuesto: sale con la lista de lo que falta y lo que se supuso.
 
@@ -78,6 +80,22 @@ Guardarlo con `--salida` y escribir `config.json` con el procedimiento de escrit
 
 La comisión de Mercado Libre depende de la categoría y del tipo de publicación, y cambia: buscarla en la web para la categoría del usuario antes de guardarla, y decirle de dónde salió. `iva_comision`: si el canal cobra IVA sobre su comisión. `cargo_fijo_hasta`: el precio desde el que ya no cobra el cargo fijo.
 
+### Impuestos de la venta
+
+Preguntar cómo factura y guardarlo con `costos.py impuestos` (lo que no se pasa queda como estaba):
+
+```
+python3 -I costos.py impuestos --config config.json --condicion monotributo --ingresos-brutos 3.5 --salida config.json
+python3 -I costos.py impuestos --config config.json --condicion responsable_inscripto --ingresos-brutos 3.5 \
+    --iva-descontable material,maquina,embalaje --salida config.json
+```
+
+- **Ingresos Brutos** (`ingresos_brutos_pct`) y otras tasas sobre la venta (`otros_pct`, por ejemplo una tasa municipal que se paga como % de lo vendido) restan del precio igual que la comisión: si no se cuentan, la ganancia real queda más baja que el margen elegido, punto por punto. 0 si no paga aparte (por ejemplo, si va incluido en la cuota del monotributo). El porcentaje lo dice el usuario o su contador: depende de la provincia y la actividad; no inventarlo.
+- **Monotributo, exento o sin facturar:** el precio es el final, sin IVA aparte. El IVA que cobran los canales sobre su comisión es un costo (`iva_comision`). La cuota mensual del monotributo no se reparte entre las piezas (se paga igual): la cubre el margen.
+- **Responsable inscripto:** el precio que paga el cliente lleva IVA (21 %, o `iva_pct`). El margen es sobre el precio sin IVA. Las comisiones se cobran sobre el precio con IVA, pero su IVA (y el del cargo fijo) se descuenta, así que no es costo. Ingresos Brutos va sobre el neto. Las compras con factura A (`iva_descontable`: material, máquina, embalaje; la luz solo si la boleta está a nombre del negocio) entran sin IVA.
+- Las retenciones y percepciones de Mercado Libre son pagos a cuenta, no costo: no se cuentan.
+- Claude no da consejo impositivo: si el usuario no sabe su situación, que la confirme con su contador.
+
 ## Las fórmulas
 
 ```
@@ -88,15 +106,18 @@ fallas        = (material + luz + máquina) × fallas % / (1 − fallas %)
 mano de obra  = minutos / 60 × precio de tu hora
 costo         = material + luz + máquina + fallas + mano de obra + embalaje
 
-precio = (costo + cargo fijo × (1 + IVA)) / (1 − (comisión % + cuotas %) × (1 + IVA) − margen %)
+precio = (costo + cargo fijo × (1 + IVA)) / (1 − (comisión % + cuotas %) × (1 + IVA) − impuestos % − margen %)
 ```
 
-El IVA va sobre las comisiones solo si el canal lo cobra.
+El IVA va sobre las comisiones solo si el canal lo cobra. `impuestos %` = Ingresos Brutos más otras tasas sobre la venta. Responsable inscripto: la cuenta da el precio sin IVA con la comisión × 1,21 (se cobra sobre el precio con IVA) y el cargo fijo sin IVA (se descuenta); el cliente paga ese precio × 1,21.
 
 ## El margen
 
 - Es **sobre el precio**: de cada venta, qué parte le queda de ganancia después de comisiones y costos. Un recargo del 50 % sobre el costo es un margen del 33 %: margen = recargo / (100 + recargo).
 - El `margen_pct` de antes de la 0.1.14 era un recargo. `costos.py` lo convierte y avisa: confirmarlo con el usuario y guardar `margen_precio_pct`.
+- **Según el tamaño de la pieza.** Los servicios de impresión no suelen cambiar el porcentaje por tamaño: cubren lo chico con un costo fijo por pieza (acá, tu tiempo y el embalaje) y un **precio mínimo por pieza**, y dan precios más bajos por cantidad. El taller tiene las dos cosas, opcionales:
+  - `tienda.precio_minimo_pieza`: si el precio da menos, se cobra el mínimo (la salida lo marca «el mínimo por pieza»).
+  - `tienda.margen_escalones`: un margen según el **costo** de la pieza (el costo junta material, tiempo de máquina y tu trabajo, así que mide el tamaño mejor que los gramos o las horas solos). Por ejemplo, más margen en las chicas (la ganancia en pesos es poca) y menos en las grandes (el precio ya es alto y la competencia también): `costos.py margen --escalones "5000:60,20000:50,40"` (hasta 5.000 de costo 60 %, hasta 20.000 50 %, más 40 %). Las tres opciones de cada producto se arman alrededor del margen de su escalón.
 - **En cada producto se elige** (skill `publicar`): `costos.py pieza … --margenes` da tres opciones (una más baja, la habitual y una más alta) con el precio y la ganancia en cada canal. Si el usuario dice un precio, `--precio 4500` muestra el margen real que le deja en cada canal. Si en algún canal la ganancia da negativa, decirlo claro.
 
 ```

@@ -185,10 +185,16 @@ def revisar(pub: dict) -> list[tuple[str, str]]:
                 items.append(("mal", f"{nombre}: {canal['error']}"))
                 continue
             negativa = (canal.get("ganancia") or 0) < 0
+            iva = (f" con IVA ({plata(canal.get('precio_sin_iva'), moneda)} + IVA {plata(canal.get('iva_venta'), moneda)})"
+                   if canal.get("iva_venta") else "") + (" (el mínimo por pieza)" if canal.get("por_precio_minimo") else "")
+            impuestos = f", impuestos {plata(canal.get('impuestos'), moneda)}" if canal.get("impuestos") else ""
             items.append(("mal" if negativa else "ok",
-                          f"{nombre}: {plata(canal.get('precio'), moneda)}, comisiones {plata(canal.get('comisiones'), moneda)}, "
+                          f"{nombre}: {plata(canal.get('precio'), moneda)}{iva}, comisiones "
+                          f"{plata(canal.get('comisiones'), moneda)}{impuestos}, "
                           f"te queda {plata(canal.get('te_queda'), moneda)}, ganancia {plata(canal.get('ganancia'), moneda)} "
                           f"({_numero(canal.get('margen_real_pct') or 0)} %)" + (": pierde plata" if negativa else "") + "."))
+        if precio.get("impuestos"):
+            items.append(("ok", f"Impuestos de la venta: {precio['impuestos']}."))
     textos = pub.get("textos") or {}
     if textos.get("autor") == "gemini":
         texto = "El texto lo escribió Gemini (gratis) y Claude lo revisó contra los datos de la pieza."
@@ -223,7 +229,8 @@ def generar(pub: dict, modo: str = "archivo", prefijo_fotos: str = "fotos/") -> 
             f'<img src="{e(f)}" alt="" loading="lazy"></button>' for i, f in enumerate(fotos)) if len(fotos) > 1 else ""
     else:
         principal, miniaturas = '<span class="sin-foto">Sin fotos todavía</span>', ""
-    precio_html = (f'<p class="precio">{e(plata(p["regular_price"], moneda) or "")}</p>' if p.get("regular_price")
+    con_iva = " <small>IVA incluido</small>" if (pub.get("precio") or {}).get("con_iva") else ""
+    precio_html = (f'<p class="precio">{e(plata(p["regular_price"], moneda) or "")}{con_iva}</p>' if p.get("regular_price")
                    else '<p class="precio sin">Precio a definir</p>')
     medidas = pub.get("medidas_mm")
     filas = []

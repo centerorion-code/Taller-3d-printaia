@@ -66,6 +66,10 @@
     "peso_embalaje_g": 50,
     "categoria_por_defecto": null
   },
+  "impuestos": {
+    "condicion": null,
+    "ingresos_brutos_pct": null
+  },
   "generadores_ia": {
     "hunyuan": null,
     "imagenes": null

@@ -491,6 +491,9 @@ footer{max-width:1200px;margin:0 auto;padding:0 24px 32px;color:var(--suave);fon
 .taller ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}
 .taller li{display:grid;grid-template-columns:22px 1fr;gap:4px 8px;align-items:start;font-size:14px}
 .taller li button{grid-column:2;justify-self:start;min-height:36px;padding:4px 12px;border:1.5px solid var(--tinta);border-radius:999px;background:#fff;font:inherit;font-size:13px;cursor:pointer}
+.taller form.dato{grid-column:2;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.taller form.dato input{width:7em;min-height:36px;padding:4px 8px;border:1.5px solid var(--tinta);border-radius:8px;font:inherit;background:#fff}
+.taller form.dato input.palabra{width:12em}
 .taller .marca{font-weight:700;text-align:center}
 .taller .falta .marca{color:#B3261E}.taller .revisar .marca{color:var(--acento)}
 .idea .imagen{background:var(--papel)}
@@ -617,6 +620,15 @@ GUION = """
   document.querySelectorAll('[data-comentar]').forEach(function(b){b.addEventListener('click',function(){
     if(com){com.openComposer({element:lugar(b)}).catch(function(){});}
   });});
+  // «Tu taller»: los datos con número (un monto, un porcentaje) se completan acá y recién ahí se mandan.
+  document.querySelectorAll('form.dato').forEach(function(f){f.addEventListener('submit',function(ev){
+    ev.preventDefault();
+    var vacio=[].some.call(f.querySelectorAll('input'),function(i){return !i.value.trim();});
+    if(vacio){avisar(f,'Completá el dato y tocá de nuevo.');return;}
+    var texto=[].map.call(f.querySelectorAll('.t,input'),function(n){
+      return n.tagName==='INPUT'?n.value.trim():n.textContent;}).join('');
+    pedir(f.querySelector('button'),texto);
+  });});
   var idea=document.getElementById('idea');
   if(idea){idea.addEventListener('submit',function(ev){
     ev.preventDefault();var campo=idea.querySelector('input'),t=campo.value.trim();
@@ -731,10 +743,28 @@ def _taller(estado: list[dict] | None) -> str:
     e = html.escape
     marcas = {"listo": "✓", "revisar": "!", "falta": "✗"}
     pendientes = [i for i in estado if i.get("estado") != "listo"]
+
+    def boton(frase: str) -> str:
+        # Con "…" en la frase (un monto, un porcentaje), el panel pide el dato y recién ahí lo manda: si no, a Claude
+        # le llegaría «me costó $…» sin el número.
+        if "…" not in frase:
+            return f'<button type="button" data-pedido="{e(frase)}">Decíselo a Claude</button>'
+        partes = frase.split("…")
+
+        def campo(n: int) -> str:
+            # Un número si va después de "$" o antes de "%" o "minutos"; si no, una palabra («monotributista»).
+            numero = partes[n].rstrip().endswith("$") or partes[n + 1].lstrip().startswith(("%", "minutos", "min "))
+            modo, clase = ("decimal", "") if numero else ("text", 'class="palabra" ')
+            return (f'<input type="text" inputmode="{modo}" autocomplete="off" required {clase}'
+                    f'aria-label="Dato {n + 1}">')
+        campos = "".join(f'<span class="t">{e(t)}</span>' + (campo(n) if n < len(partes) - 1 else "")
+                         for n, t in enumerate(partes))
+        return f'<form class="dato">{campos}<button type="submit">Decíselo a Claude</button></form>'
+
     filas = "".join(
         f'<li class="{e(i.get("estado") or "")}"><span class="marca" aria-hidden="true">{marcas.get(i.get("estado"), "·")}</span>'
         f'<span><strong>{e(str(i.get("tema") or ""))}:</strong> {e(str(i.get("texto") or ""))}</span>'
-        + (f'<button type="button" data-pedido="{e(str(i["frase"]))}">Decíselo a Claude</button>' if i.get("frase") else "")
+        + (boton(str(i["frase"])) if i.get("frase") else "")
         + "</li>" for i in estado)
     titulo = ("Tu taller: todo listo para calcular costos y precios" if not pendientes else
               f"Tu taller: {len(pendientes)} dato{'s' if len(pendientes) != 1 else ''} para costos y precios")

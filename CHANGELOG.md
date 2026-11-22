@@ -1,5 +1,14 @@
 # Cambios
 
+## 0.1.29 (2026-11-22)
+
+- **Impuestos de la venta:** le decís cómo facturás (monotributo, responsable inscripto, exento o sin facturar) y si pagás Ingresos Brutos, y el precio de cada canal ya los descuenta: el margen que elegís es el que te queda de verdad. Si sos responsable inscripto, el precio sale con IVA incluido, el margen es sobre el precio sin IVA, la comisión se calcula sobre el precio con IVA (y su IVA no es costo, porque lo descontás) y las compras con factura A que digas (filamento, impresora, embalaje, luz) entran sin IVA. Lo guarda `costos.py impuestos`; «Tu taller» lo pide si falta.
+- **Margen según la pieza:** opcionalmente, un precio mínimo por pieza y márgenes por escalones según el costo de la pieza (más margen en las chicas, menos en las grandes). Las tres opciones de margen de cada producto se arman alrededor del escalón de esa pieza. `costos.py margen` guarda el margen habitual, también como recargo sobre el costo (`--recargo 100` = el doble del costo = 50 % de margen), los escalones y el mínimo.
+- **«Tu taller» pide el número:** los datos con monto o porcentaje («La Ender me costó $…») tienen un campo en el panel y se mandan completos. Antes, a Claude le llegaba la frase con «$…» sin el número.
+- **El instalador se acuerda de tu carpeta de trabajo** aunque ya existiera, así una corrida sin `--carpeta-trabajo` no vuelve a `Documentos/Taller 3D` (Linux y Windows). **No escribe la configuración de la app de Claude mientras siga abierta** (la app la reescribe al cerrarse y se perdía el cambio): pide cerrarla del todo y, si sigue abierta, no la toca. Si la configuración del taller ya existía, anota tu ACEPTO (con respaldo). El desinstalador tampoco toca la configuración de la app con la app abierta.
+- **`/taller-3d:instalar` revisa a qué carpeta atiende el programa que abre Orca** (con una sonda que no abre nada) y explica cómo arreglarlo si es otra.
+- **`costos.py --help`** ya no se rompe por un «%» suelto en la ayuda.
+
 ## 0.1.28 (2026-11-22)
 
 - **Las fotos de producto se hacen en tu PC si tenés el conector de Blender:** con Blender en segundo plano (nunca en la ventana que tengas abierta), una foto por vez. En una PC con un i5 de 6 núcleos, las cuatro tardaron unos 2 minutos, contra casi 7 en el espacio de Claude, y no hay que instalar Blender en cada conversación. Las fotos salen iguales. El fondo blanco y la sombra se arman en el espacio de Claude, porque el Blender de la PC no trae Pillow. Si el conector no está o falla, se hacen como antes.

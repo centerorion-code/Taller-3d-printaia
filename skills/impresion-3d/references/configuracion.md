@@ -6,7 +6,7 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
 {
   "version": 1,
   "carpeta_trabajo": "/home/usuario/Documentos/Taller 3D",
-  "aceptacion": {"fecha": "2026-11-21T10:00:00-03:00", "version_plugin": "0.1.28", "texto": "ACEPTO", "medio": "instalar.sh"},
+  "aceptacion": {"fecha": "2026-11-21T10:00:00-03:00", "version_plugin": "0.1.29", "texto": "ACEPTO", "medio": "instalar.sh"},
   "orca": {"version": "2.5.1", "ejecutable": "/home/usuario/Aplicaciones/OrcaSlicer_Linux_AppImage_Ubuntu2404_V2.5.1.AppImage",
            "origen": "oficial", "carpeta_usuario": "/home/usuario/.config/OrcaSlicer/user/default"},
   "impresora_por_defecto": "marca-modelo",
@@ -40,6 +40,7 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
                                           "cargo_fijo": 1000, "cargo_fijo_hasta": 20000}},
              "embalaje": 400, "redondeo": 100, "demora_dias": 3, "peso_embalaje_g": 50,
              "categoria_por_defecto": "Piezas a medida"},
+  "impuestos": {"condicion": "monotributo", "ingresos_brutos_pct": 3.5},
   "generadores_ia": {"hunyuan": true, "imagenes": "gemini", "textos": "gemini"}
 }
 ```
@@ -60,6 +61,8 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
 - `tienda.margen_precio_pct`: el margen habitual sobre el precio. El `margen_pct` de antes era un recargo sobre el costo: `costos.py` lo convierte y avisa.
 - `tienda.canales`: comisión, cuotas, IVA sobre la comisión y cargo fijo de cada canal de venta (`references/costos.md`).
 - `tienda.costo_hora_maquina` (de antes de la 0.1.14): se usa solo si la impresora no tiene precio.
+- `tienda.margen_escalones` (opcional): margen según el costo de la pieza, `[{"hasta": 5000, "margen_pct": 60}, {"hasta": 20000, "margen_pct": 50}, {"margen_pct": 40}]` (el último sin `hasta` cubre lo más caro). `tienda.precio_minimo_pieza` (opcional): el precio mínimo de cualquier pieza. Los guarda `costos.py margen`.
+- `impuestos`: cómo factura y qué paga por cada venta (`references/costos.md`, «Impuestos de la venta»). `condicion`: `monotributo`, `responsable_inscripto`, `exento` o `sin_facturar`. `ingresos_brutos_pct` y `otros_pct`: % sobre la venta (sin IVA). Solo responsable inscripto: `iva_pct` (21 si falta) e `iva_descontable` (lista de `material`, `maquina`, `embalaje`, `luz`: las compras cuyo IVA descuenta). Lo guarda `costos.py impuestos`.
 - `generadores_ia` (opcional): para hacer piezas desde una foto (`references/foto-a-3d.md`). `hunyuan`: si tiene cuenta en Hunyuan 3D (la sesión queda en su Chrome; acá no se guarda nada de la cuenta). `imagenes`: con qué genera imágenes cuando no hay foto o faltan ángulos, `gemini`, `flow` o null. `textos`: quién escribe los textos de venta en `/publicar`, `gemini` (su Gemini gratis, revisado por Claude: `references/textos-con-gemini.md`) o `claude` (lo mismo si falta). Si falta algo, se pregunta la primera vez que hace falta.
 - `vista_previa_claude` (opcional): la página de claude.ai donde `/publicar` muestra la vista previa de la publicación (`{"slug": "…", "url": "…"}`); se reusa en cada producto.
 

@@ -62,6 +62,7 @@ while IFS=$'\t' read -r tipo valor <&3; do
   [ -n "$tipo" ] || continue
   case "$tipo" in
     carpeta) [ "$TODO" -eq 1 ] && echo "   carpeta de trabajo (con --todo): $valor" || echo "   (se conserva) carpeta de trabajo: $valor" ;;
+    carpeta-usada) echo "   (se conserva) carpeta de trabajo que ya tenías: $valor" ;;
     apt) PAQUETES+=("$valor") ;;
     *) echo "   $tipo: $valor" ;;
   esac
@@ -75,8 +76,13 @@ if [ "$PRUEBA" -eq 1 ]; then echo "Modo prueba: no cambié nada."; exit 0; fi
 read -r -p "¿Lo quito? Va todo a la papelera. Escribí QUITAR para confirmar: " r
 [ "$r" = "QUITAR" ] || { echo "No cambié nada."; exit 0; }
 
-if grep -qE $'^mcp-app(-orca)?\t' "$MANIFIESTO" && app_de_claude_abierta; then
-  read -r -p "Cerrá la app de Claude (también desde la bandeja) y apretá Enter para seguir: " _
+APP_ABIERTA=0
+if grep -qE $'^mcp-app(-orca)?\t' "$MANIFIESTO"; then
+  while app_de_claude_abierta; do
+    read -r -p "Cerrá la app de Claude del todo (Salir desde el ícono de la bandeja) y apretá Enter, o escribí SALTEAR: " r
+    [ "$r" = "SALTEAR" ] && break
+  done
+  app_de_claude_abierta && APP_ABIERTA=1
 fi
 
 while IFS=$'\t' read -r tipo valor <&3; do
@@ -101,6 +107,8 @@ while IFS=$'\t' read -r tipo valor <&3; do
       # mcp-app: la entrada orca-mcp; mcp-app-orca: la de taller3d-orca (abrir Orca desde Claude y el panel)
       if [ "$tipo" = mcp-app ]; then entrada=orca-mcp; else entrada=taller3d-orca; fi
       if ! ruta_segura "$valor"; then echo "No toco '$valor': está fuera de tu carpeta personal."
+      elif [ "$APP_ABIERTA" -eq 1 ]; then
+        echo "No toqué la configuración de la app (seguía abierta): con la app cerrada, sacá a mano la entrada \"$entrada\" de $valor."
       elif [ -f "$valor" ]; then
         cp -- "$valor" "$valor.respaldo-$(date +%Y%m%d-%H%M%S)"
         if python3 - "$valor" "$entrada" <<'EOF_PY'

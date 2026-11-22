@@ -104,11 +104,20 @@ def calcular_precio(gramos: float | None, segundos: float | None, material: str 
         "margen_habitual_pct": p["margen_habitual_pct"],
         "margen_elegido": margen_pct is not None or precio is not None,
         "precio_sugerido": elegido.get("precio"),
+        "impuestos": p.get("impuestos"),
+        "con_iva": p.get("con_iva", False),
+        "margen_origen": p.get("margen_origen"),
         "canal": canal,
         "canales": p["canales"],
         "faltan_datos": c["faltan"] + p["faltan"],
         "supuestos": c["supuestos"] + ([p["aviso_margen"]] if p["aviso_margen"] else []),
     }
+
+
+def _extra_precio(canal: dict) -> str:
+    """Lo que acompaña al precio de un canal: el IVA (responsable inscripto) y si es el mínimo por pieza."""
+    extra = f" con IVA ({canal['precio_sin_iva']} + IVA {canal['iva_venta']})" if canal.get("iva_venta") else ""
+    return extra + (" (el mínimo por pieza)" if canal.get("por_precio_minimo") else "")
 
 
 IMAGENES = (".jpg", ".jpeg", ".png", ".webp")
@@ -265,17 +274,23 @@ def escribir(resultado: dict, salida: Path) -> list[Path]:
         f"- Costo total: {pr['costo_total']} {pr['moneda']}",
         (f"- Precio elegido: {p.get('regular_price')} {pr['moneda']} (abajo, el margen real que deja en cada canal)"
          if resultado.get("precio_fijo") else
-         f"- Margen sobre el precio: {pr['margen_pct'] if pr['margen_pct'] is not None else 'sin definir'} %"
-         + (" (elegido para este producto)" if pr.get("margen_elegido") else " (tu margen habitual)"
+         f"- Margen sobre el precio{' sin IVA' if pr.get('con_iva') else ''}: "
+         f"{pr['margen_pct'] if pr['margen_pct'] is not None else 'sin definir'} %"
+         + (" (elegido para este producto)" if pr.get("margen_elegido") else
+            f" (tu margen habitual{', ' + pr['margen_origen'] if pr.get('margen_origen') else ''})"
             if pr['margen_pct'] is not None else "")),
-        f"- Precio sugerido ({pr['canal']}): {pr['precio_sugerido']} {pr['moneda']}",
+        *([f"- Impuestos de la venta: {pr['impuestos']}"] if pr.get("impuestos") else []),
+        f"- Precio sugerido ({pr['canal']}): {pr['precio_sugerido']} {pr['moneda']}"
+        + (" con IVA incluido" if pr.get("con_iva") else ""),
     ]
     for clave, canal in pr["canales"].items():
         if "error" in canal:
             lineas.append(f"- {canal.get('nombre') or clave}: {canal['error']}")
         else:
-            lineas.append(f"- {canal.get('nombre') or clave}: precio {canal['precio']}, comisiones {canal['comisiones']}, "
-                          f"te queda {canal['te_queda']}, ganancia {canal['ganancia']} ({canal['margen_real_pct']} %)")
+            lineas.append(f"- {canal.get('nombre') or clave}: precio {canal['precio']}{_extra_precio(canal)}, "
+                          f"comisiones {canal['comisiones']}"
+                          + (f", impuestos {canal['impuestos']}" if canal.get("impuestos") else "")
+                          + f", te queda {canal['te_queda']}, ganancia {canal['ganancia']} ({canal['margen_real_pct']} %)")
     lineas += [f"- Supuesto: {s}" for s in pr["supuestos"]]
     if pr["faltan_datos"]:
         lineas.append(f"- Faltan datos para un precio real: {', '.join(pr['faltan_datos'])}.")
@@ -411,8 +426,9 @@ def main(argv=None) -> None:
           f"{pr['moneda']}")
     for clave, canal in pr["canales"].items():
         if "error" not in canal:
-            print(f"  {canal.get('nombre') or clave}: {canal['precio']} → te queda {canal['te_queda']}, ganancia "
-                  f"{canal['ganancia']} ({canal['margen_real_pct']} % del precio)")
+            print(f"  {canal.get('nombre') or clave}: {canal['precio']}{_extra_precio(canal)} → te queda "
+                  f"{canal['te_queda']}, ganancia {canal['ganancia']} ({canal['margen_real_pct']} % del precio"
+                  f"{' sin IVA' if canal.get('iva_venta') else ''})")
     if pr["faltan_datos"]:
         print(f"Faltan datos: {', '.join(pr['faltan_datos'])}")
 

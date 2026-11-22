@@ -30,7 +30,7 @@
 #     --sin-app         no tocar la configuración de la app de Claude
 set -euo pipefail
 
-VERSION_PLUGIN="0.1.28"
+VERSION_PLUGIN="0.1.29"
 ORCA_VERSION="2.5.1"
 ORCA_ARCHIVO="OrcaSlicer_Linux_AppImage_Ubuntu2404_V${ORCA_VERSION}.AppImage"
 ORCA_URL="https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v${ORCA_VERSION}/${ORCA_ARCHIVO}"
@@ -100,6 +100,13 @@ preguntar_si() {  # como preguntar, pero por defecto SÍ
 sha_ok() { echo "$ORCA_SHA256  $1" | sha256sum -c --status 2>/dev/null; }
 version_de_nombre() { basename "$1" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true; }
 version_flatpak() { LC_ALL=C flatpak info "$1" 2>/dev/null | awk -F': *' '$1 ~ /^ *Version$/ {print $2; exit}' || true; }
+# La app de Claude guarda su configuración con lo que tiene en memoria: si sigue abierta, pisa lo que se escriba.
+app_de_claude_abierta() {
+  pgrep -u "$(id -u)" -f '(^|/)(claude-desktop|Claude)( |$)' >/dev/null 2>&1 \
+    || pgrep -u "$(id -u)" -x 'claude-desktop|Claude' >/dev/null 2>&1
+}
+# La última carpeta de trabajo que usó el instalador (la creada o una que ya existía).
+carpeta_anotada() { awk -F'\t' '$1 == "carpeta" || $1 == "carpeta-usada" {c = $2} END {print c}' "$MANIFIESTO" 2>/dev/null || true; }
 
 # --- 0. Comprobaciones e inventario -----------------------------------------------------------
 paso "Revisando tu PC"
@@ -132,7 +139,7 @@ CARPETA_ELEGIDA=0
 if [ -n "$CARPETA_TRABAJO" ]; then
   CARPETA_ELEGIDA=1
 elif [ -f "$MANIFIESTO" ]; then
-  ANTERIOR="$(awk -F'\t' '$1 == "carpeta" {c = $2} END {print c}' "$MANIFIESTO")"
+  ANTERIOR="$(carpeta_anotada)"
   if [ -n "$ANTERIOR" ] && [ -f "$ANTERIOR/taller-3d/config.json" ]; then CARPETA_TRABAJO="$ANTERIOR"; CARPETA_ELEGIDA=1; fi
 fi
 if [ -z "$CARPETA_TRABAJO" ]; then
@@ -500,7 +507,27 @@ for d in impresiones disenos respaldos calibraciones "taller-3d/impresoras"; do
 done
 if [ -f "$CONFIG" ]; then
   YA_CONFIGURADO=1
-  info "Ya existe la configuración: $CONFIG (no la toco)."
+  info "Ya existe la configuración: $CONFIG (solo le anoto tu ACEPTO si no estaba)."
+  # Sin esto, una corrida sin --carpeta-trabajo vuelve a proponer Documentos/Taller 3D aunque uses otra.
+  [ "$(carpeta_anotada)" = "$CARPETA_TRABAJO" ] || anotar carpeta-usada "$CARPETA_TRABAJO"
+  if [ "$PRUEBA" -eq 0 ]; then
+    ACEPTACION_FECHA="$ACEPTACION_FECHA" VERSION_PLUGIN="$VERSION_PLUGIN" \
+    RESPALDO="$CARPETA_TRABAJO/respaldos/$(date +%Y-%m-%d_%H%M%S)/taller-3d" python3 - "$CONFIG" <<'EOF_PY' \
+      || info "No pude anotar tu ACEPTO en $CONFIG: Claude te lo pide la primera vez."
+import json, os, shutil, sys
+ruta, e = sys.argv[1], os.environ
+with open(ruta, encoding="utf-8") as f:
+    config = json.load(f)
+if isinstance(config, dict) and not config.get("aceptacion"):
+    os.makedirs(e["RESPALDO"], exist_ok=True)
+    shutil.copy2(ruta, os.path.join(e["RESPALDO"], "config.json"))
+    config["aceptacion"] = {"fecha": e["ACEPTACION_FECHA"], "version_plugin": e["VERSION_PLUGIN"],
+                            "texto": "ACEPTO", "medio": "instalar.sh"}
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+    print("   Anoté tu ACEPTO en la configuración (la copia de antes quedó en respaldos/).")
+EOF_PY
+  fi
 elif [ "$PRUEBA" -eq 0 ]; then
   CARPETA_TRABAJO="$CARPETA_TRABAJO" ACEPTACION_FECHA="$ACEPTACION_FECHA" VERSION_PLUGIN="$VERSION_PLUGIN" \
   ORCA_VERSION_USADA="${ORCA_VERSION_USADA:-}" ORCA_RUTA="${ORCA_RUTA:-}" ORCA_TIPO="${ORCA_TIPO:-}" \
@@ -610,9 +637,15 @@ if [ "$SIN_APP" -eq 0 ] && [ -d "$HOME/.config/Claude" ]; then
   if [ "$APP_TIENE_MCP" -eq 1 ] && [ -z "$SERVIDOR_ORCA" ]; then
     info "La app ya tiene un orca-mcp configurado: no lo cambio."
   elif preguntar "¿Las agrego yo a $CONFIG_APP? (hago una copia de respaldo antes; un orca-mcp que ya tengas no lo toco)"; then
-    if pgrep -u "$(id -u)" -f '(^|/)(claude-desktop|Claude)( |$)' >/dev/null 2>&1; then
-      read -r -p "   Cerrá la app de Claude (también desde la bandeja) y apretá Enter: " _
-    fi
+    while app_de_claude_abierta; do
+      info "La app de Claude está abierta: al cerrarse volvería a dejar su configuración como estaba."
+      read -r -p "   Cerrala del todo (Salir desde el ícono de la bandeja; cerrar la ventana no alcanza) y apretá Enter, o escribí SALTEAR: " r
+      [ "$r" = "SALTEAR" ] && break
+    done
+    if app_de_claude_abierta; then
+      info "La app sigue abierta: no toqué su configuración. Copiá las entradas de arriba con la app cerrada,"
+      info "o cerrala del todo y corré de nuevo este instalador."
+    else
     [ -f "$CONFIG_APP" ] && cp "$CONFIG_APP" "$CONFIG_APP.respaldo-$(date +%Y%m%d-%H%M%S)"
     if AGREGADAS="$(ENTRADA="$ENTRADA" python3 - "$CONFIG_APP" <<'EOF_PY'
 import json, os, sys
@@ -645,6 +678,7 @@ EOF_PY
       info "Listo. Abrí la app de Claude para que tome el cambio."
     else
       info "No pude agregarlas: copiá las entradas de arriba a mano (tu configuración quedó como estaba)."
+    fi
     fi
   fi
 fi
