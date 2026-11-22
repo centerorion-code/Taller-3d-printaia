@@ -40,7 +40,7 @@ La nota guarda lo que ya se sabe (medidas, para qué es, material) para no volve
 
 ## Armar o rehacer el panel
 
-1. Ubicar la carpeta de trabajo (skill `impresion-3d`, sección 3).
+1. Ubicar la carpeta de trabajo (skill `impresion-3d`, sección 3). Traer `taller-3d/config.json` y, si a una impresora preparada le falta el consumo (`costos.py estado`), buscarlo y guardarlo antes de armar la página, sin preguntar (`references/costos.md`, «El consumo de la impresora»; si no hay promedio publicado, el estimado por la cama). Así la caja "Tu taller" no queda con "Falta el consumo".
 2. Listar la carpeta de trabajo con `device_list_dir` y `recursive=true` y guardar la respuesta en `listado.json` (si se corta por cantidad, listar `impresiones` y `disenos` por separado y anteponer esa carpeta a cada nombre).
 3. Traer `taller-3d/catalogo.json` si existe (anotar `mtimeMs`) y correr:
    ```bash

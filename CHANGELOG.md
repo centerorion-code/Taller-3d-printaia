@@ -1,5 +1,9 @@
 # Cambios
 
+## 0.1.23 (2026-11-22)
+
+- **El consumo de la impresora se completa solo, también en las impresoras preparadas antes de la 0.1.19:** al empezar una conversación con el taller y al armar el panel, si a una impresora le falta el consumo, Claude lo busca en internet y, si el fabricante solo publica la potencia máxima, lo estima por el tamaño de la cama, sin preguntarte ni esperar a que toques el botón. "Falta el consumo" ya no queda en "Tu taller".
+
 ## 0.1.22 (2026-11-22)
 
 - **El panel ya no da por impresa una pieza por una foto cualquiera:** solo cuenta `foto.jpg` (o `foto-2.jpg`, …) en la carpeta de la pieza, que es la foto de la pieza impresa. La foto de referencia de una pieza generada desde una foto se guarda como `referencia.jpg` y no la cambia de paso. Si no hay foto real ni foto de producto, la tarjeta muestra la primera vista (`vista…`).

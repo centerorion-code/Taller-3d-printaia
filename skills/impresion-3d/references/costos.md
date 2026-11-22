@@ -45,7 +45,7 @@ python3 -I costos.py luz --config config.json --kwh 310 --total 53072 --cargo-va
 
 ### El consumo de la impresora
 
-Se busca en internet **sin preguntarle al usuario**, cada vez que una impresora entra al taller (`/impresoras`, `/instalar`) y cada vez que una cuenta de costo usa una impresora que no lo tiene (`/pieza`, `/publicar`, el botón "Buscá el consumo…" del panel). Lo que importa es el **promedio mientras imprime**. La potencia nominal de la ficha ("Rated power", la de la fuente) es el máximo calentando: con una fuente de 350 W se imprime con 100 a 170 W, según la cama y el material, y una Creality Hi dice 1150 W a 220 V (390 W a 110 V), que no es lo que gasta imprimiendo.
+Se busca en internet **sin preguntarle al usuario y sin esperar a que toque un botón**: cada vez que una impresora entra al taller (`/impresoras`, `/instalar`), al empezar una conversación con el taller y al armar o rehacer el panel si alguna impresora preparada no lo tiene (pasa con las que se prepararon antes de la 0.1.19), y cada vez que una cuenta de costo usa una impresora que no lo tiene (`/pieza`, `/publicar`). Si no se encuentra el promedio, se estima en el momento (paso 3): "Falta el consumo" no queda en el panel. El botón "Buscá el consumo…" del panel queda solo para cuando no se pudo buscar (sin internet). Lo que importa es el **promedio mientras imprime**. La potencia nominal de la ficha ("Rated power", la de la fuente) es el máximo calentando: con una fuente de 350 W se imprime con 100 a 170 W, según la cama y el material, y una Creality Hi dice 1150 W a 220 V (390 W a 110 V), que no es lo que gasta imprimiendo.
 
 En este orden, con el modelo exacto de la impresora:
 
