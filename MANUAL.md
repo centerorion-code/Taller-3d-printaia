@@ -120,6 +120,17 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
 - Publicar el producto: queda en borrador hasta que lo publiques vos.
 - Instalar plugins de Orca: Claude solo los sugiere.
 
+## Cargar productos en tu tienda (WooCommerce)
+
+Si vendés en una tienda WooCommerce (WordPress), el botón «Cargala como borrador» del panel (o pedírselo a Claude) carga el producto directo en tu tienda, con título, textos, precio, peso, medidas y fotos, **siempre como borrador**: lo revisás y lo publicás vos desde la tienda. Si ya está publicado, no lo toca.
+
+Se conecta una sola vez (por ahora en Linux):
+1. En tu WordPress: **Usuarios → Perfil → Contraseñas de aplicación**, nombre «Taller 3D» → **Añadir**. Copiá la contraseña: WordPress la muestra una sola vez.
+2. Cerrá la app de Claude del todo (Salir desde el ícono de la bandeja) y corré el instalador en una terminal. Cuando pregunte «¿Lo instalo?» en «Cargar productos en tu tienda», contestá **s** y pegá la contraseña cuando la pida (no se ve al escribirla).
+3. Abrí la app de Claude.
+
+La contraseña no pasa por el chat: queda en tu PC, en un archivo que solo lee tu usuario. Para cambiarla o conectar otra tienda: `python3 ~/.local/share/taller-3d/tienda_mcp.py configurar`; para ver si anda: `… tienda_mcp.py probar`. Para desconectarla, revocá la contraseña en WordPress (el desinstalador también borra la conexión de tu PC).
+
 ## Dónde quedan tus archivos
 
 En tu carpeta de trabajo, que es siempre **`Taller 3D` dentro de tus documentos** (`Documentos/Taller 3D`; en Windows, `Documentos\Taller 3D`). Todas las piezas van ahí, una carpeta por pieza dentro de `impresiones`. Si tenías un taller en otra carpeta (de antes de la versión 0.1.34), pedile a Claude que lo mude: "mudá mi taller a Taller 3D".

@@ -77,7 +77,7 @@ read -r -p "¿Lo quito? Va todo a la papelera. Escribí QUITAR para confirmar: "
 [ "$r" = "QUITAR" ] || { echo "No cambié nada."; exit 0; }
 
 APP_ABIERTA=0
-if grep -qE $'^mcp-app(-orca)?\t' "$MANIFIESTO"; then
+if grep -qE $'^mcp-app(-orca|-tienda)?\t' "$MANIFIESTO"; then
   while app_de_claude_abierta; do
     read -r -p "Cerrá la app de Claude del todo (Salir desde el ícono de la bandeja) y apretá Enter, o escribí SALTEAR: " r
     [ "$r" = "SALTEAR" ] && break
@@ -103,9 +103,10 @@ while IFS=$'\t' read -r tipo valor <&3; do
       if command -v flatpak >/dev/null && flatpak override --user --nofilesystem="$carpeta" "$id"; then
         echo "Quitado el permiso de $id para $carpeta"
       fi ;;
-    mcp-app|mcp-app-orca)
-      # mcp-app: la entrada orca-mcp; mcp-app-orca: la de taller3d-orca (abrir Orca desde Claude y el panel)
-      if [ "$tipo" = mcp-app ]; then entrada=orca-mcp; else entrada=taller3d-orca; fi
+    mcp-app|mcp-app-orca|mcp-app-tienda)
+      # mcp-app: la entrada orca-mcp; mcp-app-orca: la de taller3d-orca (abrir Orca desde Claude y el panel);
+      # mcp-app-tienda: la de taller3d-tienda (cargar productos en la tienda)
+      case "$tipo" in mcp-app) entrada=orca-mcp ;; mcp-app-orca) entrada=taller3d-orca ;; *) entrada=taller3d-tienda ;; esac
       if ! ruta_segura "$valor"; then echo "No toco '$valor': está fuera de tu carpeta personal."
       elif [ "$APP_ABIERTA" -eq 1 ]; then
         echo "No toqué la configuración de la app (seguía abierta): con la app cerrada, sacá a mano la entrada \"$entrada\" de $valor."
@@ -124,6 +125,13 @@ with open(ruta, "w", encoding="utf-8") as f:
 EOF_PY
         then echo "Quitado $entrada de la app de Claude (respaldo al lado). Abrí la app de nuevo."
         else echo "No pude editar $valor: sacá a mano la entrada \"$entrada\" (hay un respaldo al lado)."; fi
+      fi ;;
+    credenciales-tienda)
+      # la conexión con la tienda (con la contraseña de aplicación): se borra, no va a la papelera
+      if ! ruta_segura "$valor"; then echo "No toco '$valor': está fuera de tu carpeta personal."
+      elif [ -f "$valor" ] && rm -f -- "$valor"; then
+        echo "Borré la conexión con tu tienda. Si querés, revocá también la contraseña de aplicación «Taller 3D»"
+        echo "en tu WordPress (Usuarios → Perfil → Contraseñas de aplicación)."
       fi ;;
     carpeta)
       if [ "$TODO" -eq 1 ] && [ -d "$valor" ]; then

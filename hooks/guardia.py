@@ -15,6 +15,9 @@ Modos:
   pre-read    Lo mismo para Read y Grep (Claude Code en la propia PC).
   post-slice  Después de laminar: recuerda revisar el G-code antes de entregarlo.
 
+Tampoco deja traer, leer, copiar ni escribir la conexión con la tienda (credenciales-tienda.json, con la contraseña de
+aplicación de WordPress): la usa solo el conector local taller3d-tienda y la guarda el usuario en una terminal.
+
 Nunca deja escribir en los perfiles de sistema de Orca, en sus plugins ni en su configuración.
 Con un archivo de impresión 3D (G-code, .3mf o perfil) falla cerrado: si no lo puede leer o
 revisar, no lo deja escribir. Con cualquier otro archivo o comando, ante un error propio deja
@@ -250,12 +253,28 @@ def revisar_archivo(destino: str, leer) -> list[str]:
     return [f"{destino}: {que} ({'; '.join(motivos)})."] if motivos else []
 
 
+# --- La conexión con la tienda ---------------------------------------------------------------------------------
+# credenciales-tienda.json guarda la contraseña de aplicación de WordPress. La escribe el usuario en una terminal
+# (tienda_mcp.py configurar) y la lee solo el conector local. Claude no la trae, no la lee, no la copia ni la escribe.
+AVISO_TIENDA = ("taller-3d: credenciales-tienda.json guarda la contraseña de aplicación de tu tienda: no se trae, no "
+                "se lee, no se copia ni se escribe desde Claude. La usa solo el conector local taller3d-tienda. Para "
+                "cambiarla, el usuario corre en una terminal: python3 ~/.local/share/taller-3d/tienda_mcp.py configurar")
+RE_TIENDA = re.compile(r"credenciales-tienda|\.config/taller-3d(/|$|\s|\*|\?|\[|\"|')"
+                       r"|appdata[/\\]roaming[/\\]taller-3d|appdata%?[/\\]taller-3d", re.I)
+
+
+def es_conexion_tienda(texto: str) -> bool:
+    return bool(RE_TIENDA.search(str(texto).replace("\\", "/")))
+
+
 def pre_commit(datos: dict) -> None:
     problemas = []
     for archivo in (datos.get("tool_input") or {}).get("files") or []:
         if not isinstance(archivo, dict):
             continue
         destino = str(archivo.get("devicePath", ""))
+        if es_conexion_tienda(destino):
+            bloquear(AVISO_TIENDA)
         bajo = normalizar(destino)
         prohibida = zona_prohibida(bajo)
         if prohibida:
@@ -296,6 +315,8 @@ def pre_write(datos: dict) -> None:
     destino = str(entrada.get("file_path") or entrada.get("notebook_path") or "")
     if not destino:
         return
+    if es_conexion_tienda(destino):
+        bloquear(AVISO_TIENDA)
     if "content" in entrada:
         problemas = revisar_archivo(destino, lambda: str(entrada.get("content", "")).encode("utf-8"))
     else:
@@ -556,6 +577,8 @@ def no_se_trae(ruta: str) -> bool:
 def pre_stage(datos: dict) -> None:
     entrada = datos.get("tool_input") or {}
     rutas = [x for clave, v in entrada.items() if clave != "artifact_ids" for x in _textos(v)]
+    if any(es_conexion_tienda(r) for r in rutas):
+        bloquear(AVISO_TIENDA)
     if any(no_se_trae(r) for r in rutas):
         bloquear(AVISO_CONF)
 
@@ -564,6 +587,8 @@ def pre_read(datos: dict) -> None:
     entrada = datos.get("tool_input") or {}
     for clave in ("file_path", "path", "notebook_path"):
         ruta = entrada.get(clave)
+        if isinstance(ruta, str) and es_conexion_tienda(ruta):
+            bloquear(AVISO_TIENDA)
         if isinstance(ruta, str) and ruta.strip() and (no_se_trae(ruta) or _es_raiz_orca(normalizar(ruta))):
             bloquear(AVISO_CONF)
 
@@ -571,6 +596,8 @@ def pre_read(datos: dict) -> None:
 def pre_bash(datos: dict) -> None:
     comando = _comando(datos.get("tool_input") or {})
     c = comando.lower()
+    if es_conexion_tienda(comando):
+        bloquear(AVISO_TIENDA)
     if toca_conf_de_orca(comando):
         bloquear(AVISO_CONF)
     if re.search(HERRAMIENTAS_RED, c) and any(re.search(p, c) for p in PATRONES_IMPRESION):

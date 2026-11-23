@@ -30,7 +30,7 @@
 #     --sin-app         no tocar la configuración de la app de Claude
 set -euo pipefail
 
-VERSION_PLUGIN="0.1.34"
+VERSION_PLUGIN="0.1.35"
 ORCA_VERSION="2.5.1"
 ORCA_ARCHIVO="OrcaSlicer_Linux_AppImage_Ubuntu2404_V${ORCA_VERSION}.AppImage"
 ORCA_URL="https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v${ORCA_VERSION}/${ORCA_ARCHIVO}"
@@ -593,6 +593,41 @@ else
   fi
 fi
 
+# --- 4c. Cargar productos en la tienda ------------------------------------------------------------
+paso "Cargar productos en tu tienda (opcional)"
+SERVIDOR_TIENDA=""
+CRED_TIENDA="${XDG_CONFIG_HOME:-$HOME/.config}/taller-3d/credenciales-tienda.json"
+if [ ! -f "$AQUI/tienda_mcp.py" ]; then
+  info "No está tienda_mcp.py al lado del instalador: salteo este paso."
+else
+  info "Si vendés en una tienda WooCommerce (WordPress), Claude y el botón «Cargala como borrador» del panel"
+  info "cargan ahí el producto con sus fotos, siempre como borrador (publicarlo es tuyo). Lo hace tienda_mcp.py,"
+  info "un programa chico de Python que arranca la app de Claude. La contraseña la escribís acá, no en el chat."
+  if preguntar "¿Lo instalo?"; then
+    SERVIDOR_TIENDA="$HOME/.local/share/taller-3d/tienda_mcp.py"
+    hacer mkdir -p "$(dirname "$SERVIDOR_TIENDA")"
+    hacer install -m 0644 "$AQUI/tienda_mcp.py" "$SERVIDOR_TIENDA"
+    grep -qxF "$(printf 'archivo\t%s' "$SERVIDOR_TIENDA")" "$MANIFIESTO" 2>/dev/null || anotar archivo "$SERVIDOR_TIENDA"
+    CONECTAR=1
+    if [ -f "$CRED_TIENDA" ]; then
+      info "Tu tienda ya estaba conectada."
+      preguntar "¿La conecto de nuevo (otra contraseña u otra tienda)?" || CONECTAR=0
+    fi
+    if [ "$CONECTAR" -eq 1 ]; then
+      info "Antes, en tu WordPress: Usuarios → Perfil → Contraseñas de aplicación, nombre «Taller 3D» → Añadir."
+      info "WordPress la muestra una sola vez: copiala y pegala cuando te la pida."
+      if [ "$PRUEBA" -eq 1 ]; then
+        info "[prueba] te pediría la dirección de la tienda, tu usuario y la contraseña de aplicación"
+      elif ! python3 -I "$SERVIDOR_TIENDA" configurar; then
+        info "La tienda no quedó conectada. Cuando quieras: python3 \"$SERVIDOR_TIENDA\" configurar"
+      fi
+    fi
+    if [ -f "$CRED_TIENDA" ] && ! grep -qxF "$(printf 'credenciales-tienda\t%s' "$CRED_TIENDA")" "$MANIFIESTO" 2>/dev/null; then
+      anotar credenciales-tienda "$CRED_TIENDA"
+    fi
+  fi
+fi
+
 # --- 5. App de Claude ----------------------------------------------------------------------------
 paso "Conexión con la app de Claude"
 TEMPORAL_MCP=""
@@ -603,6 +638,7 @@ if [ "${ORCA_TIPO:-}" = "flatpak" ]; then
 fi
 ENTRADA="$(ORCA_MCP_BIN="$ORCA_MCP_BIN" ORCA_PARA_MCP="$ORCA_PARA_MCP" DATOS_ORCA="${DATOS_ORCA:-}" \
   TEMPORAL_MCP="$TEMPORAL_MCP" SERVIDOR_ORCA="$SERVIDOR_ORCA" ORCA_VENTANA="$ORCA_VENTANA" \
+  SERVIDOR_TIENDA="$SERVIDOR_TIENDA" \
   CARPETA_TRABAJO="$CARPETA_TRABAJO" PYTHON="$(command -v python3)" python3 -c '
 import json, os
 e = {"command": os.environ["ORCA_MCP_BIN"]}
@@ -621,11 +657,15 @@ if os.environ.get("SERVIDOR_ORCA"):
         "command": os.environ["PYTHON"], "args": ["-I", os.environ["SERVIDOR_ORCA"]],
         "env": {"TALLER3D_CARPETA": os.environ["CARPETA_TRABAJO"],
                 "TALLER3D_ORCA": json.dumps([os.environ["ORCA_VENTANA"]], ensure_ascii=False)}}
+if os.environ.get("SERVIDOR_TIENDA"):
+    servidores["taller3d-tienda"] = {
+        "command": os.environ["PYTHON"], "args": ["-I", os.environ["SERVIDOR_TIENDA"]],
+        "env": {"TALLER3D_CARPETA": os.environ["CARPETA_TRABAJO"]}}
 print(json.dumps({"mcpServers": servidores}, indent=2, ensure_ascii=False))')"
 info "Estas son las entradas para la app de Claude (Configuración → Desarrollador → Editar configuración):"
 echo "$ENTRADA"
 if [ "$SIN_APP" -eq 0 ] && [ -d "$HOME/.config/Claude" ]; then
-  if [ "$APP_TIENE_MCP" -eq 1 ] && [ -z "$SERVIDOR_ORCA" ]; then
+  if [ "$APP_TIENE_MCP" -eq 1 ] && [ -z "$SERVIDOR_ORCA" ] && [ -z "$SERVIDOR_TIENDA" ]; then
     info "La app ya tiene un orca-mcp configurado: no lo cambio."
   elif preguntar "¿Las agrego yo a $CONFIG_APP? (hago una copia de respaldo antes; un orca-mcp que ya tengas no lo toco)"; then
     while app_de_claude_abierta; do
@@ -665,6 +705,9 @@ EOF_PY
       if grep -qx orca-mcp <<<"$AGREGADAS"; then anotar mcp-app "$CONFIG_APP"; fi
       if grep -qx taller3d-orca <<<"$AGREGADAS" && ! grep -qxF "$(printf 'mcp-app-orca\t%s' "$CONFIG_APP")" "$MANIFIESTO" 2>/dev/null; then
         anotar mcp-app-orca "$CONFIG_APP"
+      fi
+      if grep -qx taller3d-tienda <<<"$AGREGADAS" && ! grep -qxF "$(printf 'mcp-app-tienda\t%s' "$CONFIG_APP")" "$MANIFIESTO" 2>/dev/null; then
+        anotar mcp-app-tienda "$CONFIG_APP"
       fi
       info "Listo. Abrí la app de Claude para que tome el cambio."
     else

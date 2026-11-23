@@ -1,5 +1,17 @@
 # Cambios
 
+## 0.1.35 (22/11/2026)
+
+**Del botón a la tienda, sin escalas: el conector `taller3d-tienda`.**
+
+- **`instalador/tienda_mcp.py`** (nuevo): servidor MCP local, solo con la biblioteca estándar de Python, que la app de Claude arranca como `taller3d-tienda`. `cargar_borrador(carpeta)` lee `producto/publicacion.json` de la pieza, sube sus fotos a la biblioteca de medios (las que ya subió no las repite), busca el producto por el número guardado o por SKU y lo crea o actualiza **siempre como borrador**; comprueba que quedó así y escribe `producto/tienda.json` (número, enlaces y fotos subidas, sin la contraseña). Un producto ya publicado no lo toca. Usa las categorías que existen y avisa las que faltan; las etiquetas las crea. `estado_tienda()` dice si la tienda está conectada. Habla solo con la tienda guardada, por https, y no sigue redirecciones.
+- **La conexión se guarda una vez, en una terminal:** `tienda_mcp.py configurar` pide la dirección, el usuario y una contraseña de aplicación de WordPress (sin mostrarla), prueba la conexión y la guarda en `~/.config/taller-3d/credenciales-tienda.json` con permisos 600. `tienda_mcp.py probar` dice si anda.
+- **Instalador de Linux:** paso nuevo «Cargar productos en tu tienda» (opcional): instala el programa, conecta la tienda y agrega `taller3d-tienda` a la app de Claude. El desinstalador quita la entrada y borra la conexión.
+- **Panel:** en claude.ai, «Cargala como borrador» llama a `taller3d-tienda` desde la página si la app lo deja: el producto se carga sin pasar por el chat, la tarjeta muestra el resultado con el enlace al borrador y se le avisa a Claude para que lo anote. Si no se puede (celular, navegador, sin el programa), el pedido va a Claude, que usa el mismo conector.
+- **Bloqueos:** no dejan traer, leer, copiar ni escribir `credenciales-tienda.json` (ni la carpeta `~/.config/taller-3d`) desde Claude.
+- `/publicar` (sección 5) usa primero el conector; `/instalar` lo revisa con `estado_tienda`. El instalador se deja en `taller-3d/instalador/` dentro de la carpeta de trabajo (antes, `taller-3d-instalador/` en la raíz).
+- 4 pruebas nuevas, con una tienda WooCommerce de mentira (115 en total). Sin probar todavía con una tienda real.
+
 ## 0.1.34 (22/11/2026)
 
 **Una sola carpeta para todo: `Documentos/Taller 3D`.**

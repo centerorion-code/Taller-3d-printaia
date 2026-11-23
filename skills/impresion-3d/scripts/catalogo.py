@@ -374,6 +374,8 @@ ORIGENES = {"diseno": "Diseñada por Claude", "stl_propio": "STL tuyo", "stl_des
 CON_IMPRESORA = {"Diseñala", "Dejala lista para imprimir"}
 # El servidor MCP local que abre Orca (instalador/abrir_orca.py), como lo nombra la página del panel en la app.
 SERVIDOR_ORCA = "host:taller3d-orca"
+# El que carga la publicación en la tienda, siempre como borrador (instalador/tienda_mcp.py).
+SERVIDOR_TIENDA = "host:taller3d-tienda"
 RE_PROYECTO = re.compile(r"^(?:impresiones|disenos)/\d{4}-\d{2}-\d{2}_[^/\\]+/[^/\\]+\.3mf$")
 
 
@@ -645,6 +647,35 @@ GUION = """
       else{orca=null;pedir(el,texto);}          // nunca llegó a la PC: se lo pido a Claude
     });
   }
+  // "Cargala como borrador": si la app de Claude deja que la página use el servidor local taller3d-tienda de la PC,
+  // el producto se carga en la tienda (siempre como borrador) sin pasar por el chat, y después se le avisa a Claude
+  // para que lo anote en el panel; si no (navegador, celular, sin el servidor), el pedido va a Claude.
+  var SERVIDOR_TIENDA='host:taller3d-tienda',tienda=null;  // = SERVIDOR_TIENDA de catalogo.py
+  function enlazar(el,url,texto){
+    var a=lugar(el).querySelector('.aviso');if(!a||(url||'').indexOf('https://')!==0){return;}
+    var l=document.createElement('a');l.href=url;l.target='_blank';l.rel='noopener noreferrer';l.textContent=texto;
+    a.appendChild(document.createTextNode(' '));a.appendChild(l);
+  }
+  function cargarEnTienda(el,carpeta,texto,anotar){
+    if(!tienda){pedir(el,texto);return;}
+    el.disabled=true;avisar(el,'Cargando en tu tienda, como borrador…');
+    tienda.callTool(SERVIDOR_TIENDA,'cargar_borrador',{carpeta:carpeta},{cache:false}).then(function(r){
+      var p=(r&&r.payload)||{};el.disabled=false;
+      avisar(el,p.mensaje||'Listo: quedó como borrador en tu tienda.');
+      enlazar(el,p.enlace_admin,'Abrir el borrador');
+      if(p.cargado&&anotar&&com){com.canSendToClaude().then(function(estado){
+        if(estado!=='available'){return;}
+        return com.anchorFor(lugar(el)).then(function(ancla){return com.sendToClaude({anchor:ancla,text:anotar});});
+      }).catch(function(){});}
+    },function(err){
+      var c=err&&err.code,p=err&&err.result&&err.result.structuredContent;el.disabled=false;
+      if(c==='tool_error'){avisar(el,'No la cargué: '+((p&&p.mensaje)||'la tienda no la aceptó.'));}
+      else if(c==='cancelled'){avisar(el,'No la cargué: no lo confirmaste en la app de Claude.');}
+      else if(c==='server_unavailable'||c==='upstream_error'||c==='rate_limited'){
+        avisar(el,'No sé si se cargó: la app no contestó. Fijate en tu tienda antes de tocar de nuevo.');}
+      else{tienda=null;pedir(el,texto);}         // nunca llegó a la PC: se lo pido a Claude
+    });
+  }
   // La impresora de arriba: los botones que arrancan una pieza (data-impresora) le dicen a Claude en cuál. La
   // elegida se recuerda en este navegador si se puede; si ya no está entre las opciones, queda la que puso Claude.
   var selector=document.getElementById('impresora'),CLAVE='taller3d.impresora';
@@ -660,8 +691,9 @@ GUION = """
   }
   document.querySelectorAll('[data-pedido]').forEach(function(b){
     b.addEventListener('click',function(){
-      var ruta=b.getAttribute('data-orca');
+      var ruta=b.getAttribute('data-orca'),carpeta=b.getAttribute('data-tienda');
       if(ruta){abrirEnOrca(b,ruta,b.getAttribute('data-pedido'));}
+      else if(carpeta){cargarEnTienda(b,carpeta,b.getAttribute('data-pedido'),b.getAttribute('data-anotar'));}
       else{pedir(b,conImpresora(b,b.getAttribute('data-pedido')));}
     });
   });
@@ -670,6 +702,14 @@ GUION = """
       if(!m){return;}
       return m.listTools(SERVIDOR_ORCA).then(function(r){   // fuera de la app de escritorio no aparece
         if(((r&&r.servers)||[]).some(function(s){return s.server===SERVIDOR_ORCA;})){orca=m;}
+      });
+    }).catch(function(){});
+  }
+  if(window.claude&&typeof window.claude.use==='function'&&document.querySelector('[data-tienda]')){
+    window.claude.use('mcp').then(function(m){
+      if(!m){return;}
+      return m.listTools(SERVIDOR_TIENDA).then(function(r){
+        if(((r&&r.servers)||[]).some(function(s){return s.server===SERVIDOR_TIENDA;})){tienda=m;}
       });
     }).catch(function(){});
   }
@@ -835,7 +875,14 @@ def _publicacion(p: dict, modo: str = "archivo", imagenes: dict | None = None) -
     elif vista:
         botones.append(f'<a class="boton" href="{e(_href(carpeta, vista))}">Ver cómo queda</a>')
     if estado == "vista_previa":
-        botones.append(f'<button type="button" data-pedido="{e("Desde el panel: cargá como borrador en la tienda la publicación de " + cual + ".")}">Cargala como borrador</button>')
+        # En claude.ai lleva la carpeta: si la app deja que la página use taller3d-tienda, el producto se carga sin
+        # pasar por el chat y después se le avisa a Claude para que lo anote; si no, el pedido va a Claude.
+        cargar = ""
+        if modo == "claude":
+            anotar = ("Desde el panel: el conector de la tienda cargó como borrador la publicación de " + cual +
+                      ". Anotalo en el panel.")
+            cargar = f' data-tienda="{e(_en_una_linea(carpeta, 160))}" data-anotar="{e(anotar)}"'
+        botones.append(f'<button type="button" data-pedido="{e("Desde el panel: cargá como borrador en la tienda la publicación de " + cual + ".")}"{cargar}>Cargala como borrador</button>')
     botones.append(f'<button type="button" data-pedido="{e("Desde el panel: quiero cambiar la publicación de " + cual + ". Preguntame qué.")}">Cambiar precio o texto</button>')
     tienda = url_segura(p.get("url_tienda")) if isinstance(p.get("url_tienda"), str) else None
     if tienda:

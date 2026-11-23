@@ -595,6 +595,234 @@ class TestCarpetaFija(unittest.TestCase):
         self.assertNotIn("  - ideas/", salida.getvalue())            # una idea no tiene carpeta que mover
 
 
+class TestTienda(unittest.TestCase):
+    """0.1.35: taller3d-tienda carga la publicación en WooCommerce, siempre como borrador."""
+
+    def setUp(self):
+        import base64
+        import http.server
+        import shutil
+        import threading
+        import urllib.parse
+        sys.path.insert(0, str(RAIZ / "instalador"))
+        import tienda_mcp
+        self.tm = tienda_mcp
+        self.shutil = shutil
+        e = {"productos": {}, "media": set(), "tags": [], "subidas": 0, "redirigir": False, "siguiente": [100],
+             "categorias": [{"id": 15, "name": "Herramientas"}]}
+        self.e = e
+        clave = "Basic " + base64.b64encode("leo:abcd efgh ijkl".encode()).decode()
+
+        class Manejador(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def responder(self, codigo, datos):
+                cuerpo = json.dumps(datos).encode()
+                self.send_response(codigo)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(cuerpo)))
+                self.end_headers()
+                self.wfile.write(cuerpo)
+
+            def atender(self, metodo):
+                largo = int(self.headers.get("Content-Length") or 0)
+                cuerpo = self.rfile.read(largo) if largo else b""
+                if e["redirigir"]:
+                    self.send_response(302)
+                    self.send_header("Location", "https://otro.example/wp-json/")
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                if self.headers.get("Authorization") != clave:
+                    return self.responder(401, {"code": "incorrect_password", "message": "Contraseña incorrecta"})
+                u = urllib.parse.urlsplit(self.path)
+                q = dict(urllib.parse.parse_qsl(u.query))
+                ruta = u.path.removeprefix("/wp-json")
+                datos = json.loads(cuerpo) if cuerpo and "json" in (self.headers.get("Content-Type") or "") else {}
+                m = re.fullmatch(r"/wc/v3/products/(\d+)", ruta)
+                if ruta == "/wp/v2/users/me":
+                    return self.responder(200, {"name": "Leo"})
+                if ruta == "/wc/v3/products" and metodo == "GET":
+                    return self.responder(200, [p for p in e["productos"].values()
+                                                if "sku" not in q or p["sku"] == q["sku"]])
+                if ruta == "/wc/v3/products" and metodo == "POST":
+                    pid = e["siguiente"][0]
+                    e["siguiente"][0] += 1
+                    e["productos"][pid] = {**datos, "id": pid, "status": datos.get("status", "publish")}
+                    return self.responder(201, e["productos"][pid])
+                if m and int(m.group(1)) in e["productos"]:
+                    p = e["productos"][int(m.group(1))]
+                    if metodo == "PUT":
+                        p.update(datos)
+                    return self.responder(200, p)
+                if ruta == "/wc/v3/products/categories":
+                    return self.responder(200, [c for c in e["categorias"] if q["search"].lower() in c["name"].lower()])
+                if ruta == "/wc/v3/products/tags" and metodo == "GET":
+                    return self.responder(200, [t for t in e["tags"] if q["search"].lower() in t["name"].lower()])
+                if ruta == "/wc/v3/products/tags" and metodo == "POST":
+                    e["tags"].append({"id": 500 + len(e["tags"]), "name": datos["name"]})
+                    return self.responder(201, e["tags"][-1])
+                if ruta == "/wp/v2/media" and metodo == "POST":
+                    e["subidas"] += 1
+                    mid = 900 + e["subidas"]
+                    e["media"].add(mid)
+                    return self.responder(201, {"id": mid})
+                mm = re.fullmatch(r"/wp/v2/media/(\d+)", ruta)
+                if mm and int(mm.group(1)) in e["media"]:
+                    return self.responder(200, {"id": int(mm.group(1))})
+                return self.responder(404, {"code": "rest_no_route", "message": "No hay ruta"})
+
+            def do_GET(self):
+                self.atender("GET")
+
+            def do_POST(self):
+                self.atender("POST")
+
+            def do_PUT(self):
+                self.atender("PUT")
+
+        self.http = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Manejador)
+        threading.Thread(target=self.http.serve_forever, daemon=True).start()
+        self.base = f"http://127.0.0.1:{self.http.server_address[1]}"
+        self.tmp = Path(tempfile.mkdtemp())
+        self.trabajo = self.tmp / "Taller 3D"
+        self.pieza = self.trabajo / "impresiones" / "2026-11-22_kit"
+        (self.pieza / "producto").mkdir(parents=True)
+        for i in (1, 2):
+            (self.pieza / "producto" / f"producto-{i}.jpg").write_bytes(b"\xff\xd8\xff foto " + bytes([i]) * 50)
+        self.pub = {"producto": {"name": "Kit de escuadras", "type": "simple", "status": "draft",
+                                 "sku": "P3D-20261122-kit", "regular_price": "8700",
+                                 "description": "<p>Texto</p>", "short_description": "Corta", "weight": "0.127",
+                                 "dimensions": {"length": "15.2", "width": "12.6", "height": "2.5"},
+                                 "categories": [{"name": "Herramientas"}, {"name": "Juguetes"}],
+                                 "tags": [{"name": "melamina"}, {"name": "escuadras"}], "images": []},
+                    "fotos": ["producto-1.jpg", "producto-2.jpg", "../../../afuera.jpg"]}
+        self.escribir_pub()
+        self.cred = self.tmp / "config" / "taller-3d" / "conexion.json"
+        tienda_mcp.guardar_credenciales(str(self.cred), self.base, "leo", "abcd efgh ijkl")
+        self.entorno = {"TALLER3D_CARPETA": str(self.trabajo), "TALLER3D_CREDENCIALES": str(self.cred)}
+
+    def tearDown(self):
+        self.http.shutdown()
+        self.http.server_close()
+        self.shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def escribir_pub(self):
+        (self.pieza / "producto" / "publicacion.json").write_text(json.dumps(self.pub), encoding="utf-8")
+
+    def test_carga_como_borrador_actualiza_y_no_toca_lo_publicado(self):
+        srv = self.tm.Servidor(self.entorno)
+        salida, error = srv.cargar({"carpeta": "impresiones/2026-11-22_kit"})
+        self.assertFalse(error, salida)
+        self.assertTrue(salida["cargado"])
+        self.assertEqual(salida["accion"], "creado")
+        p = self.e["productos"][salida["id"]]
+        self.assertEqual((p["status"], p["regular_price"], p["sku"]), ("draft", "8700", "P3D-20261122-kit"))
+        self.assertEqual(len(p["images"]), 2)
+        self.assertEqual(p["categories"], [{"id": 15}])                  # Juguetes no existe: no se crea
+        self.assertEqual(len(p["tags"]), 2)
+        self.assertIn("Juguetes", salida["mensaje"])
+        self.assertIn("afuera.jpg", " ".join(salida["avisos"]))
+        self.assertEqual(self.e["subidas"], 2)
+        estado = (self.pieza / "producto" / "tienda.json").read_text(encoding="utf-8")
+        self.assertIn(f'"id": {salida["id"]}', estado)
+        self.assertNotIn("abcd", estado)                                  # la contraseña no se escribe
+        repetido, _ = srv.cargar({"carpeta": "impresiones/2026-11-22_kit"})
+        self.assertTrue(repetido.get("repetido"))
+        srv.recientes.clear()
+        self.pub["producto"]["regular_price"] = "9100"
+        self.escribir_pub()
+        otra, error = srv.cargar({"carpeta": str(self.pieza)})            # también con la ruta absoluta
+        self.assertFalse(error, otra)
+        self.assertEqual((otra["accion"], otra["id"]), ("actualizado", salida["id"]))
+        self.assertEqual(self.e["subidas"], 2)                            # las mismas fotos no se suben de nuevo
+        self.assertEqual(self.e["productos"][salida["id"]]["regular_price"], "9100")
+        self.e["productos"][salida["id"]]["status"] = "publish"
+        srv.recientes.clear()
+        self.pub["producto"]["regular_price"] = "9999"
+        self.escribir_pub()
+        publicado, error = srv.cargar({"carpeta": "impresiones/2026-11-22_kit"})
+        self.assertFalse(error)
+        self.assertEqual((publicado["cargado"], publicado["accion"]), (False, "ya_publicado"))
+        self.assertEqual(self.e["productos"][salida["id"]]["regular_price"], "9100")
+
+    def test_rechazos(self):
+        import os
+        srv = self.tm.Servidor(self.entorno)
+        for argumentos, texto in (({"carpeta": "../afuera"}, "carpeta de trabajo"),
+                                  ({"carpeta": "impresiones/2026-11-22_kit", "otra": 1}, "Solo acepto"),
+                                  ({"carpeta": "impresiones"}, "publicación armada")):
+            salida, error = srv.cargar(argumentos)
+            self.assertTrue(error, argumentos)
+            self.assertIn(texto, salida["mensaje"])
+        sin, error = self.tm.Servidor({**self.entorno, "TALLER3D_CREDENCIALES": str(self.tmp / "no.json")}).cargar(
+            {"carpeta": "impresiones/2026-11-22_kit"})
+        self.assertIn("configurar", sin["mensaje"])
+        if os.name == "posix":
+            os.chmod(self.cred, 0o644)
+            abierta, _ = srv.cargar({"carpeta": "impresiones/2026-11-22_kit"})
+            self.assertIn("chmod 600", abierta["mensaje"])
+        self.tm.guardar_credenciales(str(self.cred), self.base, "leo", "otra clave")
+        mala, error = srv.cargar({"carpeta": "impresiones/2026-11-22_kit"})
+        self.assertTrue(error)
+        self.assertIn("contraseña de aplicación", mala["mensaje"])
+        self.tm.guardar_credenciales(str(self.cred), self.base, "leo", "abcd efgh ijkl")
+        self.e["redirigir"] = True
+        redirige, error = srv.cargar({"carpeta": "impresiones/2026-11-22_kit"})
+        self.assertTrue(error)
+        self.assertIn("redirección", redirige["mensaje"])
+        self.assertEqual(self.e["productos"], {})
+        with self.assertRaises(self.tm.Rechazo):
+            self.tm.validar_url("http://printaia.com.ar")                # sin https, solo en esta PC (pruebas)
+
+    def test_protocolo_mcp(self):
+        srv = self.tm.Servidor(self.entorno)
+        r = self.tm.procesar(srv, {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                                   "params": {"protocolVersion": "2025-06-18"}})
+        self.assertEqual(r["result"]["serverInfo"]["name"], "taller3d-tienda")
+        r = self.tm.procesar(srv, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+        self.assertEqual([t["name"] for t in r["result"]["tools"]], ["cargar_borrador", "estado_tienda"])
+        r = self.tm.procesar(srv, {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                                   "params": {"name": "estado_tienda", "arguments": {}}})
+        self.assertTrue(r["result"]["structuredContent"]["conectada"])
+        self.assertIn("Leo", r["result"]["structuredContent"]["mensaje"])
+
+    def test_panel_instalador_y_hooks(self):
+        import catalogo
+        pub = {"titulo": "Kit", "estado": "vista_previa", "vista": "producto/vista-previa.html"}
+        indice = {"version": 1, "piezas": [{"carpeta": "impresiones/2026-11-22_kit", "nombre": "Kit", "tipo": "impresion",
+                                            "fecha": "2026-11-22", "publicacion": pub}]}
+        pagina = catalogo.pagina_html(indice, modo="claude") if hasattr(catalogo, "pagina_html") else None
+        if pagina is None:
+            ruta = self.tmp / "catalogo.json"
+            ruta.write_text(json.dumps(indice), encoding="utf-8")
+            r = subprocess.run([sys.executable, str(SCRIPTS / "catalogo.py"), "html", "--catalogo", str(ruta),
+                                "--modo", "claude", "--salida", str(self.tmp / "p.html")], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            pagina = (self.tmp / "p.html").read_text(encoding="utf-8")
+        self.assertIn('data-tienda="impresiones/2026-11-22_kit"', pagina)
+        self.assertIn("Anotalo en el panel.", pagina)
+        self.assertIn("host:taller3d-tienda", pagina)
+        sh = (RAIZ / "instalador" / "instalar.sh").read_text(encoding="utf-8")
+        self.assertIn('servidores["taller3d-tienda"]', sh)
+        self.assertIn('"$SERVIDOR_TIENDA" configurar', sh)
+        des = (RAIZ / "instalador" / "desinstalar.sh").read_text(encoding="utf-8")
+        self.assertIn("mcp-app-tienda", des)
+        self.assertIn("credenciales-tienda)", des)
+
+        def guardia(modo, entrada):
+            return subprocess.run([sys.executable, str(RAIZ / "hooks" / "guardia.py"), modo],
+                                  input=json.dumps({"tool_input": entrada}), capture_output=True, text=True).returncode
+        conexion = "/home/leo/.config/taller-3d/credenciales-tienda.json"
+        self.assertEqual(guardia("pre-stage", {"paths": [conexion]}), 2)
+        self.assertEqual(guardia("pre-read", {"file_path": conexion}), 2)
+        self.assertEqual(guardia("pre-bash", {"command": "cat ~/.config/taller-3d/*"}), 2)
+        self.assertEqual(guardia("pre-commit", {"files": [{"devicePath": conexion, "stagedPath": "/tmp/x"}]}), 2)
+        self.assertEqual(guardia("pre-bash", {"command": "python3 ~/.local/share/taller-3d/tienda_mcp.py probar"}), 0)
+        self.assertEqual(guardia("pre-stage", {"paths": ["/home/leo/Documentos/Taller 3D/taller-3d/config.json"]}), 0)
+
+
 class TestDesgaste(unittest.TestCase):
     """0.1.33: el daño se hace deformando la malla."""
 

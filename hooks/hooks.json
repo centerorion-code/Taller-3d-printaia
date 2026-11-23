@@ -1,5 +1,5 @@
 {
-  "description": "Bloqueos de seguridad de taller-3d: revisa G-code, proyectos .3mf y perfiles antes de escribirlos, impide arrancar impresiones por red, subir modelos a internet, tocar la carpeta de Orca desde la terminal y traer, copiar o leer entera la configuración de Orca, que guarda los códigos de acceso de las impresoras.",
+  "description": "Bloqueos de seguridad de taller-3d: revisa G-code, proyectos .3mf y perfiles antes de escribirlos, impide arrancar impresiones por red, subir modelos a internet, tocar la carpeta de Orca desde la terminal y traer, copiar o leer entera la configuración de Orca, que guarda los códigos de acceso de las impresoras, y traer, leer o escribir la conexión con la tienda (su contraseña de aplicación).",
   "hooks": {
     "PreToolUse": [
       {

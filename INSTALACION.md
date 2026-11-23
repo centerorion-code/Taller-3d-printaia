@@ -52,6 +52,7 @@ Más adelante el taller va a estar también en el directorio de plugins de Anthr
    - instala **orca-mcp 0.1.0** (licencia MIT), la conexión entre Claude y Orca, con `uv` o `pipx`;
    - crea la carpeta de trabajo con su configuración, siempre en `Documentos/Taller 3D` (si tenías un taller en otra carpeta, te avisa para que Claude lo mude);
    - si tu Orca es de Flatpak y no puede ver la carpeta de trabajo, te ofrece darle acceso solo a esa carpeta;
+   - si vendés en una tienda WooCommerce, te ofrece instalar `taller3d-tienda` y conectar la tienda: tené lista una contraseña de aplicación de tu WordPress (Usuarios → Perfil → Contraseñas de aplicación, nombre «Taller 3D» → Añadir) y pegala cuando te la pida (no se ve al escribirla). Después, el botón «Cargala como borrador» del panel carga el producto con sus fotos, siempre como borrador;
    - te muestra la entrada para la app de Claude y, si querés, la agrega con una copia de respaldo de tu configuración.
    Todo queda anotado en `~/.local/state/taller-3d/` (registro y lista de lo instalado).
 5. Cerrá y abrí la app de Claude.
