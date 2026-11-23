@@ -609,7 +609,9 @@ class TestTienda(unittest.TestCase):
         self.tm = tienda_mcp
         self.shutil = shutil
         e = {"productos": {}, "media": set(), "tags": [], "subidas": 0, "redirigir": False, "siguiente": [100],
-             "categorias": [{"id": 15, "name": "Herramientas"}]}
+             "categorias": [{"id": 15, "name": "Herramientas"}], "indice_codigo": 200,
+             "indice": {"name": "Tienda de prueba", "namespaces": ["wp/v2", "wc/v3", "wc/store/v1"],
+                        "authentication": {"application-passwords": {"endpoints": {}}}}}
         self.e = e
         clave = "Basic " + base64.b64encode("leo:abcd efgh ijkl".encode()).decode()
 
@@ -630,10 +632,13 @@ class TestTienda(unittest.TestCase):
                 cuerpo = self.rfile.read(largo) if largo else b""
                 if e["redirigir"]:
                     self.send_response(302)
-                    self.send_header("Location", "https://otro.example/wp-json/")
+                    self.send_header("Location", e["redirigir"] if isinstance(e["redirigir"], str)
+                                     else "https://otro.example/wp-json/")
                     self.send_header("Content-Length", "0")
                     self.end_headers()
                     return
+                if urllib.parse.urlsplit(self.path).path in ("/wp-json", "/wp-json/") and metodo == "GET":
+                    return self.responder(e["indice_codigo"], e["indice"])      # el índice de la API es público
                 if self.headers.get("Authorization") != clave:
                     return self.responder(401, {"code": "incorrect_password", "message": "Contraseña incorrecta"})
                 u = urllib.parse.urlsplit(self.path)
@@ -685,6 +690,7 @@ class TestTienda(unittest.TestCase):
         self.http = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Manejador)
         threading.Thread(target=self.http.serve_forever, daemon=True).start()
         self.base = f"http://127.0.0.1:{self.http.server_address[1]}"
+        e["indice"]["home"] = self.base
         self.tmp = Path(tempfile.mkdtemp())
         self.trabajo = self.tmp / "Taller 3D"
         self.pieza = self.trabajo / "impresiones" / "2026-11-22_kit"
@@ -723,6 +729,7 @@ class TestTienda(unittest.TestCase):
         self.assertEqual(p["categories"], [{"id": 15}])                  # Juguetes no existe: no se crea
         self.assertEqual(len(p["tags"]), 2)
         self.assertIn("Juguetes", salida["mensaje"])
+        self.assertRegex(salida["mensaje"], r"Ojo: [a-zá-úñ«]")          # 0.1.36: sin mayúscula después de «Ojo:»
         self.assertIn("afuera.jpg", " ".join(salida["avisos"]))
         self.assertEqual(self.e["subidas"], 2)
         estado = (self.pieza / "producto" / "tienda.json").read_text(encoding="utf-8")
@@ -821,6 +828,209 @@ class TestTienda(unittest.TestCase):
         self.assertEqual(guardia("pre-commit", {"files": [{"devicePath": conexion, "stagedPath": "/tmp/x"}]}), 2)
         self.assertEqual(guardia("pre-bash", {"command": "python3 ~/.local/share/taller-3d/tienda_mcp.py probar"}), 0)
         self.assertEqual(guardia("pre-stage", {"paths": ["/home/leo/Documentos/Taller 3D/taller-3d/config.json"]}), 0)
+        ventanas = "C:\\Users\\Ana\\AppData\\Roaming\\taller-3d\\credenciales-tienda.json"
+        self.assertEqual(guardia("pre-stage", {"paths": [ventanas]}), 2)
+
+    def test_revisar_la_tienda_sin_contrasena(self):
+        """0.1.36: antes de pedir la contraseña se revisa lo que la tienda le muestra a cualquiera."""
+        bien = self.tm.revisar_tienda(self.base)
+        self.assertTrue(bien["sirve"], bien)
+        self.assertEqual([p["que"] for p in bien["puntos"]], ["api", "woocommerce", "contrasenas", "productos"])
+        self.assertEqual(bien["nombre"], "Tienda de prueba")
+        self.assertTrue(all(p["ok"] for p in bien["puntos"]))
+
+        def faltas(informe):
+            return " ".join(p["detalle"] for p in informe["puntos"] if p["ok"] is False)
+
+        self.e["indice"]["namespaces"] = ["wp/v2"]
+        sin_wc = self.tm.revisar_tienda(self.base)
+        self.assertFalse(sin_wc["sirve"])
+        self.assertIn("WooCommerce", faltas(sin_wc))
+        self.e["indice"]["namespaces"] = ["wp/v2", "wc/v3"]
+        del self.e["indice"]["authentication"]
+        sin_claves = self.tm.revisar_tienda(self.base)
+        self.assertFalse(sin_claves["sirve"])
+        self.assertIn("Disable WordPress application passwords", faltas(sin_claves))
+        self.e["indice"]["home"] = "https://www.otra-tienda.example"
+        self.assertIn("www.otra-tienda.example", " ".join(p["detalle"] for p in self.tm.revisar_tienda(self.base)["puntos"]
+                                                          if p["ok"] is None))
+        self.e["indice_codigo"], self.e["indice"] = 401, {"code": "rest_login_required", "message": "Solo usuarios"}
+        cerrada = self.tm.revisar_tienda(self.base)
+        self.assertTrue(cerrada["sirve"])                      # se sigue: lo dice la prueba con la contraseña
+        self.assertIsNone(cerrada["puntos"][0]["ok"])
+        self.e["indice_codigo"], self.e["indice"] = 404, {"code": "rest_no_route"}
+        self.assertIn("Enlaces permanentes", faltas(self.tm.revisar_tienda(self.base)))
+        self.e["indice_codigo"], self.e["indice"] = 200, ["no", "es", "la", "api"]
+        self.assertFalse(self.tm.revisar_tienda(self.base)["sirve"])
+        self.e["redirigir"] = True
+        redirige = self.tm.revisar_tienda(self.base)
+        self.assertFalse(redirige["sirve"])
+        self.assertEqual(redirige.get("sugerida"), "https://otro.example")
+        self.assertIn("redirige a https://otro.example", faltas(redirige))
+        self.e["redirigir"] = self.base + "/?rest_route=/"           # la misma tienda, a otra página: no es la dirección
+        misma = self.tm.revisar_tienda(self.base)
+        self.assertNotIn("sugerida", misma)
+        self.assertIn("Enlaces permanentes", faltas(misma))
+        self.assertFalse(self.tm.revisar_tienda("http://printaia.com.ar")["sirve"])       # sin https
+        self.assertFalse(self.tm.revisar_tienda("")["sirve"])
+
+    def test_configurar_revisa_antes_de_pedir_la_contrasena(self):
+        import io
+        import os
+        from unittest import mock
+        pedidas = []
+
+        def clave(texto=""):
+            pedidas.append(texto)
+            return "abcd efgh ijkl"
+
+        def correr(ruta, respuestas):
+            entradas = iter(respuestas)
+            with mock.patch.dict(os.environ, {"TALLER3D_CREDENCIALES": str(ruta)}), \
+                    mock.patch("builtins.input", lambda *_: next(entradas)), \
+                    mock.patch.object(self.tm.getpass, "getpass", clave), \
+                    mock.patch("sys.stdout", new_callable=io.StringIO) as salida:
+                codigo = self.tm.configurar([])
+            return codigo, salida.getvalue()
+
+        nueva = self.tmp / "otra" / "conexion.json"
+        codigo, texto = correr(nueva, [self.base, "leo"])
+        self.assertEqual(codigo, 0, texto)
+        self.assertEqual(len(pedidas), 1)
+        self.assertTrue(nueva.is_file())
+        self.assertIn("WooCommerce está activo", texto)
+        self.assertIn("quedó conectada", texto)
+        self.assertIn('"contrasena": "abcd efgh ijkl"', nueva.read_text(encoding="utf-8"))
+
+        self.e["indice"]["namespaces"] = ["wp/v2"]              # sin WooCommerce: no se pide ni se guarda nada
+        pedidas.clear()
+        tercera = self.tmp / "tercera" / "conexion.json"
+        codigo, texto = correr(tercera, [self.base])
+        self.assertEqual(codigo, 1)
+        self.assertEqual(pedidas, [])
+        self.assertFalse(tercera.exists())
+        self.assertIn("No te pido la contraseña", texto)
+        self.assertIn("configurar", texto)                     # dice cómo volver a correrlo
+
+    def test_como_reconectar_en_cada_sistema(self):
+        self.assertIn("configurar", self.tm.como_reconectar())
+        self.assertIn("en una terminal", self.tm.SIN_CONECTAR)
+        uso = subprocess.run([sys.executable, "-I", str(RAIZ / "instalador" / "tienda_mcp.py"), "otra-cosa"],
+                             capture_output=True, text=True)
+        self.assertEqual(uso.returncode, 1)
+        self.assertIn("revisar", uso.stderr)
+
+
+def revisar_powershell(texto: str) -> list[str]:
+    """Revisión aproximada de un script de PowerShell sin PowerShell: que (), {} y [] cierren, sin contar cadenas ni
+    comentarios, con las comillas como las lee PowerShell (también las tipográficas, que para él son comillas)."""
+    simples, dobles, pares = "'\u2018\u2019\u201a\u201b", '"\u201c\u201d\u201e', {")": "(", "}": "{", "]": "["}
+    errores, pila, modo = [], [], ["codigo"]
+    i, n, linea = 0, len(texto), 1
+    while i < n:
+        c = texto[i]
+        if modo[-1] == "doble":
+            if c == "`":
+                linea += texto[i + 1:i + 2] == "\n"
+                i += 2
+            elif c in dobles:
+                if texto[i + 1:i + 2] and texto[i + 1] in dobles:
+                    i += 2
+                else:
+                    modo.pop()
+                    i += 1
+            elif c == "$" and texto[i + 1:i + 2] == "(":
+                pila.append(("(", linea, "sub"))
+                modo.append("codigo")
+                i += 2
+            else:
+                linea += c == "\n"
+                i += 1
+            continue
+        if c == "\n":
+            linea += 1
+        elif c == "`":
+            linea += texto[i + 1:i + 2] == "\n"
+            i += 1
+        elif c == "<" and texto[i + 1:i + 2] == "#":
+            fin = texto.find("#>", i + 2)
+            if fin < 0:
+                return errores + [f"línea {linea}: comentario <# sin cerrar"]
+            linea += texto.count("\n", i, fin)
+            i = fin + 1
+        elif c == "#":
+            fin = texto.find("\n", i)
+            i = (n if fin < 0 else fin) - 1
+        elif c in simples:
+            j = i + 1
+            while j < n and not (texto[j] in simples and not (j + 1 < n and texto[j + 1] in simples)):
+                j += 2 if texto[j] in simples else 1
+            if j >= n:
+                return errores + [f"línea {linea}: comilla simple sin cerrar"]
+            linea += texto.count("\n", i, j)
+            i = j
+        elif c in dobles:
+            modo.append("doble")
+        elif c in "({[":
+            pila.append((c, linea, "b"))
+        elif c in ")}]":
+            if not pila:
+                errores.append(f"línea {linea}: «{c}» de más")
+            else:
+                abre, desde, tipo = pila.pop()
+                if abre != pares[c]:
+                    errores.append(f"línea {linea}: «{c}» cierra «{abre}» de la línea {desde}")
+                if tipo == "sub":
+                    modo.pop()
+        i += 1
+    errores += [f"línea {desde}: «{abre}» sin cerrar" for abre, desde, _ in pila]
+    return errores + (["cadena entre comillas dobles sin cerrar"] if len(modo) > 1 else [])
+
+
+class TestTiendaParaTodos(unittest.TestCase):
+    """0.1.36: el conector de la tienda como un método más: Windows, macOS a mano y la guía para el usuario."""
+
+    def test_la_revision_de_powershell_ve_los_errores(self):
+        self.assertEqual(revisar_powershell("function A { if ($x) { 'a''b' } }\nWrite-Host \"$(@($y) -join ' y ')\"\n"), [])
+        self.assertTrue(revisar_powershell("function A { if ($x) { 'a' }\n"))
+        self.assertTrue(revisar_powershell("Info 'el panel\u2019s'\nWrite-Host 'x'\n"))   # ’ cierra la cadena
+        self.assertEqual(revisar_powershell("<# (sin cerrar #>\n# ( comentario\n$a = \"`\"(\"\n"), [])
+
+    def test_windows_instala_el_conector(self):
+        ps = (RAIZ / "instalador" / "instalar.ps1").read_text(encoding="utf-8-sig")
+        des = (RAIZ / "instalador" / "desinstalar.ps1").read_text(encoding="utf-8-sig")
+        for nombre, texto in (("instalar.ps1", ps), ("desinstalar.ps1", des)):
+            self.assertEqual(revisar_powershell(texto), [], nombre)
+            self.assertFalse(set(texto) & set("\u2018\u2019\u201a\u201b\u201c\u201d\u201e"), nombre)
+        for crudo in ("instalar.ps1", "desinstalar.ps1"):
+            datos = (RAIZ / "instalador" / crudo).read_bytes()
+            self.assertTrue(datos.startswith(b"\xef\xbb\xbf"), crudo)      # UTF-8 con BOM, como lee PowerShell 5.1
+            self.assertNotIn(b"\n", datos.replace(b"\r\n", b""), crudo)     # y con CRLF
+        self.assertIn("$todas['taller3d-tienda'] = $entradaTienda", ps)
+        self.assertIn("args = @('-I', '-B', $TiendaScript)", ps)
+        self.assertIn("& $TiendaPython -I -B $TiendaScript configurar", ps)
+        self.assertIn("conectar-tienda.bat", ps)
+        self.assertIn("Anotar 'mcp-app-tienda' $Ruta", ps)
+        self.assertIn("Anotar 'credenciales-tienda' $credTienda", ps)
+        self.assertIn("$uv = ConseguirUv", ps)
+        self.assertNotIn("Anotar 'mcp-app' $Ruta\n    Info", ps.replace("\r\n", "\n"))   # orca-mcp solo si se agregó
+        self.assertIn("'mcp-app-tienda' { if (-not (QuitarDeLaApp $l.Valor 'taller3d-tienda'))", des)
+        self.assertIn("'credenciales-tienda' {", des)
+        self.assertIn("yyyyMMdd-HHmmss-fff", des)                           # dos respaldos seguidos no se pisan
+
+    def test_guia_para_el_usuario(self):
+        guia = (RAIZ / "TIENDA-WOOCOMMERCE.md").read_text(encoding="utf-8")
+        for texto in ("Contraseñas de aplicación", "No la pegues en el chat", "### Linux", "### Windows",
+                      "### macOS (a mano)", "tienda_mcp.py revisar", "conectar-tienda.bat", "Problemas comunes",
+                      "Disable WordPress application passwords", "Enlaces permanentes", "Revocar", '"taller3d-tienda"'):
+            self.assertIn(texto, guia)
+        json.loads("{" + guia.split("```json", 1)[1].split("```", 1)[0] + "}")   # la entrada de macOS es JSON válido
+        for doc in ("MANUAL.md", "INSTALACION.md", "README.md", "skills/instalar/SKILL.md", "skills/publicar/SKILL.md",
+                    "skills/impresion-3d/SKILL.md"):
+            self.assertIn("TIENDA-WOOCOMMERCE.md", (RAIZ / doc).read_text(encoding="utf-8"), doc)
+        instalar = (RAIZ / "skills" / "instalar" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("### Conectar la tienda WooCommerce (opcional)", instalar)
+        self.assertIn("nunca en el chat", instalar)
 
 
 class TestDesgaste(unittest.TestCase):

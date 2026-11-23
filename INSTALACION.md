@@ -52,7 +52,7 @@ Más adelante el taller va a estar también en el directorio de plugins de Anthr
    - instala **orca-mcp 0.1.0** (licencia MIT), la conexión entre Claude y Orca, con `uv` o `pipx`;
    - crea la carpeta de trabajo con su configuración, siempre en `Documentos/Taller 3D` (si tenías un taller en otra carpeta, te avisa para que Claude lo mude);
    - si tu Orca es de Flatpak y no puede ver la carpeta de trabajo, te ofrece darle acceso solo a esa carpeta;
-   - si vendés en una tienda WooCommerce, te ofrece instalar `taller3d-tienda` y conectar la tienda: tené lista una contraseña de aplicación de tu WordPress (Usuarios → Perfil → Contraseñas de aplicación, nombre «Taller 3D» → Añadir) y pegala cuando te la pida (no se ve al escribirla). Después, el botón «Cargala como borrador» del panel carga el producto con sus fotos, siempre como borrador;
+   - si vendés en una tienda WooCommerce, te ofrece instalar `taller3d-tienda` y conectar la tienda: primero la revisa (sin contraseña) y después te pide la contraseña de aplicación de tu WordPress (Usuarios → Perfil → Contraseñas de aplicación, nombre «Taller 3D» → Añadir); pegala cuando te la pida (no se ve al escribirla). Después, el botón «Cargala como borrador» del panel carga el producto con sus fotos, siempre como borrador. Guía completa: [TIENDA-WOOCOMMERCE.md](TIENDA-WOOCOMMERCE.md);
    - te muestra la entrada para la app de Claude y, si querés, la agrega con una copia de respaldo de tu configuración.
    Todo queda anotado en `~/.local/state/taller-3d/` (registro y lista de lo instalado).
 5. Cerrá y abrí la app de Claude.
@@ -65,7 +65,7 @@ Opciones: `--orca RUTA` (un Orca que ya tengas: ejecutable, AppImage o el script
 
 ## B. Windows, con el instalador
 
-> Todavía no se probó en una PC con Windows: se revisó la sintaxis y las funciones con PowerShell 7. Si algo falla, el registro queda en `%LOCALAPPDATA%\taller-3d\` y podés mandárselo al autor.
+> Todavía no se probó en una PC con Windows: se revisó la sintaxis y las funciones con PowerShell 7 (el paso de la tienda, que se sumó en la 0.1.36, todavía no). Si algo falla, el registro queda en `%LOCALAPPDATA%\taller-3d\` y podés mandárselo al autor.
 
 1. Sumá el plugin a Claude (sección anterior), si todavía no lo hiciste.
 2. Conseguí el instalador: en Claude escribí `/taller-3d:instalar` y te lo deja en una carpeta de tu PC. También lo podés bajar de GitHub: en la página del repositorio, **Code → Download ZIP**; descomprimilo (clic derecho → **Extraer todo**) y usá la carpeta `instalador/`.
@@ -79,7 +79,8 @@ Opciones: `--orca RUTA` (un Orca que ya tengas: ejecutable, AppImage o el script
    - usa el Orca que ya tengas (instalado o portable). Si no hay, baja el **instalador oficial de OrcaSlicer 2.5.1** (x64 o ARM64), verifica su huella SHA-256 y su firma digital (ORCASLICER PTE. LTD.) y lo abre para que lo instales vos (Windows te pide permiso);
    - instala **orca-mcp 0.1.0** con uv. Si no tenés uv, baja la versión oficial 0.13.9 y verifica su huella;
    - crea la carpeta de trabajo con su configuración, siempre en `Documentos\Taller 3D` (si tenías un taller en otra carpeta, te avisa para que Claude lo mude);
-   - con la app de Claude cerrada, agrega orca-mcp a su configuración, con copia de respaldo.
+   - si vendés en una tienda WooCommerce, te ofrece instalar `taller3d-tienda` (con un Python 3.12 propio que consigue uv) y conectar la tienda: la revisa, te pide la contraseña de aplicación de tu WordPress y deja `conectar-tienda.bat` para volver a conectarla. Guía: [TIENDA-WOOCOMMERCE.md](TIENDA-WOOCOMMERCE.md);
+   - con la app de Claude cerrada, agrega orca-mcp (y el conector de la tienda) a su configuración, con copia de respaldo.
    Todo queda anotado en `%LOCALAPPDATA%\taller-3d\` (registro y lista de lo instalado).
 5. Abrí la app de Claude.
 
@@ -103,6 +104,7 @@ Opciones (en PowerShell): `-Orca "<ruta de orca-slicer.exe>"` (por ejemplo, uno 
    }
    ```
 4. Reiniciá la app de Claude.
+5. Para cargar productos en tu tienda WooCommerce: [TIENDA-WOOCOMMERCE.md](TIENDA-WOOCOMMERCE.md), «macOS (a mano)».
 
 ## Después de instalar (todos los sistemas)
 
@@ -130,6 +132,7 @@ Para formas orgánicas o decorativas, instalá Blender desde https://www.blender
 | Orca de Flatpak no lamina archivos de la carpeta de trabajo | `flatpak override --user --filesystem="<carpeta de trabajo>" com.orcaslicer.OrcaSlicer` |
 | Orca no muestra un perfil nuevo | Cerralo y abrilo: lee los perfiles al iniciar. |
 | Claude no puede escribir en la PC | Conectá las carpetas (paso 2 de "Después de instalar") o aprobá el permiso cuando lo pida. |
+| La tienda no se conecta o no carga productos | [TIENDA-WOOCOMMERCE.md](TIENDA-WOOCOMMERCE.md), «Problemas comunes». |
 
 ## Desinstalar
 

@@ -7,8 +7,9 @@
 
 .DESCRIPTION
   Deshace solo lo que anotó instalar.ps1 en %LOCALAPPDATA%\taller-3d\instalado.txt, en orden inverso:
-  la entrada de orca-mcp en la app de Claude, orca-mcp, la copia de uv que bajó y la unión de la carpeta
-  de datos de Orca (los datos vuelven a AppData). Lo que se borra va a la Papelera.
+  las entradas de orca-mcp y del conector de la tienda en la app de Claude, la conexión guardada con la
+  tienda, orca-mcp, la copia de uv que bajó y la unión de la carpeta de datos de Orca (los datos vuelven
+  a AppData). Lo que se borra va a la Papelera, salvo la conexión con la tienda, que se borra del todo.
   OrcaSlicer, tu carpeta de trabajo (piezas, respaldos y configuración) y tus perfiles de Orca NO se
   tocan, salvo que lo pidas con -Orca o -Todo y lo confirmes.
 
@@ -73,6 +74,24 @@ function EsperarCerrado([string[]]$Procesos, [string]$Nombre) {
     return $true
 }
 
+function QuitarDeLaApp([string]$Ruta, [string]$Nombre) {
+    # Saca una entrada de mcpServers de la configuración de la app, con la app cerrada y una copia de respaldo.
+    if (-not (Test-Path -LiteralPath $Ruta)) { return $true }
+    if (-not (EsperarCerrado @('claude') 'la app de Claude')) { Write-Host "   Quedó la entrada $Nombre en $Ruta"; return $false }
+    $respaldo = '{0}.respaldo-{1}' -f $Ruta, (Get-Date -Format 'yyyyMMdd-HHmmss-fff')
+    Copy-Item -LiteralPath $Ruta -Destination $respaldo
+    $datos = Get-Content -LiteralPath $Ruta -Raw -Encoding UTF8 | ConvertFrom-Json
+    $servidores = $null
+    if ($datos -is [psobject] -and $datos.PSObject.Properties['mcpServers']) { $servidores = $datos.mcpServers }
+    if ($servidores -is [psobject] -and $servidores.PSObject.Properties[$Nombre]) {
+        $servidores.PSObject.Properties.Remove($Nombre)
+        [System.IO.File]::WriteAllText($Ruta, (ConvertTo-Json -InputObject $datos -Depth 64),
+            (New-Object System.Text.UTF8Encoding($false)))
+    }
+    Write-Host "Quitado $Nombre de la app de Claude (respaldo: $respaldo)."
+    return $true
+}
+
 function DentroDe([string]$Ruta, [string]$Base) {
     # ¿$Ruta está adentro de $Base (y no es $Base)? Sin tocar el disco.
     try {
@@ -117,6 +136,8 @@ foreach ($l in $lineas) {
         'union' { Write-Host "   carpeta de datos de Orca movida (vuelve a AppData): $($l.Valor -replace '\|', ' -> ')" }
         'uv' { Write-Host "   orca-mcp (instalado con uv)" }
         'mcp-app' { Write-Host "   entrada de orca-mcp en la app de Claude: $($l.Valor)" }
+        'mcp-app-tienda' { Write-Host "   entrada del conector de la tienda (taller3d-tienda) en la app de Claude: $($l.Valor)" }
+        'credenciales-tienda' { Write-Host "   conexión guardada con tu tienda (la contraseña de aplicación): $($l.Valor)" }
         default { Write-Host "   $($l.Tipo): $($l.Valor)" }
     }
 }
@@ -128,20 +149,16 @@ $pendientes = $false
 foreach ($l in $lineas) {
     try {
         switch ($l.Tipo) {
-            'mcp-app' {
-                if (-not (Test-Path -LiteralPath $l.Valor)) { break }
-                if (-not (EsperarCerrado @('claude') 'la app de Claude')) { Write-Host "   Quedó la entrada en $($l.Valor)"; $pendientes = $true; break }
-                $respaldo = '{0}.respaldo-{1}' -f $l.Valor, (Get-Date -Format 'yyyyMMdd-HHmmss')
-                Copy-Item -LiteralPath $l.Valor -Destination $respaldo
-                $datos = Get-Content -LiteralPath $l.Valor -Raw -Encoding UTF8 | ConvertFrom-Json
-                $servidores = $null
-                if ($datos -is [psobject] -and $datos.PSObject.Properties['mcpServers']) { $servidores = $datos.mcpServers }
-                if ($servidores -is [psobject] -and $servidores.PSObject.Properties['orca-mcp']) {
-                    $servidores.PSObject.Properties.Remove('orca-mcp')
-                    [System.IO.File]::WriteAllText($l.Valor, (ConvertTo-Json -InputObject $datos -Depth 64),
-                        (New-Object System.Text.UTF8Encoding($false)))
+            'mcp-app' { if (-not (QuitarDeLaApp $l.Valor 'orca-mcp')) { $pendientes = $true } }
+            'mcp-app-tienda' { if (-not (QuitarDeLaApp $l.Valor 'taller3d-tienda')) { $pendientes = $true } }
+            'credenciales-tienda' {
+                # Solo el archivo que guarda el conector. No va a la Papelera: es una contraseña.
+                $esperado = Join-Path $env:APPDATA 'taller-3d\credenciales-tienda.json'
+                if ($l.Valor -ne $esperado) {
+                    Write-Host "   No toco '$($l.Valor)': no es la conexión que guarda el conector."; $pendientes = $true; break
                 }
-                Write-Host "Quitado orca-mcp de la app de Claude (respaldo: $respaldo)."
+                if (Test-Path -LiteralPath $l.Valor) { Remove-Item -LiteralPath $l.Valor -Force; Write-Host 'Borrada la conexión con tu tienda.' }
+                Write-Host '   Revocá también la contraseña de aplicación en tu WordPress: Usuarios → Perfil → Contraseñas de aplicación.'
             }
             'uv' {
                 $partes = $l.Valor -split '\|', 2

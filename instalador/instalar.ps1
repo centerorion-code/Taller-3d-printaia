@@ -18,7 +18,9 @@
     4. orca-mcp 0.1.0 (la conexión entre Claude y Orca) con uv. Si no tenés uv, baja la versión
        oficial y verifica su huella.
     5. Crea la carpeta de trabajo con su configuración inicial.
-    6. Agrega orca-mcp a la app de Claude, con copia de respaldo, si querés.
+    6. Si vendés en una tienda WooCommerce (WordPress), te ofrece el conector que carga ahí tus productos,
+       siempre como borrador (tienda_mcp.py): consigue Python con uv y te pide la contraseña de aplicación.
+    7. Agrega orca-mcp (y el conector de la tienda) a la app de Claude, con copia de respaldo, si querés.
 
   No borra nada tuyo: lo que reemplaza va a la Papelera. Anota lo que instala en
   %LOCALAPPDATA%\taller-3d\instalado.txt para que desinstalar.ps1 pueda quitarlo.
@@ -49,7 +51,7 @@ param(
 Set-StrictMode -Version 1.0
 $ErrorActionPreference = 'Stop'
 
-$VersionPlugin = '0.1.35'
+$VersionPlugin = '0.1.36'
 $OrcaVersion = '2.5.1'
 $OrcaBase = "https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v$OrcaVersion"
 $OrcaArchivos = @{
@@ -430,7 +432,70 @@ function BuscarBlender {
     return $null
 }
 
-function AgregarAConfigApp([string]$Ruta, $Entrada) {
+function YaAnotado([string]$Tipo, [string]$Valor) {
+    if (-not (Test-Path -LiteralPath $Manifiesto)) { return $false }
+    return (@(Get-Content -LiteralPath $Manifiesto -Encoding UTF8) -contains "$Tipo`t$Valor")
+}
+
+function ConseguirUv {
+    # Baja uv (de Astral) a la carpeta del instalador y verifica su huella. En modo prueba no baja nada.
+    $d = $UvArchivos[$Arq]
+    $carpetaUv = Join-Path $Estado 'uv'
+    if ($Prueba) {
+        EnPrueba "bajaría $UvBase/$($d.Archivo), verificaría la huella y lo dejaría en $carpetaUv"
+        return $null
+    }
+    $zip = Join-Path $env:TEMP "taller-3d\$($d.Archivo)"
+    New-Item -ItemType Directory -Path (Split-Path -Parent $zip) -Force | Out-Null
+    Bajar "$UvBase/$($d.Archivo)" $zip | Out-Null
+    if (-not (HuellaOk $zip $d.Sha256)) {
+        Remove-Item -LiteralPath $zip -Force
+        throw 'La huella SHA-256 de uv no coincide: lo descarté.'
+    }
+    Expand-Archive -LiteralPath $zip -DestinationPath $carpetaUv -Force
+    Remove-Item -LiteralPath $zip -Force
+    Anotar 'archivo' $carpetaUv
+    $exe = Join-Path $carpetaUv 'uv.exe'
+    Info "uv verificado: $exe"
+    return $exe
+}
+
+function PythonParaElConector([string]$Uv) {
+    # Un Python 3.12 propio de uv (no el del sistema ni el de la Microsoft Store) para tienda_mcp.py.
+    $dir = $null
+    $antes = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Uv python install 3.12 | Out-Host
+        if ($LASTEXITCODE -ne 0) { return $null }
+        $dir = [string](& $Uv python dir 2>$null | Select-Object -First 1)
+    } finally { $ErrorActionPreference = $antes }
+    if (-not $dir -or -not (Test-Path -LiteralPath $dir.Trim())) { return $null }
+    return (Get-ChildItem -LiteralPath $dir.Trim() -Directory -Filter 'cpython-3.12*' -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | ForEach-Object { Join-Path $_.FullName 'python.exe' } |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1)
+}
+
+function ConVariables([string]$Ruta) {
+    # Para el .bat: la ruta con %LOCALAPPDATA%, %APPDATA% o %USERPROFILE% en vez del nombre de usuario, que puede
+    # tener letras que cmd.exe lee mal.
+    foreach ($v in @('LOCALAPPDATA', 'APPDATA', 'USERPROFILE')) {
+        $base = [Environment]::GetEnvironmentVariable($v)
+        if ($base -and $Ruta.StartsWith($base.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            return "%$v%" + $Ruta.Substring($base.TrimEnd('\').Length)
+        }
+    }
+    return $Ruta
+}
+
+function TextoBatTienda([string]$Python, [string]$Script) {
+    $orden = '"{0}" -I -B "{1}" configurar' -f (ConVariables $Python), (ConVariables $Script)
+    # Solo letras ASCII: cmd.exe lee el .bat con la página de códigos de la consola.
+    return ("@echo off`r`nrem taller-3d: conecta (o vuelve a conectar) tu tienda WooCommerce. Creado por instalar.ps1.`r`n" +
+            "$orden`r`necho.`r`npause`r`n")
+}
+
+function AgregarAConfigApp([string]$Ruta, $Entradas) {
     $actual = $null
     $respaldo = $null
     if (Test-Path -LiteralPath $Ruta) {
@@ -455,14 +520,19 @@ function AgregarAConfigApp([string]$Ruta, $Entrada) {
     } elseif ($null -eq $actual.mcpServers -or -not ($actual.mcpServers -is [psobject])) {
         $actual.mcpServers = New-Object psobject
     }
-    $actual.mcpServers | Add-Member -NotePropertyName 'orca-mcp' -NotePropertyValue ([pscustomobject]$Entrada) -Force
+    foreach ($nombre in @($Entradas.Keys)) {
+        $actual.mcpServers | Add-Member -NotePropertyName $nombre -NotePropertyValue ([pscustomobject]$Entradas[$nombre]) -Force
+    }
     EscribirTexto $Ruta (ConvertTo-Json -InputObject $actual -Depth 64)
     $control = LeerJson $Ruta
-    if (-not ((TienePropiedad $control 'mcpServers') -and (TienePropiedad $control.mcpServers 'orca-mcp'))) {
-        if ($respaldo) { Copy-Item -LiteralPath $respaldo -Destination $Ruta -Force }
-        throw 'No pude verificar la configuración nueva de la app: dejé la anterior.'
+    foreach ($nombre in @($Entradas.Keys)) {
+        if (-not ((TienePropiedad $control 'mcpServers') -and (TienePropiedad $control.mcpServers $nombre))) {
+            if ($respaldo) { Copy-Item -LiteralPath $respaldo -Destination $Ruta -Force }
+            throw 'No pude verificar la configuración nueva de la app: dejé la anterior.'
+        }
     }
-    Anotar 'mcp-app' $Ruta
+    if ($Entradas.Contains('orca-mcp')) { Anotar 'mcp-app' $Ruta }
+    if ($Entradas.Contains('taller3d-tienda') -and -not (YaAnotado 'mcp-app-tienda' $Ruta)) { Anotar 'mcp-app-tienda' $Ruta }
     Info 'Listo. Abrí la app de Claude de nuevo para que tome el cambio.'
 }
 
@@ -747,25 +817,8 @@ try {
         Info "Ya está instalado: $orcaMcp"
     } else {
         if (-not $uv) {
-            $d = $UvArchivos[$Arq]
-            $carpetaUv = Join-Path $Estado 'uv'
             Info "Para instalarlo aislado uso uv $UvVersion (de Astral, el mismo que recomienda orca-mcp)."
-            if ($Prueba) {
-                EnPrueba "bajaría $UvBase/$($d.Archivo), verificaría la huella y lo dejaría en $carpetaUv"
-            } else {
-                $zip = Join-Path $env:TEMP "taller-3d\$($d.Archivo)"
-                New-Item -ItemType Directory -Path (Split-Path -Parent $zip) -Force | Out-Null
-                Bajar "$UvBase/$($d.Archivo)" $zip
-                if (-not (HuellaOk $zip $d.Sha256)) {
-                    Remove-Item -LiteralPath $zip -Force
-                    throw 'La huella SHA-256 de uv no coincide: lo descarté. No se instaló orca-mcp.'
-                }
-                Expand-Archive -LiteralPath $zip -DestinationPath $carpetaUv -Force
-                Remove-Item -LiteralPath $zip -Force
-                Anotar 'archivo' $carpetaUv
-                $uv = Join-Path $carpetaUv 'uv.exe'
-                Info "uv verificado: $uv"
-            }
+            $uv = ConseguirUv
         }
         if ($Prueba) {
             EnPrueba "uv tool install --python 3.12 orca-mcp==$OrcaMcpVersion"
@@ -821,22 +874,88 @@ try {
     }
     Info "Carpeta: $CarpetaTrabajo"
 
+    # --- 5b. Cargar productos en la tienda (opcional) -----------------------------------------------------------
+    # tienda_mcp.py: servidor MCP chico (Python, sin dependencias) que carga en una tienda WooCommerce, siempre como
+    # borrador, la publicación que arma /publicar. La contraseña de aplicación la escribe el usuario acá, no en el chat.
+    Paso 'Cargar productos en tu tienda (opcional)'
+    $TiendaScript = $null
+    $TiendaPython = $null
+    $origenTienda = Join-Path $PSScriptRoot 'tienda_mcp.py'
+    $credTienda = Join-Path $env:APPDATA 'taller-3d\credenciales-tienda.json'
+    $batTienda = Join-Path $Estado 'conectar-tienda.bat'
+    if (-not (Test-Path -LiteralPath $origenTienda)) {
+        Info 'No está tienda_mcp.py al lado del instalador: salteo este paso.'
+    } else {
+        Info 'Si vendés en una tienda WooCommerce (WordPress), Claude y el botón «Cargala como borrador» del panel'
+        Info 'cargan ahí el producto con sus fotos, siempre como borrador (publicarlo es tuyo). Lo hace tienda_mcp.py,'
+        Info 'un programa chico de Python que arranca la app de Claude. La contraseña la escribís acá, no en el chat.'
+        Info 'Qué necesita tu tienda y cómo crear la contraseña: TIENDA-WOOCOMMERCE.md (junto a INSTALACION.md).'
+        if (Preguntar '¿Lo instalo?') {
+            try {
+                if (-not $uv) {
+                    Info "Para conseguir Python sin tocar el del sistema uso uv $UvVersion (de Astral)."
+                    $uv = ConseguirUv
+                }
+                $TiendaScript = Join-Path $Estado 'tienda_mcp.py'
+                if ($Prueba) {
+                    EnPrueba "copiaría tienda_mcp.py a $TiendaScript, conseguiría Python 3.12 con uv y dejaría $batTienda"
+                    EnPrueba 'revisaría tu tienda y te pediría la dirección, tu usuario de WordPress y la contraseña de aplicación'
+                    $TiendaPython = Join-Path $env:APPDATA 'uv\python\cpython-3.12\python.exe'
+                } else {
+                    $TiendaPython = PythonParaElConector $uv
+                    if (-not $TiendaPython) { throw 'uv no pudo conseguir Python 3.12.' }
+                    Copy-Item -LiteralPath $origenTienda -Destination $TiendaScript -Force
+                    if (-not (YaAnotado 'archivo' $TiendaScript)) { Anotar 'archivo' $TiendaScript }
+                    EscribirTexto $batTienda (TextoBatTienda $TiendaPython $TiendaScript)
+                    if (-not (YaAnotado 'archivo' $batTienda)) { Anotar 'archivo' $batTienda }
+                    Info "Conector: $TiendaScript (con $TiendaPython)"
+                    $conectar = $true
+                    if (Test-Path -LiteralPath $credTienda) {
+                        Info 'Tu tienda ya estaba conectada.'
+                        if (-not (Preguntar '¿La conecto de nuevo (otra contraseña u otra tienda)?')) { $conectar = $false }
+                    }
+                    if ($conectar) {
+                        Info 'Antes, en tu WordPress: Usuarios → Perfil → Contraseñas de aplicación, nombre «Taller 3D» → Añadir.'
+                        Info 'WordPress la muestra una sola vez: copiala y pegala cuando te la pida (Ctrl+V o clic derecho).'
+                        & $TiendaPython -I -B $TiendaScript configurar
+                        if ($LASTEXITCODE -ne 0) { Aviso "La tienda no quedó conectada. Cuando quieras, abrí $batTienda" }
+                    }
+                    if ((Test-Path -LiteralPath $credTienda) -and -not (YaAnotado 'credenciales-tienda' $credTienda)) {
+                        Anotar 'credenciales-tienda' $credTienda
+                    }
+                }
+            } catch {
+                Aviso "No pude instalar el conector de la tienda: $($_.Exception.Message) Sigo con lo demás."
+                $TiendaScript = $null
+            }
+        }
+    }
+
     # --- 6. App de Claude ----------------------------------------------------------------------------------
     Paso 'Conexión con la app de Claude'
     $exeParaApp = $OrcaExe
     if (-not $exeParaApp) { $exeParaApp = Join-Path $env:ProgramFiles 'OrcaSlicer\orca-slicer.exe' }
     $entrada = [ordered]@{ command = $orcaMcp; env = [ordered]@{ ORCASLICER_PATH = $exeParaApp; ORCASLICER_CONFIG_DIR = $DatosOrca } }
-    Info 'Esta es la entrada de orca-mcp para la app de Claude:'
-    Write-Host (ConvertTo-Json -InputObject ([ordered]@{ mcpServers = [ordered]@{ 'orca-mcp' = $entrada } }) -Depth 5)
+    $todas = [ordered]@{ 'orca-mcp' = $entrada }
+    $agregar = [ordered]@{}
+    if (-not $appTieneMcp) { $agregar['orca-mcp'] = $entrada }
+    if ($TiendaScript) {
+        $entradaTienda = [ordered]@{ command = $TiendaPython; args = @('-I', '-B', $TiendaScript)
+                                     env = [ordered]@{ TALLER3D_CARPETA = $CarpetaTrabajo } }
+        $todas['taller3d-tienda'] = $entradaTienda
+        $agregar['taller3d-tienda'] = $entradaTienda
+    }
+    Info 'Estas son las entradas para la app de Claude:'
+    Write-Host (ConvertTo-Json -InputObject ([ordered]@{ mcpServers = $todas }) -Depth 6)
     if ($SinApp) {
         Info 'No toco la configuración de la app (-SinApp).'
     } elseif (-not $app) {
         Aviso 'No encontré la app de escritorio de Claude. Instalala desde https://claude.ai/download y volvé a correr este instalador.'
-    } elseif ($appTieneMcp) {
+    } elseif ($agregar.Count -eq 0) {
         Info 'La app ya tiene un orca-mcp configurado: no lo cambio.'
     } elseif ($Prueba) {
-        EnPrueba "la agregaría a $($app.Config), con copia de respaldo y con la app cerrada"
-    } elseif (Preguntar '¿La agrego yo a la configuración de la app? (hago una copia de respaldo antes)') {
+        EnPrueba "agregaría $(@($agregar.Keys) -join ' y ') a $($app.Config), con copia de respaldo y con la app cerrada"
+    } elseif (Preguntar '¿Las agrego yo a la configuración de la app? (hago una copia de respaldo antes; un orca-mcp que ya tengas no lo toco)') {
         while (AppDeClaudeAbierta) {
             Aviso 'Cerrá la app de Claude del todo (también desde el ícono junto al reloj). Lo que tenías en Claude no se pierde.'
             $r = [string](Read-Host '   Apretá Enter cuando esté cerrada, o escribí SALTEAR')
@@ -852,7 +971,7 @@ try {
                 New-Item -ItemType Directory -Path (Split-Path -Parent $app.Config) -Force | Out-Null
                 Copy-Item -LiteralPath $configClasica -Destination $app.Config
             }
-            AgregarAConfigApp $app.Config $entrada
+            AgregarAConfigApp $app.Config $agregar
         }
     }
 
@@ -862,6 +981,10 @@ try {
     Info "Datos de Orca: $DatosOrca"
     Info "orca-mcp: $orcaMcp"
     Info "Carpeta de trabajo: $CarpetaTrabajo"
+    if ($TiendaScript) {
+        Info "Conector de la tienda: $TiendaScript"
+        Info "Para conectar otra tienda o cambiar la contraseña: $batTienda"
+    }
     if (-not $Prueba) { Info "Registro de la instalación: $Registro" }
     $perfiles = Join-Path $DatosOrca 'user\default'
     Write-Host ''

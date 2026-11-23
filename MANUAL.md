@@ -124,12 +124,12 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
 
 Si vendés en una tienda WooCommerce (WordPress), el botón «Cargala como borrador» del panel (o pedírselo a Claude) carga el producto directo en tu tienda, con título, textos, precio, peso, medidas y fotos, **siempre como borrador**: lo revisás y lo publicás vos desde la tienda. Si ya está publicado, no lo toca.
 
-Se conecta una sola vez (por ahora en Linux):
+Se conecta una sola vez, con el instalador del taller en Linux y Windows (en macOS, a mano). La guía completa, con lo que necesita tu tienda y qué hacer si algo falla, es [TIENDA-WOOCOMMERCE.md](TIENDA-WOOCOMMERCE.md). En corto:
 1. En tu WordPress: **Usuarios → Perfil → Contraseñas de aplicación**, nombre «Taller 3D» → **Añadir**. Copiá la contraseña: WordPress la muestra una sola vez.
-2. Cerrá la app de Claude del todo (Salir desde el ícono de la bandeja) y corré el instalador en una terminal. Cuando pregunte «¿Lo instalo?» en «Cargar productos en tu tienda», contestá **s** y pegá la contraseña cuando la pida (no se ve al escribirla).
-3. Abrí la app de Claude.
+2. Corré el instalador (Linux: `bash instalar.sh` en una terminal; Windows: doble clic en `instalar-windows.bat`). En «Cargar productos en tu tienda» contestá **s**: primero revisa tu tienda y después te pide la dirección, tu usuario y la contraseña (pegala: no se ve al escribirla). En «Conexión con la app de Claude» contestá **s** y cerrá la app del todo cuando te lo pida.
+3. Abrí la app de Claude y preguntá «¿está conectada mi tienda?».
 
-La contraseña no pasa por el chat: queda en tu PC, en un archivo que solo lee tu usuario. Para cambiarla o conectar otra tienda: `python3 ~/.local/share/taller-3d/tienda_mcp.py configurar`; para ver si anda: `… tienda_mcp.py probar`. Para desconectarla, revocá la contraseña en WordPress (el desinstalador también borra la conexión de tu PC).
+La contraseña no pasa por el chat: queda en tu PC, en un archivo que solo lee tu usuario. Para cambiarla o conectar otra tienda: `python3 ~/.local/share/taller-3d/tienda_mcp.py configurar` (Windows: `conectar-tienda.bat`); para ver si anda: `… tienda_mcp.py probar`. Para desconectarla, revocá la contraseña en WordPress (el desinstalador también borra la conexión de tu PC).
 
 ## Dónde quedan tus archivos
 

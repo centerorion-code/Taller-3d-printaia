@@ -20,6 +20,9 @@ instalador). La configuración sale solo de esa entrada y del archivo de credenc
 
 La contraseña de aplicación (se crea en WordPress: Usuarios → Perfil → Contraseñas de aplicación) la guarda el
 usuario una vez, en una terminal, con:  python3 tienda_mcp.py configurar
+(en Windows, el instalador deja conectar-tienda.bat, que hace lo mismo). Antes de pedirla, revisa la tienda sin
+contraseña: que responda en https sin redirecciones, que tenga WooCommerce y las contraseñas de aplicación
+habilitadas. Eso solo, sin conectar nada:  python3 tienda_mcp.py revisar
 Nunca pasa por el chat. El archivo queda solo para su usuario (permisos 600).
 
 Escribe un solo archivo: <carpeta de la pieza>/producto/tienda.json (número del producto, enlaces y las fotos ya
@@ -65,9 +68,22 @@ TIPOS_FOTO = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", 
 ESTADOS = {"draft": "borrador", "publish": "publicado", "pending": "pendiente de revisión", "private": "privado",
            "future": "programado"}
 
-SIN_CONECTAR = ("La tienda todavía no está conectada. Hacelo una sola vez, en una terminal de la PC: "
-                "python3 ~/.local/share/taller-3d/tienda_mcp.py configurar (te pide la dirección de la tienda, tu "
-                "usuario de WordPress y una contraseña de aplicación).")
+
+def como_reconectar() -> str:
+    """Cómo se conecta (o se vuelve a conectar) la tienda en esta PC, para los mensajes."""
+    if os.name == "nt":
+        return "conectar-tienda.bat, que está en %LOCALAPPDATA%\\taller-3d"
+    aqui = os.path.abspath(__file__)
+    casa = os.path.expanduser("~")
+    ruta = "~" + aqui[len(casa):] if casa not in ("", "/") and aqui.startswith(casa + os.sep) else aqui
+    if " " in ruta:
+        ruta = f'"{aqui}"'
+    return f"python3 {ruta} configurar"
+
+
+SIN_CONECTAR = ("La tienda todavía no está conectada. Hacelo una sola vez en la PC, " +
+                ("abriendo " if os.name == "nt" else "en una terminal: ") + como_reconectar() +
+                " (te pide la dirección de la tienda, tu usuario de WordPress y una contraseña de aplicación).")
 
 INSTRUCCIONES = (
     "Servidor local del taller 3D (plugin taller-3d) para la tienda WooCommerce del usuario. cargar_borrador carga "
@@ -346,12 +362,20 @@ def guardar_credenciales(ruta: str, tienda: str, usuario: str, clave: str) -> No
         os.chmod(ruta, 0o600)
 
 
+class Redireccion(Rechazo):
+    """La tienda contestó con una redirección (por ejemplo, a la dirección con www)."""
+
+    def __init__(self, destino: str):
+        self.destino = str(destino)
+        super().__init__(f"La tienda contestó con una redirección a {self.destino}. Guardá esa dirección (por ejemplo, "
+                         f"con o sin www) con: {como_reconectar()}")
+
+
 class SinRedirecciones(urllib.request.HTTPRedirectHandler):
     """Una redirección podría llevar la contraseña a otro sitio: no se sigue."""
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        raise Rechazo(f"La tienda contestó con una redirección a {newurl}. Guardá esa dirección (por ejemplo, con o "
-                      "sin www) con: python3 tienda_mcp.py configurar")
+        raise Redireccion(newurl)
 
 
 def _json(datos: bytes):
@@ -370,10 +394,11 @@ def _explicar(codigo: int, cuerpo, ruta: str) -> str:
     if codigo == 401:
         if c in ("incorrect_password", "invalid_username", "invalid_email", "application_passwords_disabled"):
             return ("La tienda no aceptó el usuario o la contraseña de aplicación. Creá otra en tu WordPress "
-                    "(Usuarios → Perfil → Contraseñas de aplicación) y guardala con: python3 tienda_mcp.py configurar")
+                    f"(Usuarios → Perfil → Contraseñas de aplicación) y guardala con: {como_reconectar()}")
         return ("La tienda no reconoció la conexión: o la contraseña de aplicación ya no existe, o el servidor no le "
-                "pasa a WordPress el encabezado de autorización. Probá creando otra contraseña de aplicación y "
-                "guardándola con: python3 tienda_mcp.py configurar")
+                "pasa a WordPress el encabezado de autorización (Herramientas → Salud del sitio lo revisa; la guía "
+                "TIENDA-WOOCOMMERCE.md del taller dice cómo se arregla). Probá creando otra contraseña de aplicación y "
+                f"guardándola con: {como_reconectar()}")
     if codigo == 403:
         que = "subir imágenes" if ruta.startswith("/wp/v2/media") else "cargar productos"
         return (f"Tu usuario de WordPress no tiene permiso para {que}: tiene que ser Administrador o Gestor de la "
@@ -617,7 +642,8 @@ class Servidor:
             salida["mensaje"] = (f"Listo: «{nombre}» {hecho} en tu tienda (producto {pid}), {fotos_txt}. Revisalo y "
                                  "publicalo vos desde la tienda.")
             if avisos:
-                salida["mensaje"] += " Ojo: " + " ".join(avisos)
+                juntos = " ".join(avisos)
+                salida["mensaje"] += " Ojo: " + juntos[:1].lower() + juntos[1:]
             guardar_estado(archivo_estado, {
                 "tienda": tienda.base, "id": pid, "sku": datos["sku"], "estado": "borrador",
                 "enlace_admin": salida["enlace_admin"], "enlace_vista_previa": salida["enlace_vista_previa"],
@@ -766,6 +792,196 @@ def servir() -> None:
             salida.flush()
 
 
+# --- Revisar la tienda sin contraseña (antes de conectarla) -----------------------------------------------------
+
+def _base_de(destino: str) -> str:
+    """La dirección de la tienda a la que lleva una redirección (sin /wp-json/... ni lo que sigue)."""
+    u = urllib.parse.urlsplit(destino)
+    camino = u.path.split("/wp-json")[0].rstrip("/")
+    return f"{u.scheme}://{u.netloc}{camino}"
+
+
+def _sitio(url: str) -> str:
+    u = urllib.parse.urlsplit(url)
+    return f"{(u.hostname or '').lower()}{u.path.rstrip('/')}"
+
+
+def _pedir_publico(base: str, ruta: str, abridor, tiempo: float):
+    """GET sin contraseña: (código, JSON o None). Las redirecciones no se siguen: salen como Redireccion."""
+    pedido = urllib.request.Request(f"{base}/wp-json{ruta}", method="GET",
+                                    headers={"Accept": "application/json", "User-Agent": f"{NOMBRE}/{VERSION}"})
+    try:
+        with abridor.open(pedido, timeout=tiempo) as r:
+            return r.status, _json(r.read(MAX_RESPUESTA + 1))
+    except urllib.error.HTTPError as error:
+        return error.code, _json(error.read(MAX_RESPUESTA + 1) or b"")
+
+
+def _limpio(texto, largo: int = 80) -> str:
+    t = html.unescape(texto) if isinstance(texto, str) else ""
+    return re.sub(r"[\x00-\x1f\x7f]+", " ", t).strip()[:largo]
+
+
+def revisar_tienda(direccion, abridor=None, tiempo: float = 20.0) -> dict:
+    """Revisa, sin contraseña y sin cambiar nada, si la tienda sirve para el conector: que responda en https sin
+    redirecciones, que sea un WordPress con WooCommerce y que tenga las contraseñas de aplicación habilitadas.
+    Devuelve {"tienda", "sirve", "nombre", "sugerida" (si redirige), "puntos": [{"que", "ok", "detalle"}]}, con ok
+    True (bien), False (hay que arreglarlo antes de conectar) o None (aviso: se puede seguir)."""
+    puntos: list[dict] = []
+    salida = {"tienda": str(direccion or "").strip(), "sirve": False, "nombre": "", "puntos": puntos}
+
+    def punto(que: str, ok, detalle: str) -> None:
+        puntos.append({"que": que, "ok": ok, "detalle": detalle})
+
+    try:
+        base = validar_url(direccion)
+    except Rechazo as motivo:
+        punto("direccion", False, str(motivo))
+        return salida
+    salida["tienda"] = base
+    abridor = abridor or urllib.request.build_opener(SinRedirecciones())
+
+    def pedir(ruta: str):
+        try:
+            return _pedir_publico(base, ruta, abridor, tiempo)
+        except Redireccion as r:
+            otra = _base_de(r.destino)
+            if _sitio(otra) == _sitio(base):
+                punto("api", False, f"La API de WordPress ({base}/wp-json/) redirige a otra página "
+                                    f"({_limpio(r.destino, 200)}): revisá que los enlaces permanentes no estén en "
+                                    "«Simple» (Ajustes → Enlaces permanentes) y que ningún plugin redirija /wp-json/.")
+                return None
+            if otra.startswith("https://") or otra.startswith("http://127.0.0.1") or otra.startswith("http://localhost"):
+                salida["sugerida"] = otra
+            punto("api", False, f"La dirección redirige a {otra}: usá esa (con o sin www, como la muestra el navegador).")
+        except Rechazo as motivo:
+            punto("api", False, str(motivo))
+        except urllib.error.URLError as error:
+            punto("api", False, f"No pude conectarme con {base} ({error.reason}). Revisá la dirección y que la PC tenga "
+                                "internet.")
+        except OSError:
+            punto("api", False, f"{base} no contestó a tiempo. Probá de nuevo en un rato.")
+        except Exception as error:                 # una respuesta rota (http.client.HTTPException, por ejemplo)
+            punto("api", False, f"{base} contestó algo que no entiendo ({type(error).__name__}). Probá de nuevo en un "
+                                "rato.")
+        return None
+
+    respuesta = pedir("/")
+    if respuesta is None:
+        return salida
+    codigo, indice = respuesta
+    espacios: list[str] = []
+    if codigo == 200 and isinstance(indice, dict) and isinstance(indice.get("namespaces"), list):
+        nombre = _limpio(indice.get("name"))
+        salida["nombre"] = nombre
+        punto("api", True, "Responde en https y sin redirecciones" + (f": «{nombre}»." if nombre else "."))
+        espacios = [n for n in indice["namespaces"] if isinstance(n, str)]
+        if "wc/v3" in espacios:
+            punto("woocommerce", True, "WooCommerce está activo.")
+        else:
+            punto("woocommerce", False, "No veo WooCommerce: el conector carga productos de WooCommerce. Si lo tenés, "
+                                        "revisá que esté activado en Plugins.")
+        autenticacion = indice.get("authentication") if isinstance(indice.get("authentication"), dict) else {}
+        if "application-passwords" in autenticacion:
+            punto("contrasenas", True, "Las contraseñas de aplicación están habilitadas.")
+        else:
+            punto("contrasenas", False,
+                  "Las contraseñas de aplicación están apagadas, y sin ellas no hay cómo conectarse. Suele ser un plugin "
+                  "de seguridad (en Wordfence: All Options → Brute Force Protection → «Disable WordPress application "
+                  "passwords», destildado) o que WordPress no ve el sitio en https (Ajustes → Generales).")
+        home = indice.get("home") if isinstance(indice.get("home"), str) else ""
+        if home and _sitio(home) != _sitio(base):
+            punto("direccion", None, f"WordPress dice que su dirección es {_limpio(home, 200)}: si algo falla, probá "
+                                     "con esa.")
+    elif codigo in (401, 403) and isinstance(indice, dict) and str(indice.get("code", "")).startswith("rest_"):
+        punto("api", None, "La API de WordPress no le contesta a cualquiera (la cierra un plugin para los visitantes): "
+                           "sin contraseña no puedo ver más. Se prueba con tu contraseña de aplicación.")
+    elif codigo == 404:
+        punto("api", False, f"No encuentro la API de WordPress en {base}/wp-json/. Si es un WordPress, en Ajustes → "
+                            "Enlaces permanentes elegí cualquier opción menos «Simple» y guardá. Si no es un WordPress, "
+                            "este conector no sirve para esa tienda.")
+    else:
+        que = "una página" if indice is None else "algo que no es la API"
+        punto("api", False, f"{base}/wp-json/ contestó {codigo} con {que}: puede ser un firewall del hosting o un plugin "
+                            "de seguridad que bloquea la API. Tiene que dejar pasar /wp-json/.")
+    if "wc/v3" in espacios and all(p["ok"] is not False for p in puntos):
+        respuesta = pedir("/wc/v3/products?per_page=1")
+        if respuesta is not None:
+            codigo, cuerpo = respuesta
+            if codigo in (401, 403) and isinstance(cuerpo, dict):
+                punto("productos", True, "La API de productos responde y pide contraseña, como tiene que ser.")
+            elif codigo == 200:
+                punto("productos", None, "La API de productos contesta sin contraseña: no es lo normal, revisá los "
+                                         "permisos de WooCommerce.")
+            else:
+                que = "una página" if cuerpo is None else "un error"
+                punto("productos", False, f"La API de productos de WooCommerce contestó {codigo} con {que}: puede ser un "
+                                          "firewall o un plugin de seguridad. Tiene que dejar pasar /wp-json/wc/.")
+    salida["sirve"] = bool(puntos) and all(p["ok"] is not False for p in puntos)
+    return salida
+
+
+def mostrar_revision(informe: dict) -> None:
+    marcas = {True: "[ok]   ", False: "[falta]", None: "[aviso]"}
+    for p in informe.get("puntos") or []:
+        print(f"   {marcas.get(p.get('ok'), '[aviso]')} {p.get('detalle', '')}")
+
+
+def _con_esquema(direccion: str) -> str:
+    d = (direccion or "").strip()
+    return "https://" + d if d and "://" not in d else d
+
+
+def _preguntar_si(texto: str) -> bool:
+    r = input(f"   {texto} (S/n): ").strip().lower()
+    return r in ("", "s", "si", "sí", "y", "yes")
+
+
+def _revisar_para_conectar(tienda: str) -> tuple[str, dict]:
+    """Revisa la tienda antes de pedir la contraseña; si redirige a otra dirección, ofrece usar esa."""
+    print(f"   Revisando {tienda} (sin contraseña: solo lo que la tienda le muestra a cualquiera)…")
+    informe = revisar_tienda(tienda)
+    mostrar_revision(informe)
+    otra = informe.get("sugerida")
+    if not informe["sirve"] and otra and otra != tienda and _preguntar_si(f"¿Uso {otra}?"):
+        tienda = otra
+        print(f"   Revisando {tienda}…")
+        informe = revisar_tienda(tienda)
+        mostrar_revision(informe)
+    return tienda, informe
+
+
+def _conexion_anterior() -> dict:
+    ruta = ruta_credenciales(os.environ)
+    if not os.path.isfile(ruta):
+        return {}
+    try:
+        datos = _leer_json(ruta, MAX_CREDENCIALES, "el archivo de la tienda")
+    except Rechazo:
+        return {}
+    return datos if isinstance(datos, dict) else {}
+
+
+def revisar(argumentos) -> int:
+    ap = argparse.ArgumentParser(prog="tienda_mcp.py revisar",
+                                 description="Revisa sin contraseña, y sin cambiar nada, si tu tienda sirve para el "
+                                             "conector del taller.")
+    ap.add_argument("--tienda", help="dirección de la tienda (https://...)")
+    a = ap.parse_args(argumentos)
+    try:
+        tienda = a.tienda or _preguntar("Dirección de tu tienda", str(_conexion_anterior().get("tienda") or ""))
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return 1
+    tienda, informe = _revisar_para_conectar(_con_esquema(tienda))
+    if informe["sirve"]:
+        print("   Tu tienda sirve para el conector. Lo que sigue es crear la contraseña de aplicación y conectarla con: "
+              + como_reconectar())
+        return 0
+    print("   Hay que resolver lo marcado con [falta] antes de conectar la tienda.")
+    return 1
+
+
 # --- Configurar desde una terminal (lo hace el usuario, una vez) -------------------------------------------------
 
 def _preguntar(texto: str, defecto: str = "") -> str:
@@ -780,20 +996,18 @@ def configurar(argumentos) -> int:
     ap.add_argument("--usuario", help="tu usuario de WordPress")
     a = ap.parse_args(argumentos)
     ruta = ruta_credenciales(os.environ)
-    anterior = {}
-    if os.path.isfile(ruta):
-        try:
-            anterior = _leer_json(ruta, MAX_CREDENCIALES, "el archivo de la tienda") or {}
-        except Rechazo:
-            anterior = {}
+    anterior = _conexion_anterior()
     print("Conectar el taller 3D con tu tienda WooCommerce (los productos se cargan siempre como borrador).")
     print("Antes, creá una contraseña de aplicación en tu WordPress: Usuarios → Perfil → Contraseñas de aplicación,")
     print("con el nombre «Taller 3D» → Añadir. WordPress la muestra una sola vez: copiala.")
     try:
-        tienda = a.tienda or _preguntar("Dirección de tu tienda", str(anterior.get("tienda") or ""))
-        if tienda and "://" not in tienda:
-            tienda = "https://" + tienda
-        tienda = validar_url(tienda)
+        tienda = validar_url(_con_esquema(a.tienda or _preguntar("Dirección de tu tienda",
+                                                                  str(anterior.get("tienda") or ""))))
+        tienda, informe = _revisar_para_conectar(tienda)
+        if not informe["sirve"]:
+            print("   No te pido la contraseña hasta que eso esté resuelto. Cuando lo arregles, corré de nuevo: "
+                  + como_reconectar())
+            return 1
         usuario = a.usuario or _preguntar("Tu usuario de WordPress", str(anterior.get("usuario") or ""))
         clave = getpass.getpass("   Contraseña de aplicación (no se ve mientras la escribís): ").strip()
     except Rechazo as motivo:
@@ -811,7 +1025,7 @@ def configurar(argumentos) -> int:
         t.pedir("GET", "/wc/v3/products", params={"per_page": 1})
     except Rechazo as motivo:
         print(f"   No pude conectarme: {motivo}")
-        print("   No guardé nada. Revisá los datos y corré de nuevo: python3 tienda_mcp.py configurar")
+        print("   No guardé nada. Revisá los datos y corré de nuevo: " + como_reconectar())
         return 1
     guardar_credenciales(ruta, tienda, usuario, clave)
     nombre = (yo or {}).get("name") if isinstance(yo, dict) else None
@@ -829,10 +1043,12 @@ def probar() -> int:
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "configurar":
         sys.exit(configurar(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "revisar":
+        sys.exit(revisar(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "probar":
         sys.exit(probar())
     if len(sys.argv) > 1:
-        sys.exit("Uso: tienda_mcp.py [configurar | probar] (sin nada, atiende a la app de Claude por MCP).")
+        sys.exit("Uso: tienda_mcp.py [revisar | configurar | probar] (sin nada, atiende a la app de Claude por MCP).")
     servir()
 
 

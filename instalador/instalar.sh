@@ -30,7 +30,7 @@
 #     --sin-app         no tocar la configuración de la app de Claude
 set -euo pipefail
 
-VERSION_PLUGIN="0.1.35"
+VERSION_PLUGIN="0.1.36"
 ORCA_VERSION="2.5.1"
 ORCA_ARCHIVO="OrcaSlicer_Linux_AppImage_Ubuntu2404_V${ORCA_VERSION}.AppImage"
 ORCA_URL="https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v${ORCA_VERSION}/${ORCA_ARCHIVO}"
@@ -603,6 +603,7 @@ else
   info "Si vendés en una tienda WooCommerce (WordPress), Claude y el botón «Cargala como borrador» del panel"
   info "cargan ahí el producto con sus fotos, siempre como borrador (publicarlo es tuyo). Lo hace tienda_mcp.py,"
   info "un programa chico de Python que arranca la app de Claude. La contraseña la escribís acá, no en el chat."
+  info "Qué necesita tu tienda y cómo crear la contraseña: TIENDA-WOOCOMMERCE.md (junto a INSTALACION.md)."
   if preguntar "¿Lo instalo?"; then
     SERVIDOR_TIENDA="$HOME/.local/share/taller-3d/tienda_mcp.py"
     hacer mkdir -p "$(dirname "$SERVIDOR_TIENDA")"

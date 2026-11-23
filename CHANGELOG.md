@@ -1,5 +1,18 @@
 # Cambios
 
+## 0.1.36 (23/11/2026)
+
+**El conector de la tienda, para cualquiera con WordPress y WooCommerce.**
+
+- **Guía nueva, `TIENDA-WOOCOMMERCE.md`:** qué hace y qué no, qué necesita la tienda, cómo crear la contraseña de aplicación, cómo instalarlo en Linux, Windows y macOS (a mano), cómo comprobar que anda, cambiar de tienda, desconectarla, dónde queda cada cosa y una tabla de problemas comunes (WooCommerce apagado, contraseñas de aplicación apagadas por un plugin de seguridad, enlaces permanentes «Simple», redirecciones, el encabezado de autorización que no llega, permisos, firewalls, categorías que no existen).
+- **Se revisa la tienda antes de pedir la contraseña:** `tienda_mcp.py revisar` mira, sin contraseña y sin cambiar nada, lo que la tienda le muestra a cualquiera: que responda en https sin redirecciones, que tenga WooCommerce (`wc/v3`) y las contraseñas de aplicación habilitadas, y que la API de productos pida contraseña. `configurar` lo hace primero y, si falta algo, dice qué y no pide la contraseña; si la dirección redirige (con o sin www), ofrece usar la otra.
+- **Windows:** `instalar.ps1` suma el paso «Cargar productos en tu tienda (opcional)»: copia el conector a `%LOCALAPPDATA%\taller-3d`, consigue un Python 3.12 propio con uv (sin tocar el del sistema), conecta la tienda, deja `conectar-tienda.bat` para volver a conectarla y agrega `taller3d-tienda` a la app de Claude junto con orca-mcp (si la app ya tenía orca-mcp, agrega solo el conector). La bajada de uv pasó a una función (`ConseguirUv`). `desinstalar.ps1` saca la entrada de la app y borra la conexión (sin pasar por la Papelera: es una contraseña). **Sin probar en una PC con Windows ni con PowerShell:** se revisó con una prueba nueva que cierra paréntesis, llaves y corchetes como los lee PowerShell, y que los dos `.ps1` siguen en UTF-8 con BOM y CRLF.
+- **macOS:** instalación a mano en la guía (copiar el conector, `configurar` y la entrada para la app).
+- **`/instalar`:** sección nueva «Conectar la tienda WooCommerce»: revisar la tienda sin contraseña (con `WebFetch` o el navegador), darle al usuario los pasos de la guía, nunca pedir ni aceptar la contraseña en el chat (si la pega, que la revoque y cree otra), y al volver comprobar con `estado_tienda` y declarar el conector en el panel. El instalador que se deja en la PC lleva también `TIENDA-WOOCOMMERCE.md`.
+- Los mensajes del conector dicen cómo volver a conectar la tienda según el sistema (en Windows, `conectar-tienda.bat`). «Ojo: En tu tienda…» pasó a «Ojo: en tu tienda…».
+- **Probado con una tienda real:** el 23/11, en printaia.com.ar (WordPress 7.1.5 y WooCommerce), la 0.1.35 cargó el kit de escuadras como borrador con sus 4 fotos; desde afuera, sin sesión, no se veía.
+- 6 pruebas nuevas (121 en total, 1 se saltea): la revisión sin contraseña con una tienda de mentira (bien, sin WooCommerce, sin contraseñas de aplicación, API cerrada a visitantes, 404, otra cosa, redirección, http), `configurar` que no pide la contraseña si la tienda no sirve, los mensajes por sistema, el instalador de Windows y la guía.
+
 ## 0.1.35 (22/11/2026)
 
 **Del botón a la tienda, sin escalas: el conector `taller3d-tienda`.**

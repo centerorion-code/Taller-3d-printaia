@@ -258,7 +258,8 @@ def revisar_archivo(destino: str, leer) -> list[str]:
 # (tienda_mcp.py configurar) y la lee solo el conector local. Claude no la trae, no la lee, no la copia ni la escribe.
 AVISO_TIENDA = ("taller-3d: credenciales-tienda.json guarda la contraseña de aplicación de tu tienda: no se trae, no "
                 "se lee, no se copia ni se escribe desde Claude. La usa solo el conector local taller3d-tienda. Para "
-                "cambiarla, el usuario corre en una terminal: python3 ~/.local/share/taller-3d/tienda_mcp.py configurar")
+                "cambiarla, el usuario corre en una terminal: python3 ~/.local/share/taller-3d/tienda_mcp.py configurar "
+                "(en Windows, conectar-tienda.bat).")
 RE_TIENDA = re.compile(r"credenciales-tienda|\.config/taller-3d(/|$|\s|\*|\?|\[|\"|')"
                        r"|appdata[/\\]roaming[/\\]taller-3d|appdata%?[/\\]taller-3d", re.I)
 
