@@ -609,7 +609,10 @@ class TestTienda(unittest.TestCase):
         self.tm = tienda_mcp
         self.shutil = shutil
         e = {"productos": {}, "media": set(), "tags": [], "subidas": 0, "redirigir": False, "siguiente": [100],
-             "categorias": [{"id": 15, "name": "Herramientas"}], "indice_codigo": 200,
+             "categorias": [{"id": 15, "name": "Herramientas", "parent": 0, "count": 3},
+                            {"id": 16, "name": "Hogar y deco", "parent": 0, "count": 0},
+                            {"id": 21, "name": "Accesorios", "parent": 15, "count": 0},
+                            {"id": 22, "name": "Accesorios", "parent": 16, "count": 1}], "indice_codigo": 200,
              "indice": {"name": "Tienda de prueba", "namespaces": ["wp/v2", "wc/v3", "wc/store/v1"],
                         "authentication": {"application-passwords": {"endpoints": {}}}}}
         self.e = e
@@ -661,8 +664,20 @@ class TestTienda(unittest.TestCase):
                     if metodo == "PUT":
                         p.update(datos)
                     return self.responder(200, p)
-                if ruta == "/wc/v3/products/categories":
-                    return self.responder(200, [c for c in e["categorias"] if q["search"].lower() in c["name"].lower()])
+                if ruta == "/wc/v3/products/categories" and metodo == "GET":
+                    lista = [c for c in e["categorias"] if q.get("search", "").lower() in c["name"].lower()]
+                    pagina, por = int(q.get("page", 1)), int(q.get("per_page", 10))
+                    return self.responder(200, lista[(pagina - 1) * por:pagina * por])
+                if ruta == "/wc/v3/products/categories" and metodo == "POST":
+                    ya = next((c for c in e["categorias"] if c["name"].lower() == datos["name"].lower()
+                               and c["parent"] == datos.get("parent", 0)), None)
+                    if ya:
+                        return self.responder(400, {"code": "term_exists", "message": "Ya existe",
+                                                    "data": {"status": 400, "resource_id": ya["id"]}})
+                    nueva = {"id": 40 + len(e["categorias"]), "name": datos["name"], "parent": datos.get("parent", 0),
+                             "count": 0}
+                    e["categorias"].append(nueva)
+                    return self.responder(201, nueva)
                 if ruta == "/wc/v3/products/tags" and metodo == "GET":
                     return self.responder(200, [t for t in e["tags"] if q["search"].lower() in t["name"].lower()])
                 if ruta == "/wc/v3/products/tags" and metodo == "POST":
@@ -789,7 +804,12 @@ class TestTienda(unittest.TestCase):
                                    "params": {"protocolVersion": "2025-06-18"}})
         self.assertEqual(r["result"]["serverInfo"]["name"], "taller3d-tienda")
         r = self.tm.procesar(srv, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
-        self.assertEqual([t["name"] for t in r["result"]["tools"]], ["cargar_borrador", "estado_tienda"])
+        self.assertEqual([t["name"] for t in r["result"]["tools"]],
+                         ["cargar_borrador", "estado_tienda", "categorias_tienda", "crear_categoria",
+                          "cambiar_categorias"])
+        solo_lectura = {t["name"]: t["annotations"]["readOnlyHint"] for t in r["result"]["tools"]}
+        self.assertEqual(solo_lectura, {"cargar_borrador": False, "estado_tienda": True, "categorias_tienda": True,
+                                        "crear_categoria": False, "cambiar_categorias": False})
         r = self.tm.procesar(srv, {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
                                    "params": {"name": "estado_tienda", "arguments": {}}})
         self.assertTrue(r["result"]["structuredContent"]["conectada"])
@@ -830,6 +850,81 @@ class TestTienda(unittest.TestCase):
         self.assertEqual(guardia("pre-stage", {"paths": ["/home/leo/Documentos/Taller 3D/taller-3d/config.json"]}), 0)
         ventanas = "C:\\Users\\Ana\\AppData\\Roaming\\taller-3d\\credenciales-tienda.json"
         self.assertEqual(guardia("pre-stage", {"paths": [ventanas]}), 2)
+
+    def test_categorias_de_la_tienda(self):
+        """0.1.37: las categorías se eligen entre las de la tienda (nombre, número o «Padre › Hija»)."""
+        srv = self.tm.Servidor(self.entorno)
+        salida, error = srv.categorias({})
+        self.assertFalse(error, salida)
+        self.assertEqual({c["ruta"] for c in salida["categorias"]},
+                         {"Herramientas", "Hogar y deco", "Herramientas › Accesorios", "Hogar y deco › Accesorios"})
+        self.assertIn("Hogar y deco", salida["mensaje"])
+        self.pub["producto"]["categories"] = [{"name": "hogar Y DECO"}, {"id": 15}, {"name": "Hogar y deco > Accesorios"},
+                                              {"name": "Accesorios"}, {"id": 999}]
+        self.escribir_pub()
+        cargado, error = srv.cargar({"carpeta": "impresiones/2026-11-22_kit"})
+        self.assertFalse(error, cargado)
+        p = self.e["productos"][cargado["id"]]
+        self.assertEqual(p["categories"], [{"id": 16}, {"id": 15}, {"id": 22}])
+        self.assertIn("2 categorías «Accesorios»", cargado["mensaje"])        # ambigua: no se adivina
+        self.assertIn("número 999", cargado["mensaje"])
+        srv.recientes.clear()
+        self.pub["producto"]["categories"] = [{"name": "No existe"}]            # al actualizar, sin ninguna encontrada,
+        self.escribir_pub()                                                     # quedan las que ya tenía
+        otra, error = srv.cargar({"carpeta": "impresiones/2026-11-22_kit"})
+        self.assertFalse(error, otra)
+        self.assertEqual(self.e["productos"][otra["id"]]["categories"], [{"id": 16}, {"id": 15}, {"id": 22}])
+        self.assertIn("Las que hay: Herramientas", otra["mensaje"])
+
+    def test_crear_categoria_solo_cuando_se_pide(self):
+        srv = self.tm.Servidor(self.entorno)
+        nueva, error = srv.crear_categoria({"nombre": "  Organización ", "padre": "Hogar y deco"})
+        self.assertFalse(error, nueva)
+        self.assertTrue(nueva["creada"])
+        self.assertEqual(nueva["ruta"], "Hogar y deco › Organización")
+        creada = next(c for c in self.e["categorias"] if c["name"] == "Organización")
+        self.assertEqual(creada["parent"], 16)
+        otra_vez, error = srv.crear_categoria({"nombre": "organizacion", "padre": 16})   # ya está: no se duplica
+        self.assertFalse(error, otra_vez)
+        self.assertFalse(otra_vez["creada"])
+        self.assertEqual(otra_vez["id"], creada["id"])
+        arriba, error = srv.crear_categoria({"nombre": "Regalos"})
+        self.assertTrue(arriba["creada"], arriba)
+        self.assertEqual(next(c for c in self.e["categorias"] if c["name"] == "Regalos")["parent"], 0)
+        for malo in ({"nombre": "x"}, {"nombre": "<b>Hola</b>"}, {"nombre": "Algo", "padre": "No existe"},
+                     {"nombre": "Algo", "otra": 1}, {"nombre": "Algo", "padre": "Accesorios"}, {"nombre": "A\nB"},
+                     {"padre": 16}):
+            salida, error = srv.crear_categoria(malo)
+            self.assertTrue(error, malo)
+            self.assertFalse(salida["creada"])
+        self.assertFalse(any(c["name"] in ("Algo", "x") for c in self.e["categorias"]))
+
+    def test_cambiar_solo_las_categorias(self):
+        """0.1.37: a un producto que ya está en la tienda (también publicado) se le cambian solo las categorías."""
+        srv = self.tm.Servidor(self.entorno)
+        sin, error = srv.cambiar_categorias({"carpeta": "impresiones/2026-11-22_kit"})
+        self.assertTrue(error)
+        self.assertIn("cargalo primero", sin["mensaje"])
+        cargado, _ = srv.cargar({"carpeta": "impresiones/2026-11-22_kit"})
+        p = self.e["productos"][cargado["id"]]
+        p.update({"status": "publish", "regular_price": "9999", "description": "<p>Lo cambió el usuario</p>"})
+        self.pub["producto"]["categories"] = [{"name": "Hogar y deco"}]
+        self.escribir_pub()
+        hecho, error = srv.cambiar_categorias({"carpeta": "impresiones/2026-11-22_kit"})
+        self.assertFalse(error, hecho)
+        self.assertEqual(p["categories"], [{"id": 16}])
+        self.assertEqual((p["status"], p["regular_price"], p["description"]),
+                         ("publish", "9999", "<p>Lo cambió el usuario</p>"))       # lo demás no se toca
+        self.assertEqual((hecho["estado"], hecho["categorias"]), ("publicado", ["Hogar y deco"]))
+        self.assertIn("No cambié nada más", hecho["mensaje"])
+        self.pub["producto"]["categories"] = [{"name": "No existe"}]
+        self.escribir_pub()
+        nada, error = srv.cambiar_categorias({"carpeta": "impresiones/2026-11-22_kit"})
+        self.assertTrue(error)
+        self.assertIn("No cambié nada", nada["mensaje"])
+        self.assertEqual(p["categories"], [{"id": 16}])
+        otra, error = srv.cambiar_categorias({"carpeta": "../afuera"})
+        self.assertTrue(error)
 
     def test_revisar_la_tienda_sin_contrasena(self):
         """0.1.36: antes de pedir la contraseña se revisa lo que la tienda le muestra a cualquiera."""
@@ -1253,6 +1348,9 @@ class TestPublicacion(unittest.TestCase):
             sin_csv = sorted(x.name for x in producto.iterdir() if x.suffix in (".json", ".csv", ".md", ".html"))
             armar("--textos", str(d / "textos.json"), "--csv")
             con_csv = (producto / "producto_woocommerce.csv").read_text(encoding="utf-8")
+            varias = armar("--textos", str(d / "textos.json"), "--categoria", "Hogar y deco, Regalos")   # 0.1.37
+            self.assertEqual(varias["producto"]["categories"], [{"name": "Hogar y deco"}, {"name": "Regalos"}])
+            armar("--textos", str(d / "textos.json"))
             # El primer paso, en un comando: lo que falta, el costo y las opciones de margen. No escribe nada.
             antes = sorted(x.name for x in producto.iterdir())
             ops = subprocess.run([sys.executable, str(SCRIPTS / "producto_tienda.py"), "--opciones",

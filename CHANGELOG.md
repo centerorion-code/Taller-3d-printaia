@@ -1,5 +1,16 @@
 # Cambios
 
+## 0.1.37 (23/11/2026)
+
+**Los productos van a las categorías que les corresponden en tu tienda.** Pedido de Leo: «cuando lo subís podés agregarlo ya a las categorías que corresponde el producto?».
+
+- **`categorias_tienda()`** (conector `taller3d-tienda`, solo lectura): las categorías de productos que tiene la tienda, con su número, dentro de cuál está («Padre › Hija») y cuántos productos tiene. `/publicar` la usa al armar la publicación para elegir, entre las que existen, la que corresponde a la pieza (o las que corresponden, hasta 5); `--categoria` de `producto_tienda.py` acepta varias, separadas por coma.
+- Al cargar, las categorías se reconocen por nombre (sin importar acentos ni mayúsculas), por número o por «Padre › Hija». Si hay dos con el mismo nombre, no adivina: avisa cuáles son. Si no existe, avisa con la lista de las que hay. Al actualizar un borrador, si no encuentra ninguna, le deja las que ya tenía (antes las borraba).
+- **`crear_categoria(nombre, padre)`:** crea una categoría nueva (arriba de todo o dentro de otra), solo cuando el usuario aprobó el nombre. Si ya hay una igual en ese lugar, usa esa.
+- **`cambiar_categorias(carpeta)`:** le pone a un producto que ya está en la tienda las categorías de su publicación y no cambia nada más (ni el estado, ni el texto, ni el precio, ni las fotos). Para un producto publicado, solo con el OK del usuario.
+- `/publicar`, la guía `TIENDA-WOOCOMMERCE.md`, `SECURITY.md` y la skill `impresion-3d` lo explican. El conector pasa a la versión 0.2.0.
+- 4 pruebas nuevas (124 en total, 1 se saltea): categorías por nombre, número y ruta, ambiguas, inexistentes y que no se borran al actualizar; crear (dentro de otra, repetida, nombres malos); cambiar solo las categorías de un producto publicado; varias categorías en la ficha.
+
 ## 0.1.36 (23/11/2026)
 
 **El conector de la tienda, para cualquiera con WordPress y WooCommerce.**

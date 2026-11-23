@@ -8,8 +8,14 @@ Herramientas:
   cargar_borrador(carpeta)  lee <carpeta de la pieza>/producto/publicacion.json (lo arma /publicar), sube sus fotos y
                             crea o actualiza el producto como borrador. Un producto que ya está publicado no se toca.
   estado_tienda()           dice si la tienda está conectada y responde. No cambia nada.
+  categorias_tienda()       las categorías de productos de la tienda (número, nombre, «Padre › Hija»), para elegir
+                            entre ellas las de cada producto. No cambia nada.
+  crear_categoria(nombre, padre)  crea una categoría de productos que no existe, solo cuando el usuario dijo que sí.
+  cambiar_categorias(carpeta)  le pone a un producto que ya está en la tienda (también uno publicado, con el OK del
+                            usuario) las categorías de su publicación. No cambia nada más: ni el estado, ni el texto,
+                            ni el precio, ni las fotos.
 
-Nunca publica, no borra, no toca pedidos, clientes ni otros productos. Habla solo con la tienda guardada (https) y no
+Nunca publica, no borra, no toca pedidos, clientes ni otros productos. Categorías nuevas, solo con crear_categoria. Habla solo con la tienda guardada (https) y no
 sigue redirecciones (no le manda la contraseña a otro sitio).
 
 Lo arranca la app de escritorio de Claude (entrada "taller3d-tienda" de claude_desktop_config.json, que escribe el
@@ -46,7 +52,7 @@ import urllib.parse
 import urllib.request
 
 NOMBRE = "taller3d-tienda"
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 INFO = {"name": NOMBRE, "title": "Taller 3D: cargar en la tienda", "version": VERSION}
 VERSIONES_MODERNAS = ("2026-07-28",)
 VERSIONES_LEGADAS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
@@ -89,7 +95,10 @@ INSTRUCCIONES = (
     "Servidor local del taller 3D (plugin taller-3d) para la tienda WooCommerce del usuario. cargar_borrador carga "
     "como BORRADOR, con sus fotos, la publicación que /publicar armó en <carpeta de la pieza>/producto/"
     "publicacion.json; si el producto ya está publicado, no lo toca. Usala cuando el usuario pida cargar una "
-    "publicación en su tienda, también desde el panel. estado_tienda dice si la tienda está conectada. Nunca "
+    "publicación en su tienda, también desde el panel. estado_tienda dice si la tienda está conectada. "
+    "categorias_tienda da las categorías que ya tiene la tienda: elegí entre ellas las de cada producto antes de "
+    "armar la publicación. crear_categoria crea una nueva solo si el usuario la aprobó. cambiar_categorias cambia solo "
+    "las categorías de un producto que ya está en la tienda (si está publicado, solo con el OK del usuario). Nunca "
     "publica: publicar es siempre del usuario, desde su tienda.")
 
 HERRAMIENTAS = [
@@ -148,6 +157,93 @@ HERRAMIENTAS = [
             "required": ["conectada", "mensaje"],
         },
         "annotations": {"title": "Estado de la tienda", "readOnlyHint": True, "destructiveHint": False,
+                        "idempotentHint": True, "openWorldHint": True},
+    },
+    {
+        "name": "categorias_tienda",
+        "title": "Ver las categorías de la tienda",
+        "description": ("Las categorías de productos que tiene la tienda WooCommerce del usuario: número, nombre, "
+                        "dentro de cuál está («Padre › Hija») y cuántos productos tiene. Sirve para elegir entre "
+                        "ellas las de cada producto (en la publicación van por su nombre exacto, o «Padre › Hija» si "
+                        "hay dos con el mismo nombre). No cambia nada."),
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "categorias": {"type": "array", "items": {"type": "object", "properties": {
+                    "id": {"type": "integer"}, "nombre": {"type": "string"}, "padre": {"type": "integer"},
+                    "ruta": {"type": "string"}, "productos": {"type": "integer"}}}},
+                "tienda": {"type": "string"},
+                "mensaje": {"type": "string"},
+            },
+            "required": ["categorias", "mensaje"],
+        },
+        "annotations": {"title": "Categorías de la tienda", "readOnlyHint": True, "destructiveHint": False,
+                        "idempotentHint": True, "openWorldHint": True},
+    },
+    {
+        "name": "crear_categoria",
+        "title": "Crear una categoría en la tienda",
+        "description": ("Crea en la tienda WooCommerce del usuario una categoría de productos nueva. Usala solo "
+                        "después de que el usuario aprobó el nombre (y dentro de cuál va): las categorías se ven en "
+                        "su tienda. Si ya hay una con ese nombre en ese lugar, no crea otra y devuelve esa. "
+                        "`padre`: el número o el nombre de la categoría dentro de la que va (vacío: arriba de todo)."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "nombre": {"type": "string", "minLength": 2, "maxLength": 60,
+                           "description": "El nombre de la categoría nueva, como se va a ver en la tienda."},
+                "padre": {"type": ["integer", "string"],
+                          "description": "Opcional: la categoría dentro de la que va (número o nombre)."},
+            },
+            "required": ["nombre"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "creada": {"type": "boolean", "description": "Si se creó (false si ya existía o si no se pudo)."},
+                "id": {"type": "integer"},
+                "nombre": {"type": "string"},
+                "ruta": {"type": "string"},
+                "mensaje": {"type": "string"},
+            },
+            "required": ["creada", "mensaje"],
+        },
+        # Crea algo en otro sistema (la tienda): no es de solo lectura, pero no borra ni cambia lo que hay.
+        "annotations": {"title": "Crear categoría", "readOnlyHint": False, "destructiveHint": False,
+                        "idempotentHint": True, "openWorldHint": True},
+    },
+    {
+        "name": "cambiar_categorias",
+        "title": "Cambiar las categorías de un producto de la tienda",
+        "description": ("Le pone al producto de una pieza que ya está en la tienda (el de producto/tienda.json o el "
+                        "del mismo SKU) las categorías de su publicación (producto/publicacion.json), elegidas entre "
+                        "las que existen. Cambia solo eso: ni el estado, ni el texto, ni el precio, ni las fotos. Si "
+                        "el producto ya está publicado, el cambio se ve en la tienda: usala solo con el OK del "
+                        "usuario. `carpeta`: la de la pieza, relativa a la carpeta de trabajo."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "carpeta": {"type": "string", "minLength": 1, "maxLength": MAX_RUTA,
+                            "description": "La carpeta de la pieza, relativa a la carpeta de trabajo."},
+            },
+            "required": ["carpeta"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "cambiado": {"type": "boolean"},
+                "id": {"type": "integer"},
+                "estado": {"type": "string", "description": "Cómo está el producto en la tienda: borrador, publicado, ..."},
+                "categorias": {"type": "array", "items": {"type": "string"}},
+                "avisos": {"type": "array", "items": {"type": "string"}},
+                "mensaje": {"type": "string"},
+            },
+            "required": ["cambiado", "mensaje"],
+        },
+        "annotations": {"title": "Cambiar categorías", "readOnlyHint": False, "destructiveHint": False,
                         "idempotentHint": True, "openWorldHint": True},
     },
 ]
@@ -246,6 +342,31 @@ def _numero(valor, que: str) -> str:
     return t
 
 
+def _categorias_pedidas(lista, maximo: int = 5) -> list[dict]:
+    """Las categorías que pide la publicación: por número ({"id": 16}) o por nombre ({"name": "Hogar y deco"}, o
+    «Padre › Hija» si hay dos con el mismo nombre). Hasta 5, sin repetir."""
+    salida, vistas = [], set()
+    for x in lista if isinstance(lista, list) else []:
+        numero = x.get("id") if isinstance(x, dict) else None
+        if isinstance(numero, int) and not isinstance(numero, bool) and numero > 0:
+            clave, pedida = ("id", numero), {"id": numero}
+        else:
+            n = x.get("name") if isinstance(x, dict) else x
+            if not isinstance(n, str) or not n.strip() or len(n) > 200 or _con_control(n):
+                continue
+            clave, pedida = ("nombre", _clave(n)), {"name": n.strip()}
+        if clave not in vistas:
+            vistas.add(clave)
+            salida.append(pedida)
+    return salida[:maximo]
+
+
+def _clave(texto: str) -> str:
+    """Para comparar nombres: sin acentos, sin mayúsculas y con los espacios de a uno."""
+    t = unicodedata.normalize("NFKD", html.unescape(texto)).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"\s+", " ", t).strip().casefold()
+
+
 def _nombres(lista, maximo: int) -> list[str]:
     salida = []
     for x in lista if isinstance(lista, list) else []:
@@ -257,8 +378,8 @@ def _nombres(lista, maximo: int) -> list[str]:
     return salida[:maximo]
 
 
-def armar_producto(pub: dict) -> tuple[dict, list[str], list[str]]:
-    """(datos del producto para WooCommerce, nombres de categorías, nombres de etiquetas). Siempre borrador."""
+def armar_producto(pub: dict) -> tuple[dict, list[dict], list[str]]:
+    """(datos del producto para WooCommerce, categorías pedidas, nombres de etiquetas). Siempre borrador."""
     p = pub["producto"]
     if p.get("type") not in (None, "", "simple"):
         raise Rechazo("Solo cargo productos simples.")
@@ -278,7 +399,7 @@ def armar_producto(pub: dict) -> tuple[dict, list[str], list[str]]:
     if medidas:
         datos["dimensions"] = {k: _numero(medidas.get(k), f"la medida «{k}»") for k in ("length", "width", "height")
                                if medidas.get(k) not in (None, "")}
-    return datos, _nombres(p.get("categories"), 5), _nombres(p.get("tags"), MAX_ETIQUETAS)
+    return datos, _categorias_pedidas(p.get("categories")), _nombres(p.get("tags"), MAX_ETIQUETAS)
 
 
 def rutas_fotos(pub: dict, carpeta: str) -> tuple[list[str], list[str]]:
@@ -474,18 +595,111 @@ def _mismo_nombre(a, b: str) -> bool:
     return isinstance(a, str) and html.unescape(a).strip().casefold() == b.strip().casefold()
 
 
-def ids_categorias(tienda: Tienda, nombres: list[str], avisos: list[str]) -> list[dict]:
-    """Solo categorías que ya existen en la tienda: las que no, se avisan (no se crean)."""
-    ids = []
-    for n in nombres:
-        _, lista = tienda.pedir("GET", "/wc/v3/products/categories", params={"search": n, "per_page": 100})
-        hallada = next((c for c in _lista(lista) if _mismo_nombre(c.get("name"), n)), None)
-        if hallada and isinstance(hallada.get("id"), int):
-            ids.append({"id": hallada["id"]})
+MAX_CATEGORIAS = 300
+
+
+def listar_categorias(tienda: Tienda) -> list[dict]:
+    """Las categorías de productos de la tienda (hasta 300), con su ruta («Padre › Hija») y cuántos productos tiene
+    cada una."""
+    crudas: list[dict] = []
+    for pagina in range(1, MAX_CATEGORIAS // 100 + 1):
+        _, lista = tienda.pedir("GET", "/wc/v3/products/categories",
+                                params={"per_page": 100, "page": pagina, "orderby": "name", "order": "asc"})
+        lote = [c for c in _lista(lista) if isinstance(c.get("id"), int) and isinstance(c.get("name"), str)]
+        crudas += lote
+        if len(lote) < 100:
+            break
+    por_id = {c["id"]: c for c in crudas}
+
+    def ruta(c: dict) -> str:
+        partes, actual, vistas = [], c, set()
+        while actual and actual["id"] not in vistas and len(partes) < 10:
+            vistas.add(actual["id"])
+            partes.append(_limpio(actual["name"], 100))
+            actual = por_id.get(actual.get("parent")) if actual.get("parent") else None
+        return " › ".join(reversed(partes))
+
+    return [{"id": c["id"], "nombre": _limpio(c["name"], 100),
+             "padre": c["parent"] if isinstance(c.get("parent"), int) else 0, "ruta": ruta(c),
+             "productos": c["count"] if isinstance(c.get("count"), int) else 0} for c in crudas]
+
+
+def _las_que_hay(todas: list[dict]) -> str:
+    rutas = [c["ruta"] for c in todas]
+    return ", ".join(rutas[:15]) + (f" y {len(rutas) - 15} más" if len(rutas) > 15 else "") if rutas else "ninguna"
+
+
+def buscar_categoria(todas: list[dict], pedida) -> tuple[list[dict], str]:
+    """Las categorías que coinciden con lo pedido (número, nombre o «Padre › Hija»), y cómo se pidió (para avisos)."""
+    if isinstance(pedida, dict) and "id" in pedida:
+        return [c for c in todas if c["id"] == pedida["id"]], f"con el número {pedida['id']}"
+    nombre = pedida.get("name", "") if isinstance(pedida, dict) else str(pedida)
+    partes = [_clave(p) for p in re.split(r"\s*[›>]\s*", nombre) if p.strip()]
+    if not partes:
+        return [], "sin nombre"
+    halladas = [c for c in todas if [_clave(x) for x in c["ruta"].split(" › ")][-len(partes):] == partes]
+    return halladas, f"«{nombre}»"
+
+
+def ids_categorias(tienda: Tienda, pedidas: list[dict], avisos: list[str]) -> list[dict]:
+    """Solo categorías que ya existen en la tienda (por número, nombre o «Padre › Hija»). Las que no, se avisan con
+    las que hay, para elegir una: no se crean acá (eso es crear_categoria, con el OK del usuario)."""
+    if not pedidas:
+        return []
+    todas = listar_categorias(tienda)
+    ids: list[dict] = []
+    for pedida in pedidas:
+        halladas, como = buscar_categoria(todas, pedida)
+        if len(halladas) == 1:
+            if {"id": halladas[0]["id"]} not in ids:
+                ids.append({"id": halladas[0]["id"]})
+        elif halladas:
+            avisos.append(f"En tu tienda hay {len(halladas)} categorías {como} ("
+                          + ", ".join(c["ruta"] for c in halladas[:5]) + "): decí cuál con «Padre › Hija». El "
+                          "producto quedó sin esa.")
         else:
-            avisos.append(f"En tu tienda no hay una categoría «{n}»: el producto quedó sin ella (creala en "
-                          "Productos → Categorías y elegila en el borrador).")
+            avisos.append(f"En tu tienda no hay una categoría {como}: el producto quedó sin ella. Las que hay: "
+                          f"{_las_que_hay(todas)}. Elegí una de esas o pedile a Claude que la cree.")
     return ids
+
+
+def crear_categoria(tienda: Tienda, nombre, padre=None) -> dict:
+    """Crea una categoría de productos (o devuelve la que ya existe con ese nombre en ese lugar)."""
+    if not isinstance(nombre, str) or not nombre.strip():
+        raise Rechazo("Falta el nombre de la categoría.")
+    if _con_control(nombre) or re.search(r"[<>›]", nombre):
+        raise Rechazo("El nombre de la categoría no puede llevar < > ni ›.")
+    nombre = re.sub(r"\s+", " ", nombre).strip()
+    if not 2 <= len(nombre) <= 60:
+        raise Rechazo("El nombre de la categoría tiene que tener entre 2 y 60 letras.")
+    todas = listar_categorias(tienda)
+    padre_id, padre_ruta, en = 0, "", ""
+    if padre not in (None, "", 0):
+        if isinstance(padre, bool) or not isinstance(padre, (int, str)):
+            raise Rechazo("`padre` tiene que ser el número o el nombre de una categoría.")
+        halladas, como = buscar_categoria(todas, {"id": padre} if isinstance(padre, int) else {"name": padre})
+        if len(halladas) != 1:
+            raise Rechazo(f"No encuentro una sola categoría {como} para ponerla adentro. Las que hay: "
+                          f"{_las_que_hay(todas)}.")
+        padre_id, padre_ruta = halladas[0]["id"], halladas[0]["ruta"]
+        en = f" dentro de «{padre_ruta}»"
+    ya = next((c for c in todas if c["padre"] == padre_id and _clave(c["nombre"]) == _clave(nombre)), None)
+    if ya:
+        return {"creada": False, "id": ya["id"], "nombre": ya["nombre"], "ruta": ya["ruta"],
+                "mensaje": f"La categoría «{ya['ruta']}» ya estaba en tu tienda (número {ya['id']}): uso esa."}
+    codigo, nueva = tienda.pedir("POST", "/wc/v3/products/categories", {"name": nombre, "parent": padre_id},
+                                 admitir=(400,))
+    datos = nueva.get("data") if isinstance(nueva, dict) and isinstance(nueva.get("data"), dict) else {}
+    if codigo in (200, 201) and isinstance(nueva, dict) and isinstance(nueva.get("id"), int):
+        ruta = f"{padre_ruta} › {nombre}" if padre_ruta else nombre
+        return {"creada": True, "id": nueva["id"], "nombre": nombre, "ruta": ruta,
+                "mensaje": f"Listo: creé la categoría «{nombre}»{en} en tu tienda (número {nueva['id']})."}
+    if isinstance(datos.get("resource_id"), int):                   # term_exists: ya estaba
+        return {"creada": False, "id": datos["resource_id"], "nombre": nombre, "ruta": nombre,
+                "mensaje": f"La categoría «{nombre}» ya estaba en tu tienda (número {datos['resource_id']}): uso esa."}
+    raise Rechazo(f"No pude crear la categoría «{nombre}»" + (f": {_limpio(nueva.get('message'), 200)}"
+                                                             if isinstance(nueva, dict) and nueva.get("message")
+                                                             else "."))
 
 
 def ids_etiquetas(tienda: Tienda, nombres: list[str], avisos: list[str]) -> list[dict]:
@@ -606,7 +820,9 @@ class Servidor:
                                      "querés cambiarle el precio o el texto, pedíselo a Claude."}
                 registrar(f"ya publicado, sin tocar: {relativa} → {pid}")
                 return salida, False
-            datos["categories"] = ids_categorias(tienda, categorias, avisos)
+            elegidas = ids_categorias(tienda, categorias, avisos)
+            if elegidas or not existente:          # al actualizar sin ninguna encontrada, quedan las que ya tenía
+                datos["categories"] = elegidas
             datos["tags"] = ids_etiquetas(tienda, etiquetas, avisos)
             imagenes, mapa = subir_fotos(tienda, fotos, estado.get("fotos") or {}, nombre, datos["sku"])
             datos["images"] = [{"id": i} for i in imagenes]
@@ -655,6 +871,71 @@ class Servidor:
         except Rechazo as motivo:
             registrar(f"rechazado: {pedida!r}: {motivo}")
             return {"cargado": False, "mensaje": str(motivo)}, True
+
+    def categorias(self, argumentos: dict) -> tuple[dict, bool]:
+        try:
+            if argumentos:
+                raise Rechazo("categorias_tienda no lleva datos.")
+            tienda = self.tienda()
+            todas = listar_categorias(tienda)
+            mensaje = (f"Tu tienda tiene {len(todas)} categorías: {_las_que_hay(todas)}." if todas
+                       else "Tu tienda todavía no tiene categorías de productos.")
+            return {"tienda": tienda.base, "categorias": todas, "mensaje": mensaje}, False
+        except Rechazo as motivo:
+            return {"categorias": [], "mensaje": str(motivo)}, True
+
+    def crear_categoria(self, argumentos: dict) -> tuple[dict, bool]:
+        try:
+            extra = sorted(set(argumentos) - {"nombre", "padre"})
+            if extra:
+                raise Rechazo(f"Solo acepto `nombre` y `padre` (sobra: {', '.join(map(str, extra))}).")
+            salida = crear_categoria(self.tienda(), argumentos.get("nombre"), argumentos.get("padre"))
+            registrar(f"categoría {'creada' if salida['creada'] else 'que ya estaba'}: {salida['ruta']} → {salida['id']}")
+            return salida, False
+        except Rechazo as motivo:
+            registrar(f"categoría rechazada: {argumentos.get('nombre')!r}: {motivo}")
+            return {"creada": False, "mensaje": str(motivo)}, True
+
+    def cambiar_categorias(self, argumentos: dict) -> tuple[dict, bool]:
+        pedida = argumentos.get("carpeta")
+        try:
+            extra = sorted(set(argumentos) - {"carpeta"})
+            if extra:
+                raise Rechazo(f"Solo acepto `carpeta` (sobra: {', '.join(map(str, extra))}).")
+            raiz = carpeta_de_trabajo(self.entorno)
+            carpeta = validar_carpeta(pedida, raiz)
+            pub = leer_publicacion(carpeta)
+            datos, categorias, _ = armar_producto(pub)
+            tienda = self.tienda()
+            estado = leer_estado(os.path.join(carpeta, "producto", ESTADO), tienda.base)
+            existente = buscar_existente(tienda, datos["sku"], estado.get("id"))
+            if not existente:
+                raise Rechazo(f"«{datos['name']}» todavía no está en tu tienda: cargalo primero (cargar_borrador).")
+            if not categorias:
+                raise Rechazo("La publicación no tiene categorías: elegí una entre las de tu tienda (categorias_tienda).")
+            avisos: list[str] = []
+            elegidas = ids_categorias(tienda, categorias, avisos)
+            if not elegidas:
+                raise Rechazo("No cambié nada: " + " ".join(avisos))
+            pid = int(existente["id"])
+            tienda.pedir("PUT", f"/wc/v3/products/{pid}", {"categories": elegidas})
+            _, visto = tienda.pedir("GET", f"/wc/v3/products/{pid}")
+            visto = visto if isinstance(visto, dict) else {}
+            quedaron = sorted(c.get("id") for c in _lista(visto.get("categories")) if isinstance(c.get("id"), int))
+            if quedaron != sorted(c["id"] for c in elegidas):
+                avisos.append("La tienda no dejó las categorías como se pidió: revisalas en el producto.")
+            todas = {c["id"]: c["ruta"] for c in listar_categorias(tienda)}
+            rutas = [todas.get(c["id"], str(c["id"])) for c in elegidas]
+            como = ESTADOS.get(visto.get("status") or existente.get("status"), str(visto.get("status") or ""))
+            salida = {"cambiado": True, "id": pid, "estado": como, "categorias": rutas, "avisos": avisos,
+                      "mensaje": f"Listo: «{datos['name']}» ({como}, producto {pid}) quedó en "
+                                 + " y ".join(f"«{r}»" for r in rutas) + ". No cambié nada más."
+                                 + (" Ojo: " + " ".join(avisos) if avisos else "")}
+            registrar(f"categorías: {pid} → {', '.join(rutas)}")
+            return salida, False
+        except Rechazo as motivo:
+            registrar(f"categorías rechazadas: {pedida!r}: {motivo}")
+            return {"cambiado": False, "mensaje": str(motivo)}, True
 
     def estado(self, argumentos: dict) -> tuple[dict, bool]:
         try:
@@ -750,6 +1031,12 @@ def _atender(servidor: Servidor, ident, metodo: str, params: dict, moderno: bool
             resultado = _resultado_herramienta(*servidor.cargar(argumentos))
         elif nombre == "estado_tienda":
             resultado = _resultado_herramienta(*servidor.estado(argumentos))
+        elif nombre == "categorias_tienda":
+            resultado = _resultado_herramienta(*servidor.categorias(argumentos))
+        elif nombre == "crear_categoria":
+            resultado = _resultado_herramienta(*servidor.crear_categoria(argumentos))
+        elif nombre == "cambiar_categorias":
+            resultado = _resultado_herramienta(*servidor.cambiar_categorias(argumentos))
         else:
             return _error(ident, -32602, f"Unknown tool: {nombre}")
     else:

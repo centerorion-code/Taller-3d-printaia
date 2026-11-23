@@ -205,7 +205,7 @@ def armar(args, config: dict) -> dict:
         "regular_price": f"{precio_final:.0f}" if precio_final else "",
         "short_description": corta,
         "description": descripcion_html,
-        "categories": [{"name": args.categoria}] if args.categoria else [],
+        "categories": [{"name": c.strip()} for c in (args.categoria or "").split(",") if c.strip()],
         "tags": [{"name": e} for e in etiquetas],
         "weight": f"{peso_kg:.3f}" if peso_kg else "",
         "dimensions": {"length": f"{medidas[0] / 10:.1f}", "width": f"{medidas[1] / 10:.1f}",
@@ -429,7 +429,7 @@ def main(argv=None) -> None:
     ap.add_argument("--material")
     ap.add_argument("--color")
     ap.add_argument("--uso", help="para qué sirve, en una frase")
-    ap.add_argument("--categoria")
+    ap.add_argument("--categoria", help="la categoría de la tienda (varias, separadas por coma). Con el conector de la tienda, el nombre exacto de una que ya exista (categorias_tienda), o «Padre › Hija»")
     ap.add_argument("--etiquetas", help="separadas por coma")
     ap.add_argument("--medidas", help="si no hay informe de STL, por ejemplo 60x30x40")
     ap.add_argument("--informe-gcode", type=Path, help="JSON de revisar_gcode.py --json")

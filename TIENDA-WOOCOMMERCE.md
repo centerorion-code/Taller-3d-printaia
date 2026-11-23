@@ -8,8 +8,8 @@ Lo hace `tienda_mcp.py`, un programa chico de Python (sin dependencias) que arra
 
 - Crea el producto como borrador, o actualiza el borrador que ya existe (lo reconoce por su SKU): no lo duplica.
 - Sube las fotos (hasta 10) a la biblioteca de medios. Las que ya subió no las vuelve a subir.
-- Usa las categorías que ya existen en tu tienda y crea las etiquetas que falten. Si una categoría no existe, te avisa: la creás vos en **Productos → Categorías**.
-- **Nunca publica**, no borra nada y no toca pedidos, clientes ni otros productos. Si el producto ya está publicado, no lo cambia.
+- Pone el producto en las categorías de tu tienda que le corresponden: Claude las elige entre las que ya tenés. Si ninguna encaja, te propone una nueva y la crea solo si le decís que sí. Las etiquetas que falten las crea.
+- **Nunca publica**, no borra nada y no toca pedidos, clientes ni otros productos. Si el producto ya está publicado, no lo cambia (salvo la categoría, si le decís que sí: y entonces solo eso).
 - Habla solo con tu tienda, por https, y no sigue redirecciones: así tu contraseña no viaja a otro sitio.
 - No sube el modelo 3D ni el G-code.
 
@@ -124,8 +124,8 @@ La conexión queda fuera de las carpetas que Claude puede ver, y los bloqueos de
 | «La tienda no reconoció la conexión» | O la contraseña se revocó (creá otra y conectá de nuevo), o el servidor no le pasa a WordPress el encabezado de autorización. Mirá **Herramientas → Salud del sitio**. En servidores Apache se arregla sumando al principio del archivo `.htaccess` (vos por FTP o tu hosting) la línea `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1`. Si el sitio entero pide un usuario y una contraseña del hosting antes de abrir, las contraseñas de aplicación no andan. |
 | «Tu usuario de WordPress no tiene permiso para cargar productos» (o para subir imágenes) | Conectá un usuario con rol Administrador o Gestor de la tienda. |
 | «… contestó 403 con una página» o «puede ser un firewall» | Un firewall del hosting o un plugin de seguridad bloquea la API. Tiene que dejar pasar `/wp-json/` (pedíselo a tu hosting si no sabés cómo). |
-| «En tu tienda no hay una categoría …» | Creala en **Productos → Categorías** y elegila en el borrador: el conector no crea categorías. |
-| «… ya está en tu tienda como publicado: no lo toqué» | Es a propósito: un producto publicado no se pisa. Decile a Claude qué querés cambiar y lo cambiás vos en WordPress. |
+| «En tu tienda no hay una categoría …» | Te dice cuáles hay: pedile a Claude que use una de esas o que cree la nueva (la crea solo con tu OK), y que lo vuelva a cargar. También la podés crear vos en **Productos → Categorías**. |
+| «… ya está en tu tienda como publicado: no lo toqué» | Es a propósito: un producto publicado no se pisa. Decile a Claude qué querés cambiar y lo cambiás vos en WordPress. Si es solo la categoría, Claude te pregunta y, con tu OK, cambia eso y nada más. |
 | «No pude conectarme…» | Revisá la dirección y que la PC tenga internet. |
 
 Si sigue sin andar, escribí `/taller-3d:instalar` en Claude: revisa la conexión y te dice qué ve.
