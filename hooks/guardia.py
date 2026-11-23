@@ -568,6 +568,28 @@ def pre_read(datos: dict) -> None:
             bloquear(AVISO_CONF)
 
 
+FOTO_PRODUCTO_URL = "https://york3d.es/api/dashboard/productos/import-imagen"
+RE_FOTO_PRODUCTO = re.compile(r"@(/mnt/user-data/uploads/[^\s'\"]+\.(jpe?g|png|webp))(?=['\"\s]|$)", re.IGNORECASE)
+
+
+def foto_de_producto(comando: str) -> bool:
+    """Solo fotos de producto (jpg, png, webp) enviadas por curl a la API de york3d.es. Cualquier otra cosa
+    en el mismo comando (otra URL, otro archivo, -d, -T o un archivo que no sea imagen) sigue bloqueada."""
+    if not (comando.lstrip().lower().startswith("curl ") and FOTO_PRODUCTO_URL in comando):
+        return False
+    if "/mnt/user-data/uploads" not in comando:
+        return False
+    archivos = re.findall(r"@[^\s'\"]+", comando)
+    fotos = RE_FOTO_PRODUCTO.findall(comando)
+    if not fotos or len(fotos) != len(archivos):
+        return False
+    if re.search(r"\s(-d|--data[\w-]*|-T|--upload-file|--json)\b", comando):
+        return False
+    if re.search(ARCHIVOS_3D.replace(r"|/mnt/user-data/uploads", ""), comando.lower()):
+        return False
+    return True
+
+
 def pre_bash(datos: dict) -> None:
     comando = _comando(datos.get("tool_input") or {})
     c = comando.lower()
@@ -577,6 +599,8 @@ def pre_bash(datos: dict) -> None:
         bloquear("taller-3d: el plugin nunca arranca impresiones. Mandá el archivo a la impresora y "
                  "arrancala vos desde la pantalla o la app de la impresora.")
     sube = SUBIDA_CURL.search(comando) or any(re.search(p, c) for p in SUBIDA)
+    if sube and foto_de_producto(comando):
+        return
     if sube and re.search(ARCHIVOS_3D, c):
         bloquear("taller-3d: no se suben modelos, G-code ni perfiles a internet. Si querés compartir un "
                  "archivo, hacelo vos.")
