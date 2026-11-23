@@ -1,6 +1,6 @@
 ---
 name: publicar
-description: Arma el producto de una pieza impresa (fotos, medidas, material, cuidados, texto de venta y precio según costo y margen), muestra una vista previa de cómo se vería en la tienda y, cuando el usuario la aprueba, lo carga como borrador (WooCommerce, otra plataforma por CSV, o ficha lista para copiar). Se usa cuando el usuario dice "publicá la pieza", "subila a la tienda", "cargala como producto", "armá la publicación", "cómo va a quedar publicada" o "cuánto la vendo".
+description: Arma el producto de una pieza, impresa o no (fotos, medidas, material, cuidados, texto de venta y precio según costo y margen), muestra una vista previa de cómo se vería en la tienda y, cuando el usuario la aprueba, lo carga como borrador (WooCommerce, otra plataforma por CSV, o ficha lista para copiar). Se usa cuando el usuario dice "publicá la pieza", "subila a la tienda", "cargala como producto", "armá la publicación", "publicala sin imprimirla", "cómo va a quedar publicada" o "cuánto la vendo".
 ---
 
 # /publicar: de la pieza al producto en la tienda
@@ -10,7 +10,7 @@ Cargar antes la skill `impresion-3d` y seguir sus reglas. Scripts en `<raíz del
 ## Reglas propias
 
 - **Siempre como borrador.** Nunca dejar el producto visible al público: lo publica el usuario después de revisarlo.
-- **Fotos reales para publicar.** Si la pieza todavía no está impresa, el borrador lleva fotos de producto renderizadas (sección 2) y la descripción aclara que son ilustrativas. Antes de que el usuario lo publique, recordarle sumar fotos reales de la pieza impresa como imagen principal.
+- **Publicar sin imprimir lo decide el usuario.** Imprimirla antes es opcional: hay piezas que el usuario sabe que andan, o un STL que ya probó (el botón «Publicar» del panel está en cada pieza, impresa o no). Si todavía no está impresa, el borrador lleva fotos de producto renderizadas (sección 2) y la descripción aclara que son ilustrativas. Decirlo una sola vez, en una línea, sin insistir en imprimirla: cuando la imprima, conviene sumar fotos reales como imagen principal.
 - **Nada que no se pueda sostener:** no afirmar aptitud para alimentos, uso médico, certificaciones ni resistencias que no se midieron. Los cuidados salen del material. El texto de venta (lo escriba Gemini o Claude) no agrega datos: medidas, material, peso y cuidados salen de los informes, y el texto pasa por `textos_ia.py revisar` antes de usarse.
 - **Sin claves en archivos.** No pedir ni guardar contraseñas en `config.json`; si la tienda necesita iniciar sesión, la inicia el usuario en el navegador.
 - No subir el modelo (STL, 3MF) ni el G-code a la tienda.
@@ -21,7 +21,9 @@ Cargar antes la skill `impresion-3d` y seguir sus reglas. Scripts en `<raíz del
 
 ## 1. Datos de la pieza
 
-1. Ubicar la carpeta de la pieza en `<trabajo>/impresiones/...` y traer `informe_gcode.json`, `pieza.stl` (o su informe) y `vista.png`. Si no hay G-code laminado, ofrecer `/pieza` primero: sin tiempo y gramos no hay costo.
+1. Ubicar la carpeta de la pieza en `<trabajo>/impresiones/...` y traer `informe_gcode.json`, `pieza.stl` (o su informe) y `vista.png`. Si no hay G-code laminado, hay que laminarla: sin tiempo y gramos no hay costo.
+   - **Si el pedido es publicarla sin imprimir** (el botón «Publicar» de una pieza sin laminar dice «Laminala solo para sacar el tiempo, los gramos y el costo»), laminarla sin preguntar, con las secciones 3 y 4 de `/pieza` (perfiles AUTO, laminar y revisar el G-code), y seguir acá. Es para el costo: no se imprime nada. La impresora es la del pedido (`Impresora: «…».`) o, si no viene, la de la pieza; con «Preguntame en qué impresora.», o si hay que elegirla entre varias, preguntarla antes. Si el G-code sale RECHAZADO, no hay costo: decirlo y no seguir.
+   - Si no, ofrecer `/pieza` primero.
 2. Si no hay `informe_stl.json`, generarlo: `revisar_stl.py pieza.stl --material <m> --json informe_stl.json`.
 3. Pedir lo que falte: nombre comercial, para qué sirve (una frase), color y las fotos reales si ya está impresa (pueden mandarlas desde el celular).
 4. **Categorías de la tienda.** Si está el conector (`taller3d-tienda`), traer las categorías con `categorias_tienda` y elegir, entre las que ya existen, la que corresponde a la pieza (o las que corresponden, hasta 5) por lo que es y dónde se usa. Van en `--categoria` con su nombre exacto, separadas por coma (si hay dos con el mismo nombre, «Padre › Hija»). Si ninguna encaja, proponer una nueva (nombre y, si va, dentro de cuál) y crearla con `crear_categoria` **solo con el OK del usuario**; si no la quiere, usar la que más se acerque. Sin conector, usar `tienda.categoria_por_defecto` o preguntarla. Decir en una línea cuál se eligió y por qué (se ve en la vista previa, y el usuario la puede cambiar).

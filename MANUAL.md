@@ -108,7 +108,7 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
    **En paralelo, la publicación:** si tenés tienda configurada, Claude te ofrece armar el producto en ese momento: fotos de producto hechas con Blender desde cuatro ángulos (la primera con fondo blanco, como pide Mercado Libre; si tenés el conector de Blender en la app de Claude, se hacen en tu PC, más rápido), la descripción y el precio con el tiempo y los gramos reales. **Te pregunta qué margen querés en ese producto**, con tres opciones y lo que ganás en cada canal, o le decís un precio. El texto de venta lo puede escribir tu Gemini gratis (Claude lo revisa contra los datos de la pieza) o Claude. Antes de cargarlo te muestra una **vista previa** de cómo se vería la página del producto en tu tienda, con lo que conviene revisar: si las fotos son ilustrativas, el título para Mercado Libre, el precio y la ganancia en cada canal. Lo aprobás vos con el botón de la vista previa o en el chat, también desde la app de Claude en el celular, y queda como borrador.
 8. **Imprimís vos.** Pasás el G-code a la impresora (por USB o con la app de la marca) y la arrancás desde ahí. **Claude nunca arranca una impresión.** Mirá la primera capa completa y no dejes la impresora sola.
 9. **Contale cómo salió.** Mandale una foto, aunque haya salido bien. Si algo falló, lo diagnostica y lo corrige. Lo que funcionó queda anotado y mejora las próximas piezas.
-10. **Vender.** Cuando tengas la pieza impresa, mandale la foto: la suma al producto como imagen principal (las fotos de Blender son ilustrativas). El borrador lo publicás vos desde tu tienda. Si no lo armaste antes, `/taller-3d:publicar` lo hace en cualquier momento.
+10. **Vender.** Cuando tengas la pieza impresa, mandale la foto: la suma al producto como imagen principal (las fotos de Blender son ilustrativas). El borrador lo publicás vos desde tu tienda. Si no lo armaste antes, `/taller-3d:publicar` lo hace en cualquier momento, también sin imprimirla (o el botón «Publicar» del panel).
 
 ## Qué decidís vos
 
@@ -164,22 +164,23 @@ Idea → Diseño → Lista para imprimir → Impresa → En la tienda
 
 - Arriba, cuántas ideas están **pendientes**, cuántas piezas **en proceso** y cuántas **terminadas**, con filtros y un buscador.
 - Primero va **"Para hacer"** (lo más avanzado primero) y después las terminadas, por mes.
-- Cada tarjeta dice **a quién le toca lo que sigue**: "Le toca a Claude: dejarla lista para imprimir" o "Te toca: imprimirla". Tiene botones con el pedido ("Diseñala", "Ya la imprimí", "Publicala"…), para qué impresora es, la vista (o la foto de la pieza impresa), medidas, material, tiempo, gramos, costo, precio y los archivos.
+- Cada tarjeta dice **a quién le toca lo que sigue**: "Le toca a Claude: dejarla lista para imprimir" o "Te toca: imprimirla". Tiene botones con el pedido ("Diseñala", "Ya la imprimí", "Publicar"…), para qué impresora es, la vista (o la foto de la pieza impresa), medidas, material, tiempo, gramos, costo, precio y los archivos.
+- **Publicar, impresa o no:** el botón «Publicar» está en cada pieza con modelo, la hayas impreso o no (hay productos que sabés que andan, o un STL que ya probaste). Si no está laminada, Claude la lamina primero, solo para sacar el tiempo, los gramos y el costo. La publicación lleva fotos de producto hechas en la computadora, aclaradas como ilustrativas; ves cómo queda antes de que se cargue, se carga como borrador y la publicás vos.
 - **Publicaciones:** las piezas a las que les armaste la publicación, con su foto, su precio, lo que ganás y dónde está cada una (vista previa, borrador en la tienda o publicada). «Ver cómo queda» abre la página del producto como se vería en tu tienda.
 - **Tu taller:** arriba, lo que falta para que los costos y precios sean reales (la boleta de luz, cuánto pagaste la impresora, tu hora…), con un botón para cada cosa. El consumo de cada impresora no te lo pide: Claude lo busca en internet o, si no lo encuentra, lo estima por el tamaño de la cama, y lo guarda solo (si medís el real con un medidor de enchufe, pasáselo en el chat).
-- **Imprimir en:** arriba elegís la impresora para lo que pidas: las de tu Orca, también las que todavía no están preparadas en el taller, o "Que me pregunte Claude". Los botones que arrancan una pieza ("Diseñala", "Dejala lista para imprimir", "Pieza desde una foto") se la dicen a Claude, y el navegador se acuerda de la que elegiste. La que elegís en la ventana de Orca no le llega a Claude.
+- **Imprimir en:** arriba elegís la impresora para lo que pidas: las de tu Orca, también las que todavía no están preparadas en el taller, o "Que me pregunte Claude". Los botones que arrancan una pieza ("Diseñala", "Dejala lista para imprimir", "Pieza desde una foto", "Pieza desde un STL", y "Publicar" en una pieza sin laminar) se la dicen a Claude, y el navegador se acuerda de la que elegiste. La que elegís en la ventana de Orca no le llega a Claude.
 - En el archivo, los botones copian el pedido para que lo pegues en el chat.
 - **Ideas para después:** contale a Claude "anotá esta idea: un soporte para la tele, 15 × 10 cm" y queda pendiente con lo que ya se sabe. Cuando la quieras hacer, pedila por su nombre.
 - **Pieza desde una foto:** el botón de arriba manda el pedido a Claude (o lo copia) y te recuerda adjuntar la foto en el chat: la página no puede mandar fotos.
 - Al empezar a usar el taller, Claude te dice en una línea qué tenés pendiente.
 
-Se actualiza solo cada vez que Claude anota una idea o guarda, lamina o publica una pieza. Una pieza impresa ya está terminada: publicarla es opcional. Si tenías piezas de antes, pedí "armá el panel" y las suma.
+Se actualiza solo cada vez que Claude anota una idea o guarda, lamina o publica una pieza. Una pieza impresa ya está terminada: publicarla es opcional. Una publicada en tu tienda también, aunque no la hayas impreso: el G-code queda listo para cuando te la compren. Si tenías piezas de antes, pedí "armá el panel" y las suma.
 
 ### El panel al costado del chat
 
 En claude.ai y en la app de Claude, el panel también puede estar **al costado del chat**: Claude lo publica en tu cuenta (es privado: lo ves solo vos) y se actualiza solo. La primera vez te pregunta si lo querés.
 
-Ahí **los botones le mandan el pedido directo a Claude**: tocás "Ya la imprimí" o "Publicala" y le llega a la conversación que publicó el panel, que lo hace y te contesta. Si en ese momento Claude está trabajando en otra cosa, lo hace cuando termina. Si la página no puede mandarlo (por ejemplo, desde una conversación que ya no está), el botón copia el pedido para que lo pegues en el chat.
+Ahí **los botones le mandan el pedido directo a Claude**: tocás "Ya la imprimí" o "Publicar" y le llega a la conversación que publicó el panel, que lo hace y te contesta. Si en ese momento Claude está trabajando en otra cosa, lo hace cuando termina. Si la página no puede mandarlo (por ejemplo, desde una conversación que ya no está), el botón copia el pedido para que lo pegues en el chat.
 
 ### La guía
 

@@ -327,10 +327,12 @@ def hechos(p: dict) -> set[str]:
 
 
 def grupo_de(p: dict) -> str:
+    """pendiente (idea), en_proceso o terminada. Imprimirla antes de publicarla es opcional (0.1.39): una pieza
+    publicada en la tienda está terminada aunque no esté impresa; se imprime cuando la compren."""
     h = hechos(p)
     if h == {"idea"}:
         return "pendiente"
-    return "terminada" if "impresa" in h else "en_proceso"
+    return "terminada" if "impresa" in h or estado_publicacion(p) == "publicada" else "en_proceso"
 
 
 def siguiente(p: dict) -> str | None:
@@ -341,17 +343,24 @@ def siguiente(p: dict) -> str | None:
     if "laminada" not in h:
         return "Dejarla lista para imprimir en tu impresora: /taller-3d:pieza."
     if "impresa" not in h:
+        estado = estado_publicacion(p)
+        if estado == "publicada":
+            return None
+        if estado == "borrador" or "en_tienda" in h:
+            return "Revisar el borrador en tu tienda y publicarlo. Imprimirla puede esperar a que te la compren."
+        if estado == "vista_previa":
+            return "Ver cómo queda su publicación y cargarla como borrador (en Publicaciones), o imprimirla antes."
         return ("Imprimirla: pasá el G-code a la impresora (abrí el .3mf para verla en Orca) y después "
                 "contale a Claude cómo salió.")
     return None
 
 
 def quien_sigue(p: dict) -> str | None:
-    """A quién le toca el paso que sigue: "claude" (se lo pedís y lo hace), "vos" (imprimirla) o None."""
+    """A quién le toca el paso que sigue: "claude" (se lo pedís y lo hace), "vos" (imprimirla o publicarla) o None."""
     h = hechos(p)
     if h == {"idea"} or "laminada" not in h:
         return "claude"
-    return "vos" if "impresa" not in h else None
+    return "vos" if siguiente(p) else None
 
 
 def _en_una_linea(texto, largo: int = 80) -> str:
@@ -362,6 +371,7 @@ def _en_una_linea(texto, largo: int = 80) -> str:
 
 
 ABRIR_EN_ORCA = "Abrila en Orca"
+PUBLICAR = "Publicar"
 # El botón de arriba del panel: las fotos no se pueden mandar desde la página, se adjuntan en el chat.
 PEDIDO_FOTO = "Quiero una pieza a partir de una foto: te la adjunto en el chat."
 # Otro botón de arriba: un STL que el usuario ya tiene (suyo o bajado) sigue el mismo circuito, sin modelar.
@@ -401,14 +411,26 @@ def acciones(p: dict) -> list[tuple[str, str]]:
     if h == {"idea"}:
         return [("Diseñala", f"Desde el panel: diseñá la idea {cual} y dejala lista para imprimir."),
                 ("Solo el modelo", f"Desde el panel: hacé solo el modelo 3D de la idea {cual}, sin laminar.")]
+    botones = []
     if "laminada" not in h:
-        return [("Dejala lista para imprimir", f"Desde el panel: dejá {cual} lista para imprimir.")]
-    if "impresa" not in h:
-        return [(ABRIR_EN_ORCA, f"Desde el panel: abrí {cual} en Orca para que la vea."),
-                ("Ya la imprimí", f"Desde el panel: ya imprimí {cual}. Marcala como impresa y preguntame cómo salió.")]
-    if "en_tienda" not in h:
-        return [("Publicala", f"Desde el panel: armá la publicación de {cual} para la tienda.")]
-    return [("Revisá el precio", f"Desde el panel: revisá el precio de {cual}.")]
+        botones.append(("Dejala lista para imprimir", f"Desde el panel: dejá {cual} lista para imprimir."))
+    elif "impresa" not in h:
+        botones += [(ABRIR_EN_ORCA, f"Desde el panel: abrí {cual} en Orca para que la vea."),
+                    ("Ya la imprimí", f"Desde el panel: ya imprimí {cual}. Marcala como impresa y preguntame cómo salió.")]
+    # «Publicar» no espera a la impresión (0.1.39): hay piezas que el usuario sabe que andan, o un STL que ya probó.
+    # Está hasta que la pieza tiene su publicación; después la siguen los botones de Publicaciones.
+    if "en_tienda" not in h and not estado_publicacion(p):
+        if "impresa" in h:
+            pedido = f"Desde el panel: armá la publicación de {cual} para la tienda."
+        elif "laminada" in h:
+            pedido = f"Desde el panel: armá la publicación de {cual} para la tienda, sin imprimirla antes."
+        else:
+            pedido = (f"Desde el panel: armá la publicación de {cual} para la tienda, sin imprimirla antes. "
+                      "Laminala solo para sacar el tiempo, los gramos y el costo.")
+        botones.append((PUBLICAR, pedido))
+    elif "impresa" in h:
+        botones.append(("Revisá el precio", f"Desde el panel: revisá el precio de {cual}."))
+    return botones
 
 
 def _rutas_del_listado(listado) -> list[str]:
@@ -778,8 +800,12 @@ def _tarjeta(p: dict, modo: str = "archivo", imagenes: dict | None = None) -> st
                      for i, (clave, etiqueta) in enumerate(PASOS))
     sigue = siguiente(p)
     quien = {"vos": "Te toca", "claude": "Le toca a Claude"}.get(quien_sigue(p) or "", "Sigue")
-    paso = (f'<p class="sigue {e(quien_sigue(p) or "")}"><strong>{quien}:</strong> {e(sigue)}</p>' if sigue
-            else '<p class="terminada">Terminada.</p>')
+    if sigue:
+        paso = f'<p class="sigue {e(quien_sigue(p) or "")}"><strong>{quien}:</strong> {e(sigue)}</p>'
+    elif "impresa" not in h:                             # publicada sin imprimirla antes
+        paso = '<p class="terminada">En la tienda, sin imprimir: cuando te la compren, el G-code ya está listo.</p>'
+    else:
+        paso = '<p class="terminada">Terminada.</p>'
     filas = []
     if p.get("impresora"):
         filas.append(("Impresora", p["impresora"]))
@@ -808,9 +834,11 @@ def _tarjeta(p: dict, modo: str = "archivo", imagenes: dict | None = None) -> st
     # En claude.ai, "Abrila en Orca" lleva su .3mf (relativo a la carpeta de trabajo, sin rutas de la PC): la página
     # le pide a la app de Claude que lo abra con el servidor local taller3d-orca; si no puede, se lo pide a Claude.
     proyecto = proyecto_de(p) if modo == "claude" else None
+    # «Publicar» de una pieza sin laminar también arranca un laminado: lleva la impresora de arriba.
     botones = "".join(f'<button type="button" data-pedido="{e(pedido)}"'
                       + (f' data-orca="{e(proyecto)}"' if proyecto and etiqueta == ABRIR_EN_ORCA else "")
-                      + (" data-impresora" if etiqueta in CON_IMPRESORA else "")
+                      + (" data-impresora" if etiqueta in CON_IMPRESORA
+                         or etiqueta == PUBLICAR and "laminada" not in h else "")
                       + f'>{e(etiqueta)}</button>' for etiqueta, pedido in acciones(p))
     botones += '<button type="button" class="solo-claude" data-comentar>Otra cosa…</button>'
     fecha = p.get("fecha") or ""

@@ -1923,10 +1923,12 @@ class TestCatalogo(unittest.TestCase):
         self.assertEqual(cat.hechos(pieza), {"idea", "disenada", "laminada", "impresa", "en_tienda"})
         self.assertIsNone(cat.siguiente(pieza))
         self.assertTrue(cat.resumen_corto(c).startswith("Nada pendiente: 1 pieza terminada."))
-        # A la tienda antes de imprimirla (imagen ilustrativa): todavía falta imprimirla
+        # A la tienda antes de imprimirla, sin publicación anotada (producto.json de antes de la 0.1.30): es un
+        # borrador, todavía falta publicarlo
         otra = cat.agregar(c, "impresiones/2026-11-21_llavero_creality-hi", estado="en_tienda",
                            archivos=["llavero_creality-hi.gcode"])
         self.assertEqual((cat.grupo_de(otra), "impresa" in cat.hechos(otra)), ("en_proceso", False))
+        self.assertIn("Revisar el borrador", cat.siguiente(otra))
         # Solo se sacan ideas
         with self.assertRaises(SystemExit):
             cat.quitar_idea(c, carpeta)
@@ -2037,9 +2039,9 @@ class TestPanelEnClaude(unittest.TestCase):
         impresa = cat.agregar(c, "impresiones/2026-11-15_llavero_creality-hi", nombre="Llavero", estado="impresa",
                               archivos=["llavero_creality-hi.gcode", "vista.png", "foto.jpg"])
         self.assertEqual([x[0] for x in cat.acciones(idea)], ["Diseñala", "Solo el modelo"])
-        self.assertEqual([x[0] for x in cat.acciones(lista)], ["Abrila en Orca", "Ya la imprimí"])
+        self.assertEqual([x[0] for x in cat.acciones(lista)], ["Abrila en Orca", "Ya la imprimí", "Publicar"])
         self.assertIn("(impresiones/2026-11-21_soporte_creality-hi)", cat.acciones(lista)[0][1])
-        self.assertEqual([x[0] for x in cat.acciones(impresa)], ["Publicala"])
+        self.assertEqual([x[0] for x in cat.acciones(impresa)], ["Publicar"])
         # La foto de producto de Blender va antes que la vista, pero la foto real va primero
         self.assertEqual(cat.imagen_de(lista), "producto/producto-1-principal.jpg")
         self.assertEqual(cat.imagen_de(impresa), "foto.jpg")
@@ -2108,6 +2110,63 @@ class TestPanelEnClaude(unittest.TestCase):
         self.assertNotIn('data-pedido="La Creality Hi me costó $…"', con_taller)
         self.assertIn("form.dato", con_taller)
 
+    def test_publicar_sin_imprimir(self):
+        """0.1.39: «Publicar» está en cada pieza con modelo, impresa o no, hasta que tiene su publicación. Una pieza
+        publicada sin imprimir está terminada: se imprime cuando la compren."""
+        import catalogo as cat
+        c = {"version": 1, "piezas": []}
+        disenada = cat.agregar(c, "impresiones/2026-11-22_kabuto_ender-3-v3-plus", nombre="Kabuto",
+                               archivos=["pieza.stl", "vista.png"])
+        lista = cat.agregar(c, "impresiones/2026-11-22_cubo_ender-3-v3-plus", nombre="Cubo",
+                            archivos=["cubo_ender-3-v3-plus.gcode", "cubo_ender-3-v3-plus.3mf"])
+        impresa = cat.agregar(c, "impresiones/2026-11-15_llavero_ender-3-v3-plus", nombre="Llavero", estado="impresa",
+                              archivos=["llavero_ender-3-v3-plus.gcode"])
+        botones = {p["nombre"]: dict(cat.acciones(p)) for p in (disenada, lista, impresa)}
+        self.assertEqual(list(botones["Kabuto"]), ["Dejala lista para imprimir", "Publicar"])
+        self.assertIn("sin imprimirla antes. Laminala solo para sacar el tiempo, los gramos y el costo.",
+                      botones["Kabuto"]["Publicar"])
+        self.assertTrue(botones["Kabuto"]["Publicar"].startswith(
+            "Desde el panel: armá la publicación de «Kabuto» (impresiones/2026-11-22_kabuto_ender-3-v3-plus)"))
+        self.assertEqual(list(botones["Cubo"]), ["Abrila en Orca", "Ya la imprimí", "Publicar"])
+        self.assertTrue(botones["Cubo"]["Publicar"].endswith("para la tienda, sin imprimirla antes."))
+        self.assertEqual(botones["Llavero"]["Publicar"],
+                         "Desde el panel: armá la publicación de «Llavero» (impresiones/2026-11-15_llavero_ender-3-v3-plus) "
+                         "para la tienda.")
+        def tarjeta_de(pagina, nombre):                  # la tarjeta de la pieza, no la de su publicación
+            for articulo in pagina.split("<article")[1:]:
+                if 'data-tipo="publicacion"' not in articulo.split(">", 1)[0] and f"<h3>{nombre}</h3>" in articulo:
+                    return articulo.split("</article>")[0]
+            self.fail(f"No está la tarjeta de {nombre}")
+        # Sin laminar, «Publicar» también arranca un laminado: lleva la impresora de arriba; laminada, no
+        pagina = cat.generar_html(c)
+        tarjeta = {n: tarjeta_de(pagina, n) for n in ("Kabuto", "Cubo", "Llavero")}
+        self.assertRegex(tarjeta["Kabuto"], r'data-pedido="[^"]*Laminala[^"]*" data-impresora>Publicar</button>')
+        self.assertRegex(tarjeta["Cubo"], r'data-pedido="[^"]*sin imprimirla antes\."[^>]*>Publicar</button>')
+        self.assertNotIn("data-impresora>Publicar", tarjeta["Cubo"])
+        # Con la publicación armada, la siguen los botones de Publicaciones: en la tarjeta ya no está «Publicar»
+        vista = {"titulo": "Cubo", "vista": cat.VISTA_PUBLICACION, "estado": "vista_previa"}
+        cat.agregar(c, lista["carpeta"], publicacion=vista)
+        self.assertEqual([x[0] for x in cat.acciones(lista)], ["Abrila en Orca", "Ya la imprimí"])
+        self.assertIn("cargarla como borrador", cat.siguiente(lista))
+        self.assertEqual((cat.grupo_de(lista), cat.quien_sigue(lista)), ("en_proceso", "vos"))
+        # Cargada como borrador: te toca publicarla en tu tienda; imprimirla puede esperar
+        cat.agregar(c, lista["carpeta"], publicacion={**vista, "estado": "borrador"}, estado="en_tienda", id_tienda=7)
+        self.assertIn("Revisar el borrador en tu tienda", cat.siguiente(lista))
+        self.assertEqual(cat.grupo_de(lista), "en_proceso")
+        # Publicada sin imprimir: terminada, con el G-code listo para cuando la compren
+        cat.agregar(c, lista["carpeta"], publicacion={**vista, "estado": "publicada"})
+        self.assertEqual((cat.grupo_de(lista), cat.siguiente(lista), cat.quien_sigue(lista)), ("terminada", None, None))
+        self.assertNotIn("impresa", cat.hechos(lista))
+        self.assertEqual([x[0] for x in cat.acciones(lista)], ["Abrila en Orca", "Ya la imprimí"])
+        pagina = cat.generar_html(c)
+        cubo = tarjeta_de(pagina, "Cubo")              # empieza con los atributos del <article>
+        self.assertIn('data-grupo="terminada"', cubo.split(">", 1)[0])
+        self.assertIn("En la tienda, sin imprimir: cuando te la compren, el G-code ya está listo.", cubo)
+        # Impresa y en la tienda: como antes
+        cat.agregar(c, impresa["carpeta"], estado="en_tienda")
+        self.assertEqual([x[0] for x in cat.acciones(impresa)], ["Revisá el precio"])
+        self.assertTrue(cat.resumen_corto(c).startswith("Tenés 1 pieza diseñada sin laminar."))
+
     def test_selector_de_impresora(self):
         """Para arrancar una pieza se elige la impresora entre las preparadas y las de Orca sin preparar en este taller:
         el panel las muestra en un selector y los botones que arrancan una pieza le dicen a Claude en cuál."""
@@ -2151,8 +2210,10 @@ class TestPanelEnClaude(unittest.TestCase):
                           '<option value="Creality Hi">Creality Hi · sin preparar</option>'
                           '<option value="">Que me pregunte Claude</option></select>', pagina)
             self.assertIn("La que elegís en la ventana de Orca no le llega a Claude", pagina)
-            # Solo los botones que arrancan una pieza llevan la impresora
-            self.assertEqual(pagina.count(" data-impresora"), 4, modo)
+            # Solo los botones que arrancan una pieza llevan la impresora (también «Publicar» de la caja, que la
+            # lamina primero; el de la tapa, ya laminada, no)
+            self.assertEqual(pagina.count(" data-impresora"), 5, modo)
+            self.assertEqual(pagina.count(" data-impresora>Publicar</button>"), 1, modo)
             for etiqueta in ("Diseñala", "Dejala lista para imprimir"):
                 self.assertIn(f" data-impresora>{etiqueta}</button>", pagina)
             for etiqueta in ("Solo el modelo", "Abrila en Orca", "Ya la imprimí"):

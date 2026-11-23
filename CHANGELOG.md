@@ -1,5 +1,15 @@
 # Cambios
 
+## 0.1.39 (23/11/2026)
+
+**Botón «Publicar» en cada pieza, impresa o no.** Pedido de Leo: «quisiera que exista un botón que diga publicar que no dependa de si ya lo imprimí… hay productos que yo sé que van a funcionar porque los conozco o bien porque yo ya subo el STL».
+
+- **Panel:** «Publicar» está en cada pieza con modelo (diseñada, lista para imprimir o impresa) hasta que tiene su publicación; después la siguen los botones de «Publicaciones». Antes, «Publicala» aparecía recién con la pieza impresa. Sin imprimir, el pedido dice «sin imprimirla antes»; sin laminar, también «Laminala solo para sacar el tiempo, los gramos y el costo», y lleva la impresora elegida arriba, como los botones que arrancan una pieza.
+- **Publicada sin imprimir está terminada:** pasa a «Terminadas» con «En la tienda, sin imprimir: cuando te la compren, el G-code ya está listo», y sigue teniendo «Abrila en Orca» y «Ya la imprimí». Con la publicación armada sin imprimir, el paso que sigue es verla y cargarla como borrador; con el borrador en la tienda, revisarlo y publicarlo.
+- **`/publicar`:** sin G-code y con ese pedido, lamina la pieza sin preguntar (secciones 3 y 4 de `/pieza`), solo para el costo. Las fotos son de producto hechas en la computadora y la descripción lo aclara; se dice una vez, sin insistir en imprimirla.
+- `MANUAL.md`, las skills `panel` y `publicar` y `references/panel-al-costado.md` lo explican.
+- 1 prueba nueva (125 en total, 1 se saltea): los botones en cada paso, la impresora en el pedido sin laminar, y la pieza con la publicación armada, en borrador y publicada sin imprimir.
+
 ## 0.1.38 (23/11/2026)
 
 - **Panel: volver atrás «Ya la imprimí» ahora sí la saca de impresas.** `catalogo.py agregar --estado disenada` o `--estado laminada` (a mano, por ejemplo después de tocar «Ya la imprimí» por error) borra la marca de impresa que se guardaba aunque cambiara el paso; antes la pieza seguía figurando como impresa y terminada. Lo que deduce el paso solo (con el G-code, por ejemplo) no la borra. Prueba nueva en `test_panel_por_linea_de_comandos`.
