@@ -1,5 +1,9 @@
 # Cambios
 
+## 0.1.38 (23/11/2026)
+
+- **Panel: volver atrás «Ya la imprimí» ahora sí la saca de impresas.** `catalogo.py agregar --estado disenada` o `--estado laminada` (a mano, por ejemplo después de tocar «Ya la imprimí» por error) borra la marca de impresa que se guardaba aunque cambiara el paso; antes la pieza seguía figurando como impresa y terminada. Lo que deduce el paso solo (con el G-code, por ejemplo) no la borra. Prueba nueva en `test_panel_por_linea_de_comandos`.
+
 ## 0.1.37 (23/11/2026)
 
 **Los productos van a las categorías que les corresponden en tu tienda.** Pedido de Leo: «cuando lo subís podés agregarlo ya a las categorías que corresponde el producto?».

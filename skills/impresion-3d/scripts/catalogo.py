@@ -1222,6 +1222,8 @@ def main(argv=None) -> None:
             extra.setdefault("estado", "en_tienda")
         if args.estado:
             extra["estado"] = args.estado
+            if args.estado in ("disenada", "laminada"):
+                extra["impresa"] = False           # volver atrás a mano («no la imprimí»): deja de contar como impresa
         if args.moneda and extra.get("precio"):
             extra["precio"]["moneda"] = args.moneda
         pieza = agregar(catalogo, args.carpeta, nombre=args.nombre, tipo=args.tipo, fecha=args.fecha,

@@ -1954,6 +1954,13 @@ class TestCatalogo(unittest.TestCase):
         correr("agregar", "--catalogo", str(indice), "--carpeta", "disenos/2026-11-22_caja-con-tapa",
                "--de-idea", "ideas/2026-11-21_caja-con-tapa")
         self.assertIn("sigue: Dejarla lista para imprimir", correr("resumen", "--catalogo", str(indice)))
+        # 0.1.38: «ya la imprimí» por error y vuelta atrás a mano: deja de contar como impresa
+        correr("agregar", "--catalogo", str(indice), "--carpeta", "disenos/2026-11-22_caja-con-tapa", "--estado", "impresa")
+        correr("agregar", "--catalogo", str(indice), "--carpeta", "disenos/2026-11-22_caja-con-tapa", "--estado", "laminada")
+        import catalogo as cat
+        caja = next(p for p in json.loads(indice.read_text(encoding="utf-8"))["piezas"] if p["carpeta"].endswith("caja-con-tapa"))
+        self.assertNotIn("impresa", cat.hechos(caja))
+        self.assertEqual(cat.grupo_de(caja), "en_proceso")
         correr("html", "--catalogo", str(indice), "--salida", str(tmp / "panel.html"))
         self.assertIn("Panel del taller", (tmp / "panel.html").read_text())
         # Con las impresoras de Orca (impresora.py detectar --json): el selector y «Tu taller»
