@@ -122,7 +122,7 @@ No pasa nada: Claude te pregunta lo que falta. Lo único que no inventa son las 
 
 ## Dónde quedan tus archivos
 
-En tu carpeta de trabajo, la que elegiste al instalar (si apretaste Enter, `Documentos/Taller 3D`). Para usar otra, movela vos a donde quieras y decile a Claude la ruta nueva: te pide acceso y sigue desde ahí.
+En tu carpeta de trabajo, que es siempre **`Taller 3D` dentro de tus documentos** (`Documentos/Taller 3D`; en Windows, `Documentos\Taller 3D`). Todas las piezas van ahí, una carpeta por pieza dentro de `impresiones`. Si tenías un taller en otra carpeta (de antes de la versión 0.1.34), pedile a Claude que lo mude: "mudá mi taller a Taller 3D".
 
 ```
 panel.html              el panel del taller: tus ideas y piezas y en qué paso está cada una (doble clic)

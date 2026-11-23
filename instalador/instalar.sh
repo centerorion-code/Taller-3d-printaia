@@ -26,11 +26,11 @@
 #                       (portable o en un contenedor); saltea la búsqueda
 #     --datos-orca      carpeta de datos de ese Orca (por defecto ~/.config/OrcaSlicer)
 #     --carpeta-apps    dónde guardar el AppImage (por defecto ~/Aplicaciones o ~/Applications)
-#     --carpeta-trabajo carpeta del taller (por defecto <Documentos>/Taller 3D)
+#     --carpeta-trabajo solo para probar el instalador: el taller guarda siempre en <Documentos>/Taller 3D
 #     --sin-app         no tocar la configuración de la app de Claude
 set -euo pipefail
 
-VERSION_PLUGIN="0.1.33"
+VERSION_PLUGIN="0.1.34"
 ORCA_VERSION="2.5.1"
 ORCA_ARCHIVO="OrcaSlicer_Linux_AppImage_Ubuntu2404_V${ORCA_VERSION}.AppImage"
 ORCA_URL="https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v${ORCA_VERSION}/${ORCA_ARCHIVO}"
@@ -133,19 +133,21 @@ if [ -z "$CARPETA_APPS" ]; then
   if [ -d "$HOME/Aplicaciones" ]; then CARPETA_APPS="$HOME/Aplicaciones"; else CARPETA_APPS="$HOME/Applications"; fi
 fi
 APP_OFICIAL="$CARPETA_APPS/$ORCA_ARCHIVO"
-# Carpeta de trabajo: la que pasaste con --carpeta-trabajo, la de una instalación anterior o,
-# si no hay ninguna, se pregunta en el paso 4 (proponiendo Documentos/Taller 3D).
-CARPETA_ELEGIDA=0
-if [ -n "$CARPETA_TRABAJO" ]; then
-  CARPETA_ELEGIDA=1
-elif [ -f "$MANIFIESTO" ]; then
-  ANTERIOR="$(carpeta_anotada)"
-  if [ -n "$ANTERIOR" ] && [ -f "$ANTERIOR/taller-3d/config.json" ]; then CARPETA_TRABAJO="$ANTERIOR"; CARPETA_ELEGIDA=1; fi
-fi
+# Carpeta de trabajo: siempre "Taller 3D" dentro de la carpeta de documentos (desde la 0.1.34 no se pregunta
+# ni se sigue usando la de una instalación anterior). Si antes se usó otra, se avisa en el paso 4 para mudarla.
+CARPETA_ANTERIOR=""
 if [ -z "$CARPETA_TRABAJO" ]; then
   DOCS="$(xdg-user-dir DOCUMENTS 2>/dev/null || true)"
-  [ -n "$DOCS" ] && [ "$DOCS" != "$HOME" ] || DOCS="$HOME/Documentos"
+  if [ -z "$DOCS" ] || [ "$DOCS" = "$HOME" ]; then
+    if [ ! -d "$HOME/Documentos" ] && [ -d "$HOME/Documents" ]; then DOCS="$HOME/Documents"; else DOCS="$HOME/Documentos"; fi
+  fi
   CARPETA_TRABAJO="$DOCS/Taller 3D"
+  if [ -f "$MANIFIESTO" ]; then
+    ANTERIOR="$(carpeta_anotada)"
+    if [ -n "$ANTERIOR" ] && [ "$ANTERIOR" != "$CARPETA_TRABAJO" ] && [ -f "$ANTERIOR/taller-3d/config.json" ]; then
+      CARPETA_ANTERIOR="$ANTERIOR"
+    fi
+  fi
 fi
 CONFIG="$CARPETA_TRABAJO/taller-3d/config.json"
 LANZADOR="$HOME/.local/bin/orca-slicer-taller"
@@ -485,22 +487,11 @@ fi
 
 # --- 4. Carpeta de trabajo ---------------------------------------------------------------------
 paso "Carpeta de trabajo"
-if [ "$CARPETA_ELEGIDA" -eq 0 ] && [ ! -f "$CONFIG" ]; then
-  info "Acá van a quedar tus diseños, impresiones (con sus vistas y G-code), respaldos y la configuración."
-  if [ "$PRUEBA" -eq 1 ]; then
-    info "[prueba] te preguntaría dónde guardarlos (si apretás Enter: $CARPETA_TRABAJO)"
-  else
-    while :; do
-      read -r -p "   ¿Dónde los guardo? Enter = $CARPETA_TRABAJO, o escribí otra carpeta: " r
-      [ -n "$r" ] || break
-      r="${r/#\~/$HOME}"
-      case "$r" in /*) ;; *) info "Escribí la ruta completa (que empiece con / o con ~)."; continue ;; esac
-      r="${r%/}"
-      if [ -e "$r" ] && [ ! -d "$r" ]; then info "'$r' es un archivo, no una carpeta."; continue; fi
-      case "$r/" in "$HOME/.config/OrcaSlicer/"*|"$HOME/.var/"*|"$HOME/") info "Elegí una carpeta propia (no la de Orca ni tu carpeta personal entera)."; continue ;; esac
-      CARPETA_TRABAJO="$r"; CONFIG="$CARPETA_TRABAJO/taller-3d/config.json"; break
-    done
-  fi
+info "Tus piezas (con sus vistas y G-code), los respaldos y la configuración se guardan siempre en:"
+info "  $CARPETA_TRABAJO"
+if [ -n "$CARPETA_ANTERIOR" ]; then
+  info "Antes usabas $CARPETA_ANTERIOR. No la toco:"
+  info "  pedile a Claude que mude tus piezas a la carpeta nueva (/taller-3d:instalar)."
 fi
 for d in impresiones disenos respaldos calibraciones "taller-3d/impresoras"; do
   [ -d "$CARPETA_TRABAJO/$d" ] || hacer mkdir -p "$CARPETA_TRABAJO/$d"
@@ -508,7 +499,7 @@ done
 if [ -f "$CONFIG" ]; then
   YA_CONFIGURADO=1
   info "Ya existe la configuración: $CONFIG (solo le anoto tu ACEPTO si no estaba)."
-  # Sin esto, una corrida sin --carpeta-trabajo vuelve a proponer Documentos/Taller 3D aunque uses otra.
+  # Queda anotada para que el desinstalador la conserve.
   [ "$(carpeta_anotada)" = "$CARPETA_TRABAJO" ] || anotar carpeta-usada "$CARPETA_TRABAJO"
   if [ "$PRUEBA" -eq 0 ]; then
     ACEPTACION_FECHA="$ACEPTACION_FECHA" VERSION_PLUGIN="$VERSION_PLUGIN" \
@@ -698,8 +689,8 @@ Próximos pasos (ya tenías el taller: esto fue una actualización):
   1. Si cambió la configuración de la app, cerrala del todo (también desde la bandeja) y volvé a abrirla.
   2. En Claude escribí: /taller-3d:instalar
      Claude revisa que todo ande y te dice qué quedó nuevo.
-  Si la carpeta de trabajo de arriba no es la que usás con Claude, corré de nuevo con
-  --carpeta-trabajo "<la tuya>" (por ejemplo la que conectaste en la app).
+  El taller guarda siempre en la carpeta de trabajo de arriba. Si tenías piezas en otra,
+  pedile a Claude que las mude: /taller-3d:instalar
 EOF_ACTUALIZAR
   exit 0
 fi

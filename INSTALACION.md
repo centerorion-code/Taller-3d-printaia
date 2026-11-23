@@ -50,13 +50,13 @@ Más adelante el taller va a estar también en el directorio de plugins de Anthr
    - si faltan bibliotecas del sistema que Orca necesita (OpenGL, WebKitGTK 4.1) o `fuse3` (lo usa el AppImage), te ofrece instalarlas con `sudo apt` (pide tu contraseña; podés decir que no: sin `fuse3`, Orca igual abre, más lento);
    - crea un lanzador (`~/.local/bin/orca-slicer-taller`) para que Claude use tus perfiles, y el acceso directo del menú si instaló Orca;
    - instala **orca-mcp 0.1.0** (licencia MIT), la conexión entre Claude y Orca, con `uv` o `pipx`;
-   - te pregunta dónde guardar tus archivos (Enter = `Documentos/Taller 3D`) y crea ahí la carpeta de trabajo con su configuración;
+   - crea la carpeta de trabajo con su configuración, siempre en `Documentos/Taller 3D` (si tenías un taller en otra carpeta, te avisa para que Claude lo mude);
    - si tu Orca es de Flatpak y no puede ver la carpeta de trabajo, te ofrece darle acceso solo a esa carpeta;
    - te muestra la entrada para la app de Claude y, si querés, la agrega con una copia de respaldo de tu configuración.
    Todo queda anotado en `~/.local/state/taller-3d/` (registro y lista de lo instalado).
 5. Cerrá y abrí la app de Claude.
 
-Opciones: `--orca RUTA` (un Orca que ya tengas: ejecutable, AppImage o el script que lo abre), `--datos-orca DIR` (su carpeta de datos), `--carpeta-apps DIR` (dónde guardar Orca), `--carpeta-trabajo DIR`, `--sin-app` (no tocar la configuración de la app).
+Opciones: `--orca RUTA` (un Orca que ya tengas: ejecutable, AppImage o el script que lo abre), `--datos-orca DIR` (su carpeta de datos), `--carpeta-apps DIR` (dónde guardar Orca), `--sin-app` (no tocar la configuración de la app).
 
 **Orca en un contenedor (distrobox, toolbox, Docker):** Claude le pasa a Orca rutas de tu PC (el modelo, los perfiles y la carpeta de salida), así que el contenedor tiene que ver tu carpeta personal en la misma ruta. distrobox y toolbox lo hacen solos; en Docker, montá `$HOME` en `$HOME`. Si no, instalá el oficial al lado.
 
@@ -77,12 +77,12 @@ Opciones: `--orca RUTA` (un Orca que ya tengas: ejecutable, AppImage o el script
    - si la app de Claude es la versión empaquetada de Windows (MSIX, la que se baja hoy de claude.ai), te ofrece **mover la carpeta de datos de Orca** de `%APPDATA%\OrcaSlicer` a `C:\Users\<vos>\OrcaSlicer` y dejar un acceso en el lugar de siempre. Hace falta porque Windows guarda en un lugar privado los archivos nuevos que esa app crea dentro de AppData, y Orca no los vería. Orca sigue funcionando igual;
    - usa el Orca que ya tengas (instalado o portable). Si no hay, baja el **instalador oficial de OrcaSlicer 2.5.1** (x64 o ARM64), verifica su huella SHA-256 y su firma digital (ORCASLICER PTE. LTD.) y lo abre para que lo instales vos (Windows te pide permiso);
    - instala **orca-mcp 0.1.0** con uv. Si no tenés uv, baja la versión oficial 0.13.9 y verifica su huella;
-   - te pregunta dónde guardar tus archivos (Enter = `Documentos\Taller 3D`; fuera de AppData) y crea ahí la carpeta de trabajo con su configuración;
+   - crea la carpeta de trabajo con su configuración, siempre en `Documentos\Taller 3D` (si tenías un taller en otra carpeta, te avisa para que Claude lo mude);
    - con la app de Claude cerrada, agrega orca-mcp a su configuración, con copia de respaldo.
    Todo queda anotado en `%LOCALAPPDATA%\taller-3d\` (registro y lista de lo instalado).
 5. Abrí la app de Claude.
 
-Opciones (en PowerShell): `-Orca "<ruta de orca-slicer.exe>"` (por ejemplo, uno portable), `-CarpetaTrabajo "<carpeta>"`, `-SinApp`.
+Opciones (en PowerShell): `-Orca "<ruta de orca-slicer.exe>"` (por ejemplo, uno portable), `-SinApp`.
 
 **Si preferís WSL con Ubuntu:** se puede usar el instalador de Linux adentro de WSL, pero no lo recomendamos: Orca abre como ventana de Linux y la app de Claude de Windows no ve orca-mcp sin configurarlo a mano. El instalador de Linux avisa si detecta WSL.
 

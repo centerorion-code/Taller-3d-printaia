@@ -1,5 +1,15 @@
 # Cambios
 
+## 0.1.34 (22/11/2026)
+
+**Una sola carpeta para todo: `Documentos/Taller 3D`.**
+
+- La carpeta de trabajo es siempre `Taller 3D` dentro de los documentos del usuario (`Documentos/Taller 3D` en Linux, `Documentos\Taller 3D` en Windows, `Documents/Taller 3D` en macOS). Los instaladores ya no preguntan dónde guardar ni siguen usando la carpeta de una instalación anterior; si había un taller en otra, avisan («Antes usabas …») y no la tocan. `--carpeta-trabajo` y `-CarpetaTrabajo` quedan solo para probar el instalador.
+- `/taller-3d:instalar` y la skill base usan esa carpeta sin preguntar. Si encuentran un taller en otra carpeta, o dos, ofrecen mudarlo.
+- **`mudar_taller.py`** y la guía «Mudar un taller de otra carpeta» (`/taller-3d:instalar`, sección 3): une la configuración (manda la más completa y la otra completa lo que falte; quedan las impresoras de las dos), el catálogo (todas las piezas; avisa las carpetas repetidas) y el historial, y dice qué carpetas mover. No mueve ni borra archivos.
+- En Linux sin `xdg-user-dir`, el instalador usa `~/Documents` si existe y no hay `~/Documentos`.
+- 3 pruebas nuevas (111 en total).
+
 ## 0.1.33 (2026-11-22)
 
 - **Daño y desgaste que se ven naturales:** para utilería y réplicas, los golpes, tajos y rayones ya no se hacen restando formas (dejaban cortes perfectos): se deforma la malla. `cad.py` suma `desgastar` con `marca_golpe` (hundimiento de bordes suaves con labio), `marca_tajo` (surco con el material corrido a un costado y astillados), `marca_rayon` (tiembla, cambia de hondo y se corta) y `marca_picadura`, y `deformar` para cualquier otra deformación. Una pared abollada conserva su espesor.

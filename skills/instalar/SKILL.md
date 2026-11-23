@@ -27,7 +27,7 @@ Con `get_device_info` y las herramientas de Orca, armar una tabla corta de estad
 
 Si todo está bien, decirlo y ofrecer la pieza de prueba (paso 5). Si algo falta, seguir solo con lo que corresponda.
 
-**Sonda de `taller3d-orca`** (no abre nada): llamar a `abrir_en_orca` con la ruta absoluta de un `.3mf` que no existe dentro de la carpeta de trabajo, por ejemplo `<trabajo>/taller-3d/sonda-no-existe.3mf`. Si contesta «No existe ese proyecto en la carpeta de trabajo», atiende esta carpeta. Si contesta «Solo abro proyectos que estén dentro de la carpeta de trabajo…», atiende otra (pasa si hay dos carpetas de trabajo o si el instalador corrió con otra): el botón «Abrila en Orca» no va a andar. Arreglo: que corra de nuevo `bash instalar.sh --carpeta-trabajo "<trabajo>"` y, cuando lo pida, **cierre la app de Claude del todo** (Salir desde el ícono de la bandeja; cerrar la ventana no alcanza), porque la app reescribe su configuración con lo que tiene en memoria y pisaría el cambio. Desde la 0.1.29 el instalador no escribe mientras la app siga abierta. El programa atiende una sola carpeta: si el usuario tiene dos, preguntarle cuál usa y ofrecer pasar a esa lo que sirva de la otra.
+**Sonda de `taller3d-orca`** (no abre nada): llamar a `abrir_en_orca` con la ruta absoluta de un `.3mf` que no existe dentro de la carpeta de trabajo, por ejemplo `<trabajo>/taller-3d/sonda-no-existe.3mf`. Si contesta «No existe ese proyecto en la carpeta de trabajo», atiende esta carpeta. Si contesta «Solo abro proyectos que estén dentro de la carpeta de trabajo…», atiende otra (pasa si hay dos carpetas de trabajo o si el instalador corrió con otra): el botón «Abrila en Orca» no va a andar. Arreglo: que corra de nuevo `bash instalar.sh` (desde la 0.1.34 apunta siempre a `Documentos/Taller 3D`) y, cuando lo pida, **cierre la app de Claude del todo** (Salir desde el ícono de la bandeja; cerrar la ventana no alcanza), porque la app reescribe su configuración con lo que tiene en memoria y pisaría el cambio. Desde la 0.1.29 el instalador no escribe mientras la app siga abierta. El programa atiende una sola carpeta: si el usuario tiene dos, preguntarle cuál usa y ofrecer pasar a esa lo que sirva de la otra.
 
 **Orca que no aparece:** si `check_installation` no lo encuentra, preguntar si usa uno portable (sin instalar) o en un contenedor (distrobox, toolbox, Docker). En ese caso el instalador lo usa con `--orca <ruta>` (Linux) o `-Orca <ruta>` (Windows). Con Docker, Orca tiene que ver la carpeta personal en la misma ruta; si no, recomendar el oficial al lado.
 
@@ -55,11 +55,11 @@ La app de Claude de Windows es un paquete MSIX: Windows manda a una carpeta priv
 
 Hacen falta dos: la **carpeta de trabajo** (diseños, impresiones con sus vistas y G-code, respaldos y configuración) y la **carpeta de perfiles de usuario de Orca** (`user/<id>`, que tiene `process`, `filament` y `machine`). La app solo conecta carpetas que ya existen: primero ubicarlas, después crear la de trabajo si falta y recién ahí pedir acceso a las dos en **un solo pedido**.
 
-1. **Ubicar la carpeta de trabajo.**
-   - Si una carpeta conectada tiene `taller-3d/config.json`, es esa: no preguntar nada.
-   - Si no, ver si el instalador ya la creó: `device_list_dir` sobre la carpeta de documentos (`Documentos` o `Documents`, según `homeDirectories` de `get_device_info`; sin permiso muestra solo los nombres de las carpetas) y buscar `Taller 3D`. Si está, usarla sin preguntar.
-   - Si no existe, **preguntar dónde guardar los archivos** (`AskUserQuestion` si está): `Documentos/Taller 3D` (recomendada), una carpeta que ya use para impresión 3D u otra que diga. Nunca AppData en Windows ni la carpeta de Orca. Si en la carpeta personal están `Documentos` y `Documents`, preguntar cuál usa.
-2. **Si la elegida no existe, crearla** antes de pedir el acceso:
+1. **Ubicar la carpeta de trabajo: es siempre `Taller 3D`, dentro de la carpeta de documentos del usuario** (`Documentos/Taller 3D` en Linux; `Documents\Taller 3D` o `Documentos\Taller 3D` en Windows; `Documents/Taller 3D` en macOS). No se pregunta dónde guardar y no se usa otra carpeta, para que todas las piezas queden en un solo lugar.
+   - Si ya está conectada y tiene `taller-3d/config.json`, seguir: no preguntar nada.
+   - Si no, ver si ya existe: `device_list_dir` sobre la carpeta de documentos (`Documentos` o `Documents`, según `homeDirectories` de `get_device_info`; sin permiso muestra solo los nombres de las carpetas) y buscar `Taller 3D`. Si en la carpeta personal están `Documentos` y `Documents`, usar la que ya tenga `Taller 3D`; si ninguna la tiene, preguntar cuál de las dos usa. En Windows con OneDrive, la carpeta de documentos puede estar dentro de `OneDrive`: usar la que diga el instalador en su cierre.
+   - **Si hay un taller en otra carpeta** (una carpeta conectada con otro nombre que tiene `taller-3d/config.json`; pasa con instalaciones anteriores a la 0.1.34, o si el instalador avisó «Antes usabas …»): decirlo y ofrecer mudarlo con «Mudar un taller de otra carpeta» (abajo). No seguir guardando piezas nuevas en la otra.
+2. **Si `Taller 3D` no existe, crearla** antes de pedir el acceso:
    - **Con terminal en la PC** (`device_bash`): crearla directamente con sus subcarpetas (`mkdir -p "<ruta>/impresiones" "<ruta>/disenos" "<ruta>/respaldos" "<ruta>/calibraciones" "<ruta>/taller-3d/impresoras"`; en PowerShell, `New-Item -ItemType Directory -Force -Path` con cada una).
    - **Sin terminal**, ofrecer las dos formas en una pregunta (`AskUserQuestion` si está; si no, en el texto):
      - **"Que la cree Claude"** (recomendada): pedir acceso a la carpeta de documentos solo para crearla, diciendo en el motivo que el permiso dura esta conversación y que se usa solo para la carpeta nueva. Crearla con sus subcarpetas escribiendo el `LEEME.md` de cada una (paso 4) y, de ahí en adelante, trabajar solo dentro de ella. En las próximas conversaciones se pide solo esa.
@@ -74,6 +74,17 @@ Hacen falta dos: la **carpeta de trabajo** (diseños, impresiones con sus vistas
    - Si `user/<id>` no existe, Orca todavía no guardó ningún perfil propio: pedirle que abra Orca, elija su impresora y guarde una copia (`references/impresoras.md`, sección 1, paso 4), y después conectarla.
    - Si rechaza el permiso, no repetir el pedido: explicarle cómo conectarlas desde el **+** → **Agregar carpeta**.
 4. Crear `impresiones/`, `disenos/`, `respaldos/`, `calibraciones/`, `taller-3d/` y `taller-3d/impresoras/` escribiendo un `LEEME.md` corto en cada una (si no existen).
+
+### Mudar un taller de otra carpeta a `Taller 3D`
+
+Para quien tiene su taller en otra carpeta (instalaciones anteriores a la 0.1.34) o en dos. Nada se borra: lo que no se muda queda en la carpeta vieja y la borra el usuario cuando quiera.
+
+1. Conectar las dos carpetas (la otra y `Documentos/Taller 3D`; crearla si falta, paso 2 de arriba) y traer de cada una `taller-3d/config.json`, `catalogo.json` e `historial.csv` (los que haya), cada taller a una carpeta local distinta.
+2. Unirlos: `python3 -I mudar_taller.py --origen <la otra> --destino <la de Taller 3D> --carpeta "<ruta de Taller 3D en la PC>" --salida <carpeta local>`. De la configuración manda la más completa y la otra completa lo que falte; quedan las impresoras de las dos y todas las piezas. Lee la salida: lista las carpetas de piezas que hay que mover y avisa si alguna está repetida.
+3. **Mover las carpetas** de las piezas, `respaldos/`, `taller-3d/impresoras/` y `taller-3d/blender/` a `Taller 3D`, con el mismo nombre. Con terminal en la PC (`device_bash`), con `mv` y sin pisar nada que ya exista. Sin terminal Claude no puede mover: darle al usuario la lista para que las mueva él con el explorador de archivos (o, si usa Claude Code en esa PC, el pedido escrito para pegarle). Esperar su «listo» y comprobar con `device_list_dir` que cada pieza del catálogo unido tenga su carpeta en `Taller 3D`.
+4. Recién entonces escribir en `Taller 3D/taller-3d/` los tres archivos unidos (procedimiento de escritura, con respaldo de los que hubiera), rehacer `panel.html` (skill `panel`) y republicar el panel al costado. Si cada taller tenía su panel al costado, queda el de la configuración que mandó; el otro lo borra el usuario si quiere.
+5. Si está `taller3d-orca`, hacer la sonda (sección 1): si atiende la carpeta vieja, que corra de nuevo el instalador con la app cerrada del todo.
+6. Decirle que de ahora en más todo se guarda en `Taller 3D` y que la carpeta vieja puede borrarla (o desconectarla de la app) cuando vea que no falta nada.
 
 ## 4. Configuración inicial
 

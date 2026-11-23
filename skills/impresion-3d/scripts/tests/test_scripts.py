@@ -518,6 +518,83 @@ class TestProducto(unittest.TestCase):
         self.assertTrue(any("recargo" in s for s in p["supuestos"]))
 
 
+class TestCarpetaFija(unittest.TestCase):
+    """0.1.34: la carpeta de trabajo es siempre Documentos/Taller 3D."""
+
+    RAIZ = Path(__file__).resolve().parents[4]
+
+    def test_los_instaladores_no_preguntan_donde_guardar(self):
+        sh = (self.RAIZ / "instalador" / "instalar.sh").read_text(encoding="utf-8")
+        ps = (self.RAIZ / "instalador" / "instalar.ps1").read_text(encoding="utf-8-sig")
+        for texto in (sh, ps):
+            self.assertNotIn("Dónde los guardo", texto)
+            self.assertIn("se guardan siempre en", texto)
+            self.assertIn("Antes usabas", texto)
+        self.assertIn('CARPETA_TRABAJO="$DOCS/Taller 3D"', sh)
+        self.assertIn("GetFolderPath('MyDocuments')) 'Taller 3D'", ps)
+        self.assertNotIn("CARPETA_ELEGIDA", sh)
+        self.assertNotIn("CarpetaElegida", ps)
+
+    def test_unir_dos_talleres(self):
+        import mudar_taller
+        viejo = {"carpeta_trabajo": "/home/u/Otra", "aceptacion": {"fecha": "2026-11-22"}, "orca": {"version": "2.5.1"},
+                 "impresora_por_defecto": "ender", "impresoras": [{"id": "ender", "nombre": "Ender", "costo": {"precio": 850000}}],
+                 "costos": {"precio_kwh": 245.36, "filamentos": {"PETG": {"precio_kg": 16191}}},
+                 "tienda": {"margen_precio_pct": 50}, "generadores_ia": {"hunyuan": True, "textos": "gemini"}}
+        nuevo = {"carpeta_trabajo": "/home/u/Documentos/Taller 3D", "orca": {"version": "2.5.1", "ejecutable": "/x/orca"},
+                 "impresora_por_defecto": "hi", "impresoras": [{"id": "hi", "nombre": "Hi"}, {"id": "ender", "cama": "PEI"}],
+                 "costos": {"precio_kwh": None, "filamentos": {"PETG": {"precio_kg": None}}},
+                 "tienda": {"margen_pct": None, "redondeo": 100}, "generadores_ia": {"imagenes": ["gemini", "flow"]}}
+        config, base = mudar_taller.unir_config(viejo, nuevo, "/home/u/Documentos/Taller 3D")
+        self.assertEqual(base, "origen")                            # manda la más completa
+        self.assertEqual(config["carpeta_trabajo"], "/home/u/Documentos/Taller 3D")
+        self.assertEqual([i["id"] for i in config["impresoras"]], ["ender", "hi"])
+        self.assertEqual(config["impresoras"][0]["costo"]["precio"], 850000)
+        self.assertEqual(config["impresoras"][0]["cama"], "PEI")     # lo que faltaba se completa
+        self.assertEqual(config["impresora_por_defecto"], "ender")
+        self.assertEqual(config["costos"]["precio_kwh"], 245.36)
+        self.assertEqual(config["orca"]["ejecutable"], "/x/orca")
+        self.assertEqual(config["tienda"], {"margen_precio_pct": 50, "redondeo": 100})   # sin claves vacías de más
+        self.assertEqual(config["generadores_ia"], {"hunyuan": True, "textos": "gemini", "imagenes": ["gemini", "flow"]})
+        cat, repetidas = mudar_taller.unir_catalogo(
+            {"piezas": [{"carpeta": "impresiones/a", "nombre": "A vieja"}, {"carpeta": "impresiones/b"}]},
+            {"piezas": [{"carpeta": "impresiones/a", "nombre": "A"}, {"carpeta": "impresiones/c"}]})
+        self.assertEqual([p["carpeta"] for p in cat["piezas"]], ["impresiones/a", "impresiones/c", "impresiones/b"])
+        self.assertEqual(cat["piezas"][0]["nombre"], "A")
+        self.assertEqual(repetidas, ["impresiones/a"])
+        historial = mudar_taller.unir_historial(
+            "fecha;accion;pieza;archivo;resultado\n2026-11-22T10:00:00-03:00;laminar;x;a.gcode;ok\n",
+            "fecha;acción;pieza o perfil;archivo;resultado\n2026-11-21 20:02;aceptar;-;config.json;acepto\n2026-11-22 11:00;panel;-;panel.html;ok\n")
+        filas = historial.strip().split("\n")
+        self.assertEqual(filas[0], "fecha;acción;pieza o perfil;archivo;resultado")
+        self.assertEqual([f.split(";")[1] for f in filas[1:]], ["aceptar", "laminar", "panel"])
+
+    def test_mudar_taller_escribe_los_tres_archivos(self):
+        import contextlib
+        import io
+        import mudar_taller
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            (tmp / "o").mkdir()
+            (tmp / "d").mkdir()
+            (tmp / "o" / "config.json").write_text(json.dumps({"impresoras": [{"id": "ender"}], "costos": {"precio_kwh": 1}}), encoding="utf-8")
+            (tmp / "o" / "catalogo.json").write_text(json.dumps({"version": 1, "piezas": [
+                {"carpeta": "impresiones/2026-11-21_soporte", "tipo": "impresion", "fecha": "2026-11-21"},
+                {"carpeta": "ideas/2026-11-20_llavero", "tipo": "idea", "fecha": "2026-11-20"}]}), encoding="utf-8")
+            salida = io.StringIO()
+            with contextlib.redirect_stdout(salida):
+                self.assertEqual(mudar_taller.main(["--origen", str(tmp / "o"), "--destino", str(tmp / "d"),
+                                                    "--carpeta", "C:/Users/u/Documents/Taller 3D", "--salida", str(tmp / "s")]), 0)
+            config = json.loads((tmp / "s" / "config.json").read_text(encoding="utf-8"))
+            cat = json.loads((tmp / "s" / "catalogo.json").read_text(encoding="utf-8"))
+            cabecera = (tmp / "s" / "historial.csv").read_text(encoding="utf-8").split("\n")[0]
+        self.assertEqual(config["carpeta_trabajo"], "C:/Users/u/Documents/Taller 3D")
+        self.assertEqual(len(cat["piezas"]), 2)
+        self.assertEqual(cabecera, "fecha;acción;pieza o perfil;archivo;resultado")
+        self.assertIn("  - impresiones/2026-11-21_soporte", salida.getvalue())
+        self.assertNotIn("  - ideas/", salida.getvalue())            # una idea no tiene carpeta que mover
+
+
 class TestDesgaste(unittest.TestCase):
     """0.1.33: el daño se hace deformando la malla."""
 

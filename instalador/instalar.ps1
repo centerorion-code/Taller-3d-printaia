@@ -30,7 +30,7 @@
   Ruta a un orca-slicer.exe que ya tengas (por ejemplo, uno portable). Saltea la búsqueda.
 
 .PARAMETER CarpetaTrabajo
-  Carpeta del taller. Por defecto: Documentos\Taller 3D.
+  Solo para probar el instalador: el taller guarda siempre en Documentos\Taller 3D.
 
 .PARAMETER SinApp
   No tocar la configuración de la app de Claude.
@@ -49,7 +49,7 @@ param(
 Set-StrictMode -Version 1.0
 $ErrorActionPreference = 'Stop'
 
-$VersionPlugin = '0.1.33'
+$VersionPlugin = '0.1.34'
 $OrcaVersion = '2.5.1'
 $OrcaBase = "https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v$OrcaVersion"
 $OrcaArchivos = @{
@@ -509,16 +509,17 @@ try {
     $uv = BuscarUv
     $webview = TieneWebView2
     $blender = BuscarBlender
-    # Carpeta de trabajo: la de -CarpetaTrabajo, la de una instalación anterior o, si no hay ninguna,
-    # se pregunta en el paso 5 (proponiendo Documentos\Taller 3D).
-    $CarpetaElegida = [bool]$CarpetaTrabajo
-    if (-not $CarpetaElegida -and (Test-Path -LiteralPath $Manifiesto)) {
-        $anterior = UltimaCarpetaAnotada
-        if ($anterior -and (Test-Path -LiteralPath (Join-Path $anterior 'taller-3d\config.json'))) {
-            $CarpetaTrabajo = $anterior; $CarpetaElegida = $true
+    # Carpeta de trabajo: siempre "Taller 3D" dentro de Documentos (desde la 0.1.34 no se pregunta ni se sigue
+    # usando la de una instalación anterior). Si antes se usó otra, se avisa en el paso 5 para mudarla.
+    $CarpetaAnterior = ''
+    if (-not $CarpetaTrabajo) {
+        $CarpetaTrabajo = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Taller 3D'
+        if (Test-Path -LiteralPath $Manifiesto) {
+            $anterior = UltimaCarpetaAnotada
+            if ($anterior -and ($anterior -ne $CarpetaTrabajo) -and
+                (Test-Path -LiteralPath (Join-Path $anterior 'taller-3d\config.json'))) { $CarpetaAnterior = $anterior }
         }
     }
-    if (-not $CarpetaTrabajo) { $CarpetaTrabajo = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Taller 3D' }
     $Config = Join-Path $CarpetaTrabajo 'taller-3d\config.json'
     $datosReales = Join-Path $env:APPDATA 'OrcaSlicer'
     $datosNuevos = Join-Path $env:USERPROFILE 'OrcaSlicer'
@@ -782,33 +783,11 @@ try {
 
     # --- 5. Carpeta de trabajo ---------------------------------------------------------------------------
     Paso 'Carpeta de trabajo'
-    if (-not $CarpetaElegida -and -not (Test-Path -LiteralPath $Config)) {
-        Info 'Acá van a quedar tus diseños, impresiones (con sus vistas y G-code), respaldos y la configuración.'
-        if ($Prueba) {
-            EnPrueba "te preguntaría dónde guardarlos (si apretás Enter: $CarpetaTrabajo)"
-        } else {
-            while ($true) {
-                $r = ([string](Read-Host "   ¿Dónde los guardo? Enter = $CarpetaTrabajo, o escribí otra carpeta")).Trim().Trim('"')
-                if (-not $r) { break }
-                if ($r.StartsWith('~')) { $r = $env:USERPROFILE + $r.Substring(1) }
-                if (-not [System.IO.Path]::IsPathRooted($r) -or $r.StartsWith('\\')) {
-                    Info 'Escribí la ruta completa de una carpeta de esta PC (por ejemplo D:\Impresiones 3D).'; continue
-                }
-                $r = [System.IO.Path]::GetFullPath($r).TrimEnd('\')
-                $bajo = $r.ToLowerInvariant() + '\'
-                if ((Test-Path -LiteralPath $r) -and -not (Test-Path -LiteralPath $r -PathType Container)) {
-                    Info "'$r' es un archivo, no una carpeta."; continue
-                }
-                $prohibidas = @($env:APPDATA, $env:LOCALAPPDATA, $datosNuevos) | Where-Object { $_ } |
-                    ForEach-Object { $_.ToLowerInvariant().TrimEnd('\') + '\' }
-                if ($bajo -eq ($env:USERPROFILE.ToLowerInvariant().TrimEnd('\') + '\') -or
-                    @($prohibidas | Where-Object { $bajo.StartsWith($_) }).Count -gt 0) {
-                    Info 'Elegí una carpeta propia: ni AppData (la app de Claude no la vería), ni la de Orca, ni tu carpeta personal entera.'
-                    continue
-                }
-                $CarpetaTrabajo = $r; $Config = Join-Path $CarpetaTrabajo 'taller-3d\config.json'; break
-            }
-        }
+    Info 'Tus piezas (con sus vistas y G-code), los respaldos y la configuración se guardan siempre en:'
+    Info "  $CarpetaTrabajo"
+    if ($CarpetaAnterior) {
+        Info "Antes usabas $CarpetaAnterior. No la toco:"
+        Info '  pedile a Claude que mude tus piezas a la carpeta nueva (/taller-3d:instalar).'
     }
     foreach ($sub in @('impresiones', 'disenos', 'respaldos', 'calibraciones', 'taller-3d\impresoras')) {
         $p = Join-Path $CarpetaTrabajo $sub
@@ -817,7 +796,7 @@ try {
     }
     if (Test-Path -LiteralPath $Config) {
         Info "Ya existe la configuración: $Config (no la toco)."
-        # Sin esto, una corrida sin -CarpetaTrabajo vuelve a proponer Documentos\Taller 3D aunque uses otra.
+        # Queda anotada para que el desinstalador la conserve.
         if ((UltimaCarpetaAnotada) -ne $CarpetaTrabajo) { Anotar 'carpeta-usada' $CarpetaTrabajo }
     } elseif ($Prueba) {
         EnPrueba "crearía $Config y historial.csv"

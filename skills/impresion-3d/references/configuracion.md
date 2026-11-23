@@ -6,7 +6,7 @@ Vive en la PC del usuario, dentro de la carpeta de trabajo. El plugin no guarda 
 {
   "version": 1,
   "carpeta_trabajo": "/home/usuario/Documentos/Taller 3D",
-  "aceptacion": {"fecha": "2026-11-21T10:00:00-03:00", "version_plugin": "0.1.33", "texto": "ACEPTO", "medio": "instalar.sh"},
+  "aceptacion": {"fecha": "2026-11-21T10:00:00-03:00", "version_plugin": "0.1.34", "texto": "ACEPTO", "medio": "instalar.sh"},
   "orca": {"version": "2.5.1", "ejecutable": "/home/usuario/Aplicaciones/OrcaSlicer_Linux_AppImage_Ubuntu2404_V2.5.1.AppImage",
            "origen": "oficial", "carpeta_usuario": "/home/usuario/.config/OrcaSlicer/user/default"},
   "impresora_por_defecto": "marca-modelo",
